@@ -19,7 +19,7 @@ const kindLabel = computed(() => {
 
 const pointerOrigin = ref<{ x: number; y: number } | null>(null);
 const didDrag = shallowRef(false);
-const badgeSize = shallowRef(96);
+const badgeSize = shallowRef(68);
 let unlistenSize: (() => void) | undefined;
 
 const { placementClass, beginExpandedDrag, moveExpandedDrag, endExpandedDrag } =

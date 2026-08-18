@@ -58,30 +58,44 @@ async function run() {
     <div class="toolbar">
       <label>
         模式
-        <select v-model="mode">
-          <option value="encrypt">加密</option>
-          <option value="decrypt">解密</option>
-        </select>
+        <ElSelect v-model="mode" class="select">
+          <ElOption label="加密" value="encrypt" />
+          <ElOption label="解密" value="decrypt" />
+        </ElSelect>
       </label>
       <label>
         算法
-        <select v-model="algorithm">
-          <option v-for="item in algorithms" :key="item" :value="item">{{ item }}</option>
-          <option v-for="item in cryptoOptions" :key="item.id" :value="item.algorithm">
-            {{ item.label }}
-          </option>
-        </select>
+        <ElSelect v-model="algorithm" class="select">
+          <ElOption v-for="item in algorithms" :key="item" :label="item" :value="item" />
+          <ElOption
+            v-for="item in cryptoOptions"
+            :key="item.id"
+            :label="item.label"
+            :value="item.algorithm"
+          />
+        </ElSelect>
       </label>
-      <button type="button" @click="run">执行</button>
+      <ElButton type="primary" class="run" @click="run">执行</ElButton>
     </div>
     <div class="grid">
       <label>
         输入
-        <textarea v-model="inputText" placeholder="明文或密文" />
+        <ElInput
+          v-model="inputText"
+          type="textarea"
+          :rows="12"
+          placeholder="明文或密文"
+        />
       </label>
       <label>
         输出
-        <textarea v-model="outputText" readonly placeholder="处理结果" />
+        <ElInput
+          v-model="outputText"
+          type="textarea"
+          :rows="12"
+          readonly
+          placeholder="处理结果"
+        />
       </label>
     </div>
     <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
@@ -121,30 +135,16 @@ async function run() {
   font-size: 13px;
 }
 
-select,
-textarea,
-button {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 8px 10px;
-  background: var(--bg-elevated);
-  color: var(--text);
+.select {
+  width: 180px;
 }
 
-button {
+.run {
   align-self: end;
-  background: var(--brand);
-  color: #fff;
-  border: 0;
 }
 
 .grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-}
-
-textarea {
-  min-height: 280px;
-  resize: vertical;
 }
 </style>

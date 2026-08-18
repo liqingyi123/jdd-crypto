@@ -19,6 +19,7 @@
     "notification:default",
     "os:default",
     "process:allow-exit",
-    "opener:default"
+    "opener:default",
+    "global-shortcut:default"
   ]
 }

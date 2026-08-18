@@ -2,6 +2,7 @@ import { createApp } from "vue";
 import { createPinia } from "pinia";
 import App from "./App.vue";
 import { useAppStore } from "./stores/app";
+import "element-plus/theme-chalk/dark/css-vars.css";
 import "./styles/theme.css";
 
 async function resolveWindowLabel(): Promise<string> {

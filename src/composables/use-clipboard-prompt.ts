@@ -5,6 +5,7 @@ import { useClipboardStore, type ClipboardCandidate } from "@/stores/clipboard";
 export function useClipboardPrompt() {
   const clipboardStore = useClipboardStore();
   let unlisten: (() => void) | undefined;
+  let unlistenFollow: (() => void) | undefined;
 
   onMounted(async () => {
     try {
@@ -17,6 +18,11 @@ export function useClipboardPrompt() {
         }
         clipboardStore.setCandidate(event.payload);
       });
+      unlistenFollow = await listen<boolean>("app://mouse-follow", (event) => {
+        if (event.payload) {
+          clipboardStore.clearCandidate();
+        }
+      });
     } catch {
       // not running inside Tauri
     }
@@ -24,6 +30,7 @@ export function useClipboardPrompt() {
 
   onUnmounted(() => {
     unlisten?.();
+    unlistenFollow?.();
   });
 
   async function accept(mode: "encrypt" | "decrypt") {

@@ -46,6 +46,9 @@ pub fn popup_app_menu(window: WebviewWindow) -> Result<(), String> {
 #[tauri::command]
 pub fn set_badge_prompt_mode(app: AppHandle, state: State<AppState>, expanded: bool) {
     state.badge_expanded.store(expanded, Ordering::Relaxed);
+    if state.follow_blocks_resize() {
+        return;
+    }
     windows::set_badge_size(&app, expanded);
 }
 
@@ -59,6 +62,9 @@ pub fn set_badge_size_pref(app: AppHandle, state: State<AppState>, size: u32) {
     let size = crate::state::normalize_badge_size(size);
     state.badge_size.store(size, Ordering::Relaxed);
     windows::save_badge_size(&app, size);
+    if state.follow_blocks_resize() {
+        return;
+    }
     let expanded = state.badge_expanded.load(Ordering::Relaxed);
     windows::set_badge_size(&app, expanded);
 }
@@ -89,4 +95,58 @@ pub fn crypto_transform(request: CryptoRequest) -> Result<CryptoResponse, String
         request.plaintext.as_deref().unwrap_or(""),
         request.ciphertext.as_deref().unwrap_or("")
     ))
+}
+
+#[tauri::command]
+pub fn get_theme_pref(app: AppHandle) -> String {
+    windows::load_theme_pref(&app)
+}
+
+#[tauri::command]
+pub fn set_theme_pref(app: AppHandle, preference: String) -> String {
+    windows::save_theme_pref(&app, &preference)
+}
+
+#[tauri::command]
+pub fn get_mouse_follow_shortcut(state: State<AppState>) -> String {
+    state
+        .mouse_follow_shortcut
+        .lock()
+        .map(|guard| guard.clone())
+        .unwrap_or_else(|_| crate::state::DEFAULT_MOUSE_FOLLOW_SHORTCUT.to_string())
+}
+
+#[tauri::command]
+pub fn set_mouse_follow_shortcut(
+    app: AppHandle,
+    state: State<AppState>,
+    shortcut: String,
+) -> Result<String, String> {
+    let normalized = crate::mouse_follow::validate_shortcut(&shortcut)?;
+    if let Ok(mut current) = state.mouse_follow_shortcut.lock() {
+        *current = normalized.clone();
+    }
+    crate::mouse_follow::save_shortcut(&app, &normalized);
+    crate::mouse_follow::register_current(&app)?;
+    Ok(normalized)
+}
+
+#[tauri::command]
+pub fn get_mouse_follow_pref(state: State<AppState>) -> bool {
+    state.mouse_follow_pref_enabled.load(Ordering::Relaxed)
+}
+
+#[tauri::command]
+pub fn set_mouse_follow_pref(app: AppHandle, enabled: bool) {
+    crate::mouse_follow::apply_pref(&app, enabled);
+}
+
+#[tauri::command]
+pub fn begin_shortcut_capture(app: AppHandle) -> Result<(), String> {
+    crate::mouse_follow::unregister_all(&app)
+}
+
+#[tauri::command]
+pub fn end_shortcut_capture(app: AppHandle) -> Result<(), String> {
+    crate::mouse_follow::register_current(&app)
 }

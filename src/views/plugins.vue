@@ -36,17 +36,17 @@ async function refresh() {
   <div class="page">
     <p>插件以 `plugin.json` 清单加载。当前只扫描并注册贡献点，不执行任意原生库。</p>
     <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
-    <ul v-if="manifests.length">
-      <li v-for="item in manifests" :key="item.id">
-        <div>
+    <div v-if="manifests.length" class="list">
+      <ElCard v-for="item in manifests" :key="item.id" shadow="never">
+        <div class="card-head">
           <strong>{{ item.name }}</strong>
           <span>{{ item.id }} · v{{ item.version }}</span>
         </div>
         <p>权限：{{ item.permissions.join(", ") || "无" }}</p>
         <p>目录：{{ item.dir }}</p>
-      </li>
-    </ul>
-    <p v-else>未发现插件。可把插件放到 `src-tauri/plugins/&lt;id&gt;/`。</p>
+      </ElCard>
+    </div>
+    <ElEmpty v-else description="未发现插件。可把插件放到 src-tauri/plugins/<id>/" />
     <div class="caps">
       <p>已注册编辑器：{{ editors.map((item) => item.label).join(", ") || "无" }}</p>
       <p>已注册特效：{{ overlayEffects.map((item) => item.label).join(", ") || "无" }}</p>
@@ -62,23 +62,13 @@ async function refresh() {
   gap: 12px;
 }
 
-ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+.list {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-li {
-  padding: 14px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--bg-elevated);
-}
-
-li div {
+.card-head {
   display: flex;
   justify-content: space-between;
   gap: 12px;

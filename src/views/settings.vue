@@ -1,14 +1,26 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onMounted, shallowRef } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { storeToRefs } from "pinia";
 import { useThemeStore, type ThemePreference } from "@/stores/theme";
 import { useClipboardStore } from "@/stores/clipboard";
+import { useShortcutRecorder } from "@/composables/use-shortcut-recorder";
 
 const themeStore = useThemeStore();
 const clipboardStore = useClipboardStore();
 const { preference } = storeToRefs(themeStore);
 const { watchEnabled } = storeToRefs(clipboardStore);
+const {
+  recording,
+  errorMessage,
+  display,
+  previewDisplay,
+  buttonRef,
+  startRecording,
+  cancelRecording,
+  onRecordKey,
+  loadShortcut,
+} = useShortcutRecorder();
 
 const themeOptions: Array<{ value: ThemePreference; label: string }> = [
   { value: "system", label: "跟随系统" },
@@ -16,7 +28,8 @@ const themeOptions: Array<{ value: ThemePreference; label: string }> = [
   { value: "dark", label: "深色" },
 ];
 
-const badgeSize = ref(96);
+const badgeSize = shallowRef(68);
+const followPref = shallowRef(true);
 const badgeSizeOptions: Array<{ value: number; label: string }> = [
   { value: 96, label: "大" },
   { value: 68, label: "中" },
@@ -35,17 +48,43 @@ onMounted(async () => {
   } catch {
     // browser preview
   }
+  try {
+    followPref.value = await invoke<boolean>("get_mouse_follow_pref");
+  } catch {
+    // browser preview
+  }
+  await loadShortcut();
 });
 
-async function onWatchChange(event: Event) {
-  const enabled = (event.target as HTMLInputElement).checked;
+async function onWatchChange(value: string | number | boolean) {
+  const enabled = Boolean(value);
   clipboardStore.setWatchEnabled(enabled);
   await invoke("set_clipboard_watch", { enabled }).catch(() => undefined);
 }
 
-async function onBadgeSizeChange(size: number) {
+async function onBadgeSizeChange(value: string | number | boolean | undefined) {
+  const size = Number(value);
+  if (!Number.isFinite(size)) {
+    return;
+  }
   badgeSize.value = size;
   await invoke("set_badge_size_pref", { size }).catch(() => undefined);
+}
+
+async function onFollowPrefChange(value: string | number | boolean) {
+  const enabled = Boolean(value);
+  followPref.value = enabled;
+  if (!enabled && recording.value) {
+    await cancelRecording();
+  }
+  await invoke("set_mouse_follow_pref", { enabled }).catch(() => undefined);
+}
+
+function onThemeChange(value: string | number | boolean | undefined) {
+  if (value === "system" || value === "light" || value === "dark") {
+    themeStore.setPreference(value);
+    void invoke("set_theme_pref", { preference: value }).catch(() => undefined);
+  }
 }
 </script>
 
@@ -53,39 +92,59 @@ async function onBadgeSizeChange(size: number) {
   <div class="page">
     <section>
       <h2>外观</h2>
-      <div class="row">
-        <label v-for="item in themeOptions" :key="item.value">
-          <input
-            type="radio"
-            name="theme"
-            :value="item.value"
-            :checked="preference === item.value"
-            @change="themeStore.setPreference(item.value)"
-          />
+      <ElRadioGroup :model-value="preference" @change="onThemeChange">
+        <ElRadio
+          v-for="item in themeOptions"
+          :key="item.value"
+          :value="item.value"
+        >
           {{ item.label }}
-        </label>
-      </div>
+        </ElRadio>
+      </ElRadioGroup>
       <h3>角标大小</h3>
-      <div class="row">
-        <label v-for="item in badgeSizeOptions" :key="item.value">
-          <input
-            type="radio"
-            name="badge-size"
-            :value="item.value"
-            :checked="badgeSize === item.value"
-            @change="onBadgeSizeChange(item.value)"
-          />
+      <ElRadioGroup :model-value="badgeSize" @change="onBadgeSizeChange">
+        <ElRadio
+          v-for="item in badgeSizeOptions"
+          :key="item.value"
+          :value="item.value"
+        >
           {{ item.label }}
-        </label>
-      </div>
+        </ElRadio>
+      </ElRadioGroup>
     </section>
     <section>
-      <h2>剪贴板</h2>
-      <label class="row">
-        <input type="checkbox" :checked="watchEnabled" @change="onWatchChange" />
-        自动识别剪贴板并提示加解密
-      </label>
-      <p>关闭后不再轮询剪贴板，避免打扰与隐私风险。</p>
+      <div class="section-head">
+        <h2>剪贴板</h2>
+        <label class="row">
+          <ElSwitch :model-value="watchEnabled" @change="onWatchChange" />
+        </label>
+      </div>
+      <p>
+        自动识别剪贴板并提示加解密，关闭后不再轮询剪贴板，避免打扰与隐私风险。</p>
+    </section>
+    <section>
+      <div class="section-head">
+        <h2>鼠标跟随</h2>
+        <label class="row">
+          <ElSwitch :model-value="followPref" @change="onFollowPrefChange" />
+        </label>
+      </div>
+      <p>按下快捷键开启后会跟随鼠标移动并自动等待鼠标下次的文本选中，按下鼠标选中文本后松开会自动打开加解密页面并代入选中的文本。</p>
+      <div class="row">
+        <span>快捷键</span>
+        <div ref="buttonRef">
+          <ElButton
+            :type="recording ? 'primary' : 'default'"
+            :disabled="!followPref"
+            @click="startRecording"
+            @keydown="onRecordKey"
+          >
+            {{ recording ? previewDisplay : display }}
+          </ElButton>
+        </div>
+      </div>
+      <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
+      <p>最多 4 个键，需包含修饰键。点击按钮后按下新组合，Esc 或点击其他区域取消。</p>
     </section>
   </div>
 </template>
@@ -109,6 +168,17 @@ h2 {
   font-size: 16px;
 }
 
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.section-head h2 {
+  margin: 0;
+}
+
 h3 {
   margin: 16px 0 12px;
   font-size: 14px;
@@ -124,5 +194,9 @@ h3 {
 p {
   margin: 8px 0 0;
   color: var(--text-muted);
+}
+
+.error {
+  color: var(--danger, #c0392b);
 }
 </style>

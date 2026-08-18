@@ -103,6 +103,8 @@ pub fn bind_close_to_hide(win: &WebviewWindow) {
 
 const SETTINGS_STORE: &str = "settings.json";
 const BADGE_SIZE_KEY: &str = "badgeSize";
+const THEME_KEY: &str = "themePreference";
+const DEFAULT_THEME_PREF: &str = "system";
 const EXPANDED_EXTRA_WIDTH: f64 = 188.0;
 const EXPANDED_EXTRA_HEIGHT: f64 = 116.0;
 
@@ -130,12 +132,48 @@ pub fn save_badge_size(app: &AppHandle, size: u32) {
     }
 }
 
+pub fn normalize_theme_pref(raw: &str) -> String {
+    match raw {
+        "system" | "light" | "dark" => raw.to_string(),
+        _ => DEFAULT_THEME_PREF.to_string(),
+    }
+}
+
+pub fn load_theme_pref(app: &AppHandle) -> String {
+    use tauri_plugin_store::StoreExt;
+
+    let Ok(store) = app.store(SETTINGS_STORE) else {
+        return DEFAULT_THEME_PREF.to_string();
+    };
+    store
+        .get(THEME_KEY)
+        .and_then(|value| value.as_str().map(str::to_string))
+        .map(|raw| normalize_theme_pref(&raw))
+        .unwrap_or_else(|| DEFAULT_THEME_PREF.to_string())
+}
+
+pub fn save_theme_pref(app: &AppHandle, preference: &str) -> String {
+    use tauri_plugin_store::StoreExt;
+
+    let normalized = normalize_theme_pref(preference);
+    if let Ok(store) = app.store(SETTINGS_STORE) {
+        store.set(THEME_KEY, serde_json::json!(normalized));
+        let _ = store.save();
+    }
+    let _ = app.emit("app://theme-preference", &normalized);
+    normalized
+}
+
 pub fn set_badge_size(app: &AppHandle, expanded: bool) {
     use std::sync::atomic::Ordering;
 
     use crate::state::AppState;
 
     let size = app.state::<AppState>().badge_size.load(Ordering::Relaxed);
+    apply_badge_window_size(app, size, expanded);
+}
+
+pub fn apply_badge_window_size(app: &AppHandle, size: u32, expanded: bool) {
     if let Some(win) = app.get_webview_window("badge") {
         let (width, height) = if expanded {
             (
