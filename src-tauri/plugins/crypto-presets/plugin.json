@@ -1,0 +1,13 @@
+{
+  "id": "crypto-presets",
+  "name": "加解密预设",
+  "version": "0.1.0",
+  "entry": "index.js",
+  "permissions": ["crypto.options"],
+  "contributes": {
+    "cryptoOptions": [
+      { "id": "aes-256-gcm-demo", "label": "AES-256-GCM Demo", "algorithm": "AES-256-GCM" }
+    ]
+  },
+  "enabled": true
+}

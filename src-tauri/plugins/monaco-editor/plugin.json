@@ -1,0 +1,11 @@
+{
+  "id": "monaco-editor",
+  "name": "Monaco 编辑器",
+  "version": "0.1.0",
+  "entry": "index.js",
+  "permissions": ["ui.editor"],
+  "contributes": {
+    "editor": "monaco"
+  },
+  "enabled": true
+}

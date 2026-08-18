@@ -1,0 +1,62 @@
+:root,
+[data-theme="light"] {
+  --bg: #f4f6fb;
+  --bg-elevated: #ffffff;
+  --bg-muted: #eef1f7;
+  --text: #1c2430;
+  --text-muted: #5c6b7a;
+  --border: #d8e0ea;
+  --brand: #2563eb;
+  --brand-soft: #dbeafe;
+  --danger: #dc2626;
+  --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+[data-theme="dark"] {
+  --bg: #10141c;
+  --bg-elevated: #171d28;
+  --bg-muted: #1f2734;
+  --text: #e8eef7;
+  --text-muted: #9aa8b8;
+  --border: #2b3647;
+  --brand: #60a5fa;
+  --brand-soft: #1e3a5f;
+  --danger: #f87171;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  font-family: Inter, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+html.badge-window,
+html.badge-window body,
+html.badge-window #app {
+  background: transparent !important;
+  overflow: hidden;
+}
