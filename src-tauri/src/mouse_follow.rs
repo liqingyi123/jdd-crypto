@@ -356,6 +356,7 @@ fn cursor_pos() -> Option<(i32, i32)> {
     use windows_sys::Win32::UI::WindowsAndMessaging::GetCursorPos;
 
     let mut point = POINT { x: 0, y: 0 };
+    // SAFETY: `point` is a valid stack POINT; GetCursorPos only writes into it.
     let ok = unsafe { GetCursorPos(&mut point) };
     if ok == 0 {
         return None;
@@ -367,6 +368,7 @@ fn cursor_pos() -> Option<(i32, i32)> {
 fn left_button_down() -> bool {
     use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
 
+    // SAFETY: GetAsyncKeyState is a read-only input query with a well-known VK code.
     unsafe { GetAsyncKeyState(i32::from(VK_LBUTTON)) as u16 & 0x8000 != 0 }
 }
 
@@ -378,6 +380,7 @@ fn send_ctrl_c() {
     };
 
     fn key_event(vk: u16, flags: u32) -> INPUT {
+        // SAFETY: INPUT is a C union; zeroed then filled for INPUT_KEYBOARD is the Win32 pattern.
         let mut input: INPUT = unsafe { zeroed() };
         input.r#type = INPUT_KEYBOARD;
         input.Anonymous.ki = KEYBDINPUT {
@@ -397,6 +400,7 @@ fn send_ctrl_c() {
         key_event(VK_CONTROL as u16, KEYEVENTF_KEYUP),
     ];
     unsafe {
+        // SAFETY: `inputs` is a contiguous array of fully initialized INPUT_KEYBOARD structs.
         SendInput(inputs.len() as u32, inputs.as_ptr(), size_of::<INPUT>() as i32);
     }
 }

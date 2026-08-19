@@ -2,6 +2,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Mutex;
 
 pub const MIN_BADGE_SIZE: u32 = 38;
+/// Default badge diameter in CSS/logical pixels. Keep in sync with `src/constants/badge.ts`.
 pub const DEFAULT_BADGE_SIZE: u32 = 68;
 pub const DEFAULT_MOUSE_FOLLOW_SHORTCUT: &str = "Ctrl+Shift+G";
 

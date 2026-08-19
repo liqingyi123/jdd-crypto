@@ -70,6 +70,8 @@ pub fn show_main(app: &AppHandle, hint: Option<CryptoHint>) {
 }
 
 pub fn show_feature(app: &AppHandle, label: &str) {
+    // Feature windows are created lazily (not declared in tauri.conf.json) so
+    // cold start only pays for badge + main. Re-open reuses the existing webview.
     if let Some(win) = app.get_webview_window(label) {
         focus_window(&win);
         return;
@@ -91,6 +93,8 @@ pub fn show_feature(app: &AppHandle, label: &str) {
     }
 }
 
+/// Map the window close button to hide instead of destroy.
+/// Keeps tray/badge workflows snappy and avoids recreating webviews on every open.
 pub fn bind_close_to_hide(win: &WebviewWindow) {
     let hidden = win.clone();
     win.on_window_event(move |event| {
@@ -105,6 +109,7 @@ const SETTINGS_STORE: &str = "settings.json";
 const BADGE_SIZE_KEY: &str = "badgeSize";
 const THEME_KEY: &str = "themePreference";
 const DEFAULT_THEME_PREF: &str = "system";
+// Keep in sync with `src/constants/badge.ts` (`EXPANDED_EXTRA_*`).
 const EXPANDED_EXTRA_WIDTH: f64 = 188.0;
 const EXPANDED_EXTRA_HEIGHT: f64 = 116.0;
 

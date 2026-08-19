@@ -1,18 +1,17 @@
 <script setup lang="ts">
-import zhCn from "element-plus/es/locale/lang/zh-cn";
-import BadgeApp from "@/windows/badge-app.vue";
-import MainApp from "@/windows/main-app.vue";
-import FeatureApp from "@/windows/feature-app.vue";
+import { defineAsyncComponent } from "vue";
 
 defineProps<{
   windowLabel: string;
 }>();
+
+const BadgeApp = defineAsyncComponent(() => import("@/windows/badge-app.vue"));
+const MainApp = defineAsyncComponent(() => import("@/windows/main-app.vue"));
+const FeatureApp = defineAsyncComponent(() => import("@/windows/feature-app.vue"));
 </script>
 
 <template>
-  <ElConfigProvider :locale="zhCn">
-    <BadgeApp v-if="windowLabel === 'badge'" />
-    <MainApp v-else-if="windowLabel === 'main'" />
-    <FeatureApp v-else :window-label="windowLabel" />
-  </ElConfigProvider>
+  <BadgeApp v-if="windowLabel === 'badge'" />
+  <MainApp v-else-if="windowLabel === 'main'" />
+  <FeatureApp v-else :window-label="windowLabel" />
 </template>

@@ -30,3 +30,10 @@ windows-sys = { version = "0.59", features = [
   "Win32_UI_Input_KeyboardAndMouse",
   "Win32_UI_WindowsAndMessaging",
 ] }
+
+# Release-only: keeps `cargo run` / `tauri dev` debug builds unaffected.
+[profile.release]
+codegen-units = 16
+lto = "thin"
+strip = true
+panic = "abort"

@@ -5,6 +5,7 @@ import Settings from "@/views/settings.vue";
 import Feedback from "@/views/feedback.vue";
 import Plugins from "@/views/plugins.vue";
 import About from "@/views/about.vue";
+import zhCn from "element-plus/es/locale/lang/zh-cn";
 
 useSystemTheme();
 
@@ -23,14 +24,16 @@ const page = computed(() => pages[props.windowLabel]);
 </script>
 
 <template>
-  <div v-if="page" class="shell">
-    <header class="header">
-      <h1 class="title">{{ page.title }}</h1>
-    </header>
-    <section class="content">
-      <component :is="page.component" />
-    </section>
-  </div>
+  <ElConfigProvider :locale="zhCn">
+    <div v-if="page" class="shell">
+      <header class="header">
+        <h1 class="title">{{ page.title }}</h1>
+      </header>
+      <section class="content">
+        <component :is="page.component" />
+      </section>
+    </div>
+  </ElConfigProvider>
 </template>
 
 <style scoped>

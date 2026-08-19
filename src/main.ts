@@ -1,8 +1,6 @@
 import { createApp } from "vue";
 import { createPinia } from "pinia";
 import App from "./App.vue";
-import { useAppStore } from "./stores/app";
-import "element-plus/theme-chalk/dark/css-vars.css";
 import "./styles/theme.css";
 
 async function resolveWindowLabel(): Promise<string> {
@@ -17,18 +15,18 @@ async function resolveWindowLabel(): Promise<string> {
 
 async function bootstrap() {
   const windowLabel = await resolveWindowLabel();
-  const app = createApp(App, { windowLabel });
-  const pinia = createPinia();
-  app.use(pinia);
-  useAppStore(pinia).setWindowLabel(windowLabel);
 
   if (windowLabel === "badge") {
     document.documentElement.classList.add("badge-window");
     document.body.style.background = "transparent";
   } else {
     document.documentElement.classList.remove("badge-window");
+    // Element Plus dark CSS vars only needed for main/feature windows.
+    await import("element-plus/theme-chalk/dark/css-vars.css");
   }
 
+  const app = createApp(App, { windowLabel });
+  app.use(createPinia());
   app.mount("#app");
 }
 

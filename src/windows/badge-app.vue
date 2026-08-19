@@ -4,9 +4,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { useClipboardPrompt } from "@/composables/use-clipboard-prompt";
 import { useBadgePromptPlacement } from "@/composables/use-badge-prompt-placement";
 import { useSystemTheme } from "@/composables/use-system-theme";
-import appIcon from "@/assets/app-icon.png";
+import { DEFAULT_BADGE_SIZE } from "@/constants/badge";
+
+const appIcon = "/app-icon.png";
 
 useSystemTheme();
+
 const { clipboardStore, accept, dismiss } = useClipboardPrompt();
 
 const promptOpen = computed(() => clipboardStore.candidate !== null);
@@ -19,7 +22,7 @@ const kindLabel = computed(() => {
 
 const pointerOrigin = ref<{ x: number; y: number } | null>(null);
 const didDrag = shallowRef(false);
-const badgeSize = shallowRef(68);
+const badgeSize = shallowRef(DEFAULT_BADGE_SIZE);
 let unlistenSize: (() => void) | undefined;
 
 const { placementClass, beginExpandedDrag, moveExpandedDrag, endExpandedDrag } =

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import appIcon from "@/assets/app-icon.png";
 
+const appIcon = "/app-icon.png";
 const version = ref("0.1.0");
 const platform = ref("desktop");
 

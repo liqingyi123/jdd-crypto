@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { computed, ref } from "vue";
+import { ref } from "vue";
 import type { CryptoOptionContribution, PluginManifest } from "@/plugins-runtime/types";
 
 export const usePluginsStore = defineStore("plugins", () => {
@@ -7,10 +7,6 @@ export const usePluginsStore = defineStore("plugins", () => {
   const cryptoOptions = ref<CryptoOptionContribution[]>([]);
   const editors = ref<Array<{ id: string; label: string }>>([]);
   const overlayEffects = ref<Array<{ id: string; label: string }>>([]);
-
-  const enabledCount = computed(
-    () => manifests.value.filter((item) => item.enabled).length,
-  );
 
   function setManifests(next: PluginManifest[]) {
     manifests.value = next;
@@ -42,7 +38,6 @@ export const usePluginsStore = defineStore("plugins", () => {
     cryptoOptions,
     editors,
     overlayEffects,
-    enabledCount,
     setManifests,
     registerCryptoOption,
     registerEditor,

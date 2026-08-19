@@ -8,6 +8,7 @@ import { usePluginsStore } from "@/stores/plugins";
 import { loadPlugin } from "@/plugins-runtime/loader";
 import type { PluginManifest } from "@/plugins-runtime/types";
 import CryptoHome from "@/views/crypto-home.vue";
+import zhCn from "element-plus/es/locale/lang/zh-cn";
 
 useSystemTheme();
 useClipboardPrompt();
@@ -51,14 +52,16 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="shell">
-    <header class="header">
-      <h1 class="title">加解密</h1>
-    </header>
-    <section class="content">
-      <CryptoHome />
-    </section>
-  </div>
+  <ElConfigProvider :locale="zhCn">
+    <div class="shell">
+      <header class="header">
+        <h1 class="title">加解密</h1>
+      </header>
+      <section class="content">
+        <CryptoHome />
+      </section>
+    </div>
+  </ElConfigProvider>
 </template>
 
 <style scoped>

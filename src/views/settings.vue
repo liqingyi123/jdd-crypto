@@ -5,6 +5,7 @@ import { storeToRefs } from "pinia";
 import { useThemeStore, type ThemePreference } from "@/stores/theme";
 import { useClipboardStore } from "@/stores/clipboard";
 import { useShortcutRecorder } from "@/composables/use-shortcut-recorder";
+import { DEFAULT_BADGE_SIZE } from "@/constants/badge";
 
 const themeStore = useThemeStore();
 const clipboardStore = useClipboardStore();
@@ -28,11 +29,11 @@ const themeOptions: Array<{ value: ThemePreference; label: string }> = [
   { value: "dark", label: "深色" },
 ];
 
-const badgeSize = shallowRef(68);
+const badgeSize = shallowRef(DEFAULT_BADGE_SIZE);
 const followPref = shallowRef(true);
 const badgeSizeOptions: Array<{ value: number; label: string }> = [
   { value: 96, label: "大" },
-  { value: 68, label: "中" },
+  { value: DEFAULT_BADGE_SIZE, label: "中" },
   { value: 38, label: "小" },
 ];
 

@@ -10,11 +10,15 @@ import {
   type MaybeRefOrGetter,
 } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import {
+  EXPANDED_EXTRA_HEIGHT,
+  EXPANDED_EXTRA_WIDTH,
+} from "@/constants/badge";
 
 /** Must match `EXPANDED_EXTRA_WIDTH` in src-tauri/src/windows.rs */
-const EXTRA_W = 188;
+const EXTRA_W = EXPANDED_EXTRA_WIDTH;
 /** Must match `EXPANDED_EXTRA_HEIGHT` in src-tauri/src/windows.rs */
-const EXTRA_H = 116;
+const EXTRA_H = EXPANDED_EXTRA_HEIGHT;
 
 const PLACEMENT_ORDER = ["right", "left"] as const;
 

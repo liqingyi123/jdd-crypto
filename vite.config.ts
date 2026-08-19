@@ -1,20 +1,14 @@
 import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
-import AutoImport from "unplugin-auto-import/vite";
 import Components from "unplugin-vue-components/vite";
 import { ElementPlusResolver } from "unplugin-vue-components/resolvers";
 
-// @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
-export default defineConfig(async () => ({
+export default defineConfig({
   plugins: [
     vue(),
-    AutoImport({
-      resolvers: [ElementPlusResolver()],
-      dts: "src/auto-imports.d.ts",
-    }),
     Components({
       resolvers: [ElementPlusResolver()],
       dts: "src/components.d.ts",
@@ -26,6 +20,10 @@ export default defineConfig(async () => ({
     },
   },
   clearScreen: false,
+  build: {
+    // WebView2 tracks Chromium; avoid legacy downlevel transforms.
+    target: "chrome105",
+  },
   server: {
     port: 1420,
     strictPort: true,
@@ -41,4 +39,4 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
-}));
+});
