@@ -3,8 +3,15 @@ import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import Components from "unplugin-vue-components/vite";
 import { ElementPlusResolver } from "unplugin-vue-components/resolvers";
+import monacoEditorPlugin from "vite-plugin-monaco-editor";
 
 const host = process.env.TAURI_DEV_HOST;
+
+// CJS default export interop for vite-plugin-monaco-editor
+const monacoPlugin =
+  typeof monacoEditorPlugin === "function"
+    ? monacoEditorPlugin
+    : (monacoEditorPlugin as { default: typeof monacoEditorPlugin }).default;
 
 export default defineConfig({
   plugins: [
@@ -12,6 +19,9 @@ export default defineConfig({
     Components({
       resolvers: [ElementPlusResolver()],
       dts: "src/components.d.ts",
+    }),
+    monacoPlugin({
+      languageWorkers: ["editorWorkerService"],
     }),
   ],
   resolve: {

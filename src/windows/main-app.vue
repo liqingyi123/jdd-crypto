@@ -82,7 +82,15 @@ onUnmounted(() => {
 
 .content {
   flex: 1;
+  min-height: 0;
   padding: 8px 24px 24px;
-  overflow: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.content :deep(.page) {
+  flex: 1;
+  min-height: 0;
 }
 </style>

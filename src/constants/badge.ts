@@ -11,3 +11,5 @@
 export const DEFAULT_BADGE_SIZE = 68;
 export const EXPANDED_EXTRA_WIDTH = 188;
 export const EXPANDED_EXTRA_HEIGHT = 116;
+/** Default distance from screen work-area edges (logical px). Keep in sync with `windows.rs`. */
+export const BADGE_EDGE_MARGIN = 50;

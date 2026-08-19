@@ -5,6 +5,14 @@ const appIcon = "/app-icon.png";
 const version = ref("0.1.0");
 const platform = ref("desktop");
 
+const roadmap = [
+  "转 KV 功能支持密文、明文两种文本格式",
+  "网络代理功能，实时捕获任意应用的网络请求",
+  "插件管理功能，支持鼠标轨迹特效、编辑器主题、加解密预设等插件",
+  "彩虹屁 + 节日祝福语功能",
+  "将结果自动复制到剪贴板"
+];
+
 onMounted(async () => {
   try {
     const { getVersion } = await import("@tauri-apps/api/app");
@@ -25,8 +33,9 @@ onMounted(async () => {
   <div class="page">
     <img class="logo" :src="appIcon" alt="多多解密" />
     <h2>多多解密</h2>
-    <p>奖多多内部专用跨平台加解密工具</p>
-    <dl>
+    <p class="lead">奖多多内部专用跨平台桌面端加解密工具</p>
+
+    <dl class="meta">
       <div>
         <dt>版本</dt>
         <dd>{{ version }}</dd>
@@ -44,6 +53,16 @@ onMounted(async () => {
         <dd>QQ：1787750205 | wx：qinghe6971</dd>
       </div>
     </dl>
+
+    <section class="roadmap">
+      <h3>规划中</h3>
+      <ol>
+        <li v-for="(item, index) in roadmap" :key="item">
+          <span class="index">{{ index + 1 }}</span>
+          <span class="text">{{ item }}</span>
+        </li>
+      </ol>
+    </section>
   </div>
 </template>
 
@@ -69,19 +88,21 @@ h2 {
   margin: 0 0 8px;
 }
 
-p,
-dd {
+.lead {
+  margin: 0 0 16px;
   color: var(--text-muted);
 }
 
-dl {
+.meta {
   display: grid;
   gap: 8px;
+  margin: 0 0 18px;
 }
 
-dl > div {
+.meta > div {
   display: grid;
   grid-template-columns: 80px 1fr;
+  gap: 8px;
 }
 
 dt {
@@ -90,5 +111,51 @@ dt {
 
 dd {
   margin: 0;
+  color: var(--text-muted);
+}
+
+.roadmap h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.roadmap ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.roadmap li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-muted);
+}
+
+.index {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.text {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
 }
 </style>

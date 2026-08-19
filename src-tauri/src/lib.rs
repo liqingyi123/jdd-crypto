@@ -60,6 +60,8 @@ pub fn run() {
                 .badge_size
                 .store(badge_size, Ordering::Relaxed);
             windows::set_badge_size(app.handle(), false);
+            windows::position_badge_on_startup(app.handle());
+            windows::watch_badge_position(app.handle());
             if let Some(main) = app.get_webview_window("main") {
                 windows::bind_close_to_hide(&main);
             }

@@ -1,5 +1,8 @@
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::thread;
+use std::time::Duration;
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 #[derive(Clone, Serialize)]
 pub struct CryptoHint {
@@ -85,6 +88,9 @@ pub fn show_feature(app: &AppHandle, label: &str) {
         .title(spec.title)
         .inner_size(spec.width, spec.height)
         .min_inner_size(spec.min_width, spec.min_height)
+        .resizable(false)
+        .minimizable(false)
+        .maximizable(false)
         .visible(true)
         .build();
 
@@ -107,11 +113,18 @@ pub fn bind_close_to_hide(win: &WebviewWindow) {
 
 const SETTINGS_STORE: &str = "settings.json";
 const BADGE_SIZE_KEY: &str = "badgeSize";
+const BADGE_POS_X_KEY: &str = "badgePosX";
+const BADGE_POS_Y_KEY: &str = "badgePosY";
 const THEME_KEY: &str = "themePreference";
 const DEFAULT_THEME_PREF: &str = "system";
 // Keep in sync with `src/constants/badge.ts` (`EXPANDED_EXTRA_*`).
 const EXPANDED_EXTRA_WIDTH: f64 = 188.0;
 const EXPANDED_EXTRA_HEIGHT: f64 = 116.0;
+// Keep in sync with `src/constants/badge.ts` (`BADGE_EDGE_MARGIN`).
+const BADGE_EDGE_MARGIN: f64 = 50.0;
+
+static SUPPRESS_BADGE_POS_SAVE: AtomicBool = AtomicBool::new(false);
+static BADGE_MOVE_SEQ: AtomicU64 = AtomicU64::new(0);
 
 pub fn load_badge_size(app: &AppHandle) -> u32 {
     use crate::state::normalize_badge_size;
@@ -135,6 +148,96 @@ pub fn save_badge_size(app: &AppHandle, size: u32) {
         store.set(BADGE_SIZE_KEY, serde_json::json!(size));
         let _ = store.save();
     }
+}
+
+pub fn load_badge_position(app: &AppHandle) -> Option<(i32, i32)> {
+    use tauri_plugin_store::StoreExt;
+
+    let store = app.store(SETTINGS_STORE).ok()?;
+    let x = store.get(BADGE_POS_X_KEY)?.as_i64()? as i32;
+    let y = store.get(BADGE_POS_Y_KEY)?.as_i64()? as i32;
+    Some((x, y))
+}
+
+pub fn save_badge_position(app: &AppHandle, x: i32, y: i32) {
+    use tauri_plugin_store::StoreExt;
+
+    if let Ok(store) = app.store(SETTINGS_STORE) {
+        store.set(BADGE_POS_X_KEY, serde_json::json!(x));
+        store.set(BADGE_POS_Y_KEY, serde_json::json!(y));
+        let _ = store.save();
+    }
+}
+
+fn set_badge_position(win: &WebviewWindow, x: i32, y: i32) {
+    SUPPRESS_BADGE_POS_SAVE.store(true, Ordering::Relaxed);
+    let _ = win.set_position(PhysicalPosition::new(x, y));
+    thread::spawn(|| {
+        thread::sleep(Duration::from_millis(100));
+        SUPPRESS_BADGE_POS_SAVE.store(false, Ordering::Relaxed);
+    });
+}
+
+pub fn position_badge_on_startup(app: &AppHandle) {
+    let Some(win) = app.get_webview_window("badge") else {
+        return;
+    };
+
+    if let Some((x, y)) = load_badge_position(app) {
+        set_badge_position(&win, x, y);
+        return;
+    }
+
+    let monitor = win
+        .current_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| app.primary_monitor().ok().flatten());
+    let Some(monitor) = monitor else {
+        return;
+    };
+
+    let work = monitor.work_area();
+    let scale = monitor.scale_factor();
+    let Ok(outer_size) = win.outer_size() else {
+        return;
+    };
+
+    let margin = (BADGE_EDGE_MARGIN * scale).round() as i32;
+    let x = work.position.x + work.size.width as i32 - outer_size.width as i32 - margin;
+    let y = work.position.y + work.size.height as i32 - outer_size.height as i32 - margin;
+    set_badge_position(&win, x, y);
+}
+
+pub fn watch_badge_position(app: &AppHandle) {
+    let Some(win) = app.get_webview_window("badge") else {
+        return;
+    };
+
+    let app_handle = app.clone();
+    win.on_window_event(move |event| {
+        if !matches!(event, tauri::WindowEvent::Moved(_)) {
+            return;
+        }
+        if SUPPRESS_BADGE_POS_SAVE.swap(false, Ordering::Relaxed) {
+            return;
+        }
+
+        let seq = BADGE_MOVE_SEQ.fetch_add(1, Ordering::Relaxed) + 1;
+        let app = app_handle.clone();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(200));
+            if BADGE_MOVE_SEQ.load(Ordering::Relaxed) != seq {
+                return;
+            }
+            let Some(win) = app.get_webview_window("badge") else {
+                return;
+            };
+            if let Ok(pos) = win.outer_position() {
+                save_badge_position(&app, pos.x, pos.y);
+            }
+        });
+    });
 }
 
 pub fn normalize_theme_pref(raw: &str) -> String {
