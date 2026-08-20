@@ -95,6 +95,8 @@ fn is_overlay_target(target: &EventTarget) -> bool {
 fn normalize_effect(raw: &str) -> String {
     match raw {
         "meteor" => "meteor".to_string(),
+        "graffiti" => "graffiti".to_string(),
+        "dots" => "dots".to_string(),
         _ => DEFAULT_EFFECT.to_string(),
     }
 }

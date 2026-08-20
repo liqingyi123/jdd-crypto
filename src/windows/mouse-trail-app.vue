@@ -3,6 +3,8 @@ import { nextTick, onMounted, onUnmounted, ref, shallowRef } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { MeteorTrail } from "@/effects/meteor-trail";
 import { RibbonTrail } from "@/effects/ribbon-trail";
+import { GraffitiTrail } from "@/effects/graffiti-trail";
+import { DotsTrail } from "@/effects/dots-trail";
 import {
   DEFAULT_MOUSE_TRAIL_PREF,
   normalizeMouseTrailEffect,
@@ -47,6 +49,12 @@ function createEngine(next: MouseTrailEffect): MouseTrailEngine | null {
   }
   if (next === "meteor") {
     return new MeteorTrail(hostRef.value, { color: "#F8EC85" });
+  }
+  if (next === "graffiti") {
+    return new GraffitiTrail(hostRef.value);
+  }
+  if (next === "dots") {
+    return new DotsTrail(hostRef.value);
   }
   return new RibbonTrail(hostRef.value);
 }

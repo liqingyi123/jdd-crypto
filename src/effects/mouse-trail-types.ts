@@ -7,7 +7,7 @@ export interface MouseTrailEngine {
   resize(): void;
 }
 
-export type MouseTrailEffect = "ribbon" | "meteor";
+export type MouseTrailEffect = "ribbon" | "meteor" | "graffiti" | "dots";
 
 export interface MouseTrailPref {
   enabled: boolean;
@@ -20,5 +20,14 @@ export const DEFAULT_MOUSE_TRAIL_PREF: MouseTrailPref = {
 };
 
 export function normalizeMouseTrailEffect(raw: string): MouseTrailEffect {
-  return raw === "meteor" ? "meteor" : "ribbon";
+  if (raw === "meteor") {
+    return "meteor";
+  }
+  if (raw === "graffiti") {
+    return "graffiti";
+  }
+  if (raw === "dots") {
+    return "dots";
+  }
+  return "ribbon";
 }

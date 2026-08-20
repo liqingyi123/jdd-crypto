@@ -51,6 +51,8 @@ const badgeSizeOptions: Array<{ value: number; label: string }> = [
 const trailEffectOptions: Array<{ value: MouseTrailEffect; label: string }> = [
   { value: "ribbon", label: "躁动线条" },
   { value: "meteor", label: "绚丽流星" },
+  { value: "graffiti", label: "街头涂鸦" },
+  { value: "dots", label: "连线点阵" },
 ];
 
 function applyTrailPref(pref: MouseTrailPref) {
@@ -121,7 +123,12 @@ async function onTrailEnabledChange(value: string | number | boolean) {
 }
 
 async function onTrailEffectChange(value: string | number | boolean | undefined) {
-  if (value !== "ribbon" && value !== "meteor") {
+  if (
+    value !== "ribbon" &&
+    value !== "meteor" &&
+    value !== "graffiti" &&
+    value !== "dots"
+  ) {
     return;
   }
   trailEffect.value = value;
@@ -195,8 +202,7 @@ function onThemeChange(value: string | number | boolean | undefined) {
           <ElSwitch :model-value="trailEnabled" @change="onTrailEnabledChange" />
         </label>
       </div>
-      <p>在所有显示器工作区跟随鼠标绘制拖尾。默认使用「躁动线条」。</p>
-      <h3>特效预设</h3>
+      <p>我的鼠标指针哪去啦？？！！<br />在所有显示器工作区跟随鼠标绘制炫酷好玩的拖尾特效以帮助更好的寻找鼠标位置。</p>
       <ElRadioGroup
         :model-value="trailEffect"
         :disabled="!trailEnabled"
