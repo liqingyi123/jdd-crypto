@@ -1,6 +1,6 @@
 [package]
 name = "jdd-crypto"
-version = "0.1.0"
+version = "0.2.1"
 description = "Desktop encrypt/decrypt utility with badge, tray, and plugins"
 authors = ["you"]
 edition = "2021"
@@ -14,6 +14,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api"] }
+tauri-plugin-single-instance = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-store = "2"
