@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use std::sync::atomic::Ordering;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_clipboard_manager::ClipboardExt;
@@ -213,6 +213,8 @@ pub fn start_follow_loop(app: AppHandle) {
         let mut anim: Option<(f64, f64)> = None;
         let mut was_down = false;
         let mut press = (0, 0);
+        #[cfg(windows)]
+        let mut last_short_up: Option<(Instant, i32, i32)> = None;
 
         loop {
             let Some(state) = app.try_state::<AppState>() else {
@@ -224,6 +226,10 @@ pub fn start_follow_loop(app: AppHandle) {
             if !enabled && !returning {
                 anim = None;
                 was_down = false;
+                #[cfg(windows)]
+                {
+                    last_short_up = None;
+                }
                 thread::sleep(Duration::from_millis(50));
                 continue;
             }
@@ -272,8 +278,15 @@ pub fn start_follow_loop(app: AppHandle) {
                 if !down && was_down {
                     let dx = cursor.0 - press.0;
                     let dy = cursor.1 - press.1;
-                    if dx * dx + dy * dy >= DRAG_THRESHOLD * DRAG_THRESHOLD {
+                    let dragged = dx * dx + dy * dy >= DRAG_THRESHOLD * DRAG_THRESHOLD;
+                    if dragged {
+                        last_short_up = None;
                         capture_selection(&app);
+                    } else if is_double_click(&last_short_up, press) {
+                        last_short_up = None;
+                        capture_selection(&app);
+                    } else {
+                        last_short_up = Some((Instant::now(), press.0, press.1));
                     }
                 }
                 was_down = down;
@@ -323,7 +336,8 @@ fn lerp_badge(app: &AppHandle, anim: &mut Option<(f64, f64)>, target: (f64, f64)
 
 #[cfg(windows)]
 fn capture_selection(app: &AppHandle) {
-    thread::sleep(Duration::from_millis(40));
+    // Slightly longer wait so double-click word selection can settle.
+    thread::sleep(Duration::from_millis(70));
     send_ctrl_c();
     thread::sleep(Duration::from_millis(80));
 
@@ -352,6 +366,41 @@ fn capture_selection(app: &AppHandle) {
         }),
     );
     stop(app);
+}
+
+#[cfg(windows)]
+fn is_double_click(last_short_up: &Option<(Instant, i32, i32)>, press: (i32, i32)) -> bool {
+    let Some((prev_at, prev_x, prev_y)) = *last_short_up else {
+        return false;
+    };
+    if prev_at.elapsed() > double_click_interval() {
+        return false;
+    }
+    let (tol_x, tol_y) = double_click_tolerance();
+    let dx = (press.0 - prev_x).abs();
+    let dy = (press.1 - prev_y).abs();
+    dx <= tol_x && dy <= tol_y
+}
+
+#[cfg(windows)]
+fn double_click_interval() -> Duration {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::GetDoubleClickTime;
+
+    // SAFETY: GetDoubleClickTime is a parameterless system query.
+    let ms = unsafe { GetDoubleClickTime() };
+    Duration::from_millis(u64::from(ms.max(1)))
+}
+
+#[cfg(windows)]
+fn double_click_tolerance() -> (i32, i32) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        GetSystemMetrics, SM_CXDOUBLECLK, SM_CYDOUBLECLK,
+    };
+
+    // SAFETY: GetSystemMetrics with documented SM_* constants is read-only.
+    let cx = unsafe { GetSystemMetrics(SM_CXDOUBLECLK) };
+    let cy = unsafe { GetSystemMetrics(SM_CYDOUBLECLK) };
+    (cx.max(4), cy.max(4))
 }
 
 #[cfg(windows)]

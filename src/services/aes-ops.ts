@@ -39,6 +39,11 @@ export function formatEncodeStr(str: string): string {
   );
 }
 
+/** Remove http(s) URLs so pasted links do not pollute ciphertext before decrypt. */
+function stripUrls(text: string): string {
+  return text.replace(/https?:\/\/[^\s]+/gi, "");
+}
+
 /**
  * Collapse prettified JSON before encrypt.
  * Lets users copy formatted decrypt output back into input and re-encrypt consistently.
@@ -70,7 +75,7 @@ function tryParse(txt: unknown, retried = false): unknown {
 }
 
 function decryptRaw(text: string, key: string, iv: string): string {
-  const cleaned = decodeURIComponent(formatEncodeStr(text));
+  const cleaned = decodeURIComponent(formatEncodeStr(stripUrls(text)));
   let res = aesDecrypt(cleaned, key, iv);
   res = res.replace(/^['|"](.*)['|"]$/, "$1");
   return res;
