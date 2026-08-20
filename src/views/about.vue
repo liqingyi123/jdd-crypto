@@ -56,7 +56,7 @@ onMounted(async () => {
     <section class="roadmap">
       <h3>联系方式</h3>
       <ol>
-        <li v-for="(item, index) in callmap" :key="item.type">
+        <li v-for="item in callmap" :key="item.type">
           <span class="index">{{ item.type }}</span>
           <span class="text">{{ item.value }}</span>
         </li>
