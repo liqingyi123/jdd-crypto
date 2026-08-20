@@ -1,6 +1,7 @@
 mod clipboard;
 mod commands;
 mod mouse_follow;
+mod mouse_trail;
 mod plugin_host;
 mod state;
 mod tray;
@@ -53,6 +54,12 @@ pub fn run() {
             commands::set_mouse_follow_pref,
             commands::begin_shortcut_capture,
             commands::end_shortcut_capture,
+            commands::get_plugin_slots,
+            commands::set_plugin_slot_enabled,
+            commands::import_plugin,
+            commands::reset_plugin_slot,
+            commands::get_mouse_trail_monitor_bounds,
+            commands::get_mouse_trail_effect_options,
         ])
         .setup(|app| {
             let badge_size = windows::load_badge_size(app.handle());
@@ -79,6 +86,7 @@ pub fn run() {
                 let _ = mouse_follow::register_shortcut(app.handle(), &shortcut);
             }
             mouse_follow::start_follow_loop(app.handle().clone());
+            plugin_host::init_plugin_slots(app.handle());
             Ok(())
         })
         .run(tauri::generate_context!())

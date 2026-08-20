@@ -1,12 +1,21 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import {
+  defaultPluginSlots,
+  type PluginSlotsState,
+} from "@/constants/plugin-slots";
 import type { CryptoOptionContribution, PluginManifest } from "@/plugins-runtime/types";
 
 export const usePluginsStore = defineStore("plugins", () => {
+  const slots = ref<PluginSlotsState>(defaultPluginSlots());
   const manifests = ref<PluginManifest[]>([]);
   const cryptoOptions = ref<CryptoOptionContribution[]>([]);
   const editors = ref<Array<{ id: string; label: string }>>([]);
   const overlayEffects = ref<Array<{ id: string; label: string }>>([]);
+
+  function setSlots(next: PluginSlotsState) {
+    slots.value = next;
+  }
 
   function setManifests(next: PluginManifest[]) {
     manifests.value = next;
@@ -34,10 +43,12 @@ export const usePluginsStore = defineStore("plugins", () => {
   }
 
   return {
+    slots,
     manifests,
     cryptoOptions,
     editors,
     overlayEffects,
+    setSlots,
     setManifests,
     registerCryptoOption,
     registerEditor,

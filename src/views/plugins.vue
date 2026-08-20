@@ -1,57 +1,96 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
-import { invoke } from "@tauri-apps/api/core";
-import { storeToRefs } from "pinia";
-import { usePluginsStore } from "@/stores/plugins";
-import { loadPlugin } from "@/plugins-runtime/loader";
-import type { PluginManifest } from "@/plugins-runtime/types";
+import { onMounted, onUnmounted, ref } from "vue";
+import { ElMessage } from "element-plus";
+import PluginTypeCard from "@/components/plugin-type-card.vue";
+import {
+  PLUGIN_KIND_META,
+  type PluginKind,
+} from "@/constants/plugin-slots";
+import { usePluginSlots } from "@/composables/use-plugin-slots";
 
-const pluginsStore = usePluginsStore();
-const { manifests, cryptoOptions, editors, overlayEffects } = storeToRefs(pluginsStore);
-const errorMessage = ref("");
+const kinds: PluginKind[] = ["mouse-trail", "editor-theme", "crypto-preset"];
+
+const {
+  loading,
+  importingKind,
+  resettingKind,
+  refresh,
+  slotOf,
+  toggleSlot,
+  resetSlot,
+  importSlot,
+} = usePluginSlots();
+
+const fileInputs = ref<Record<PluginKind, HTMLInputElement | null>>({
+  "mouse-trail": null,
+  "editor-theme": null,
+  "crypto-preset": null,
+});
+
+let unlistenSlots: (() => void) | undefined;
 
 onMounted(async () => {
   await refresh();
+  try {
+    const { listen } = await import("@tauri-apps/api/event");
+    unlistenSlots = await listen("app://plugin-slots", () => {
+      void refresh();
+    });
+  } catch {
+    // browser preview
+  }
 });
 
-async function refresh() {
-  errorMessage.value = "";
-  try {
-    const list = await invoke<PluginManifest[]>("list_plugins");
-    pluginsStore.setManifests(list);
-    for (const manifest of list) {
-      await loadPlugin(manifest, {
-        registerCryptoOption: pluginsStore.registerCryptoOption,
-        registerEditor: pluginsStore.registerEditor,
-        registerOverlayEffect: pluginsStore.registerOverlayEffect,
-      });
-    }
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : String(error);
+onUnmounted(() => {
+  unlistenSlots?.();
+});
+
+function triggerImport(kind: PluginKind) {
+  if (PLUGIN_KIND_META[kind].comingSoon) {
+    ElMessage.warning("开发中，敬请期待");
+    return;
   }
+  fileInputs.value[kind]?.click();
+}
+
+async function onFileSelected(kind: PluginKind, event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) {
+    return;
+  }
+  await importSlot(kind, file);
 }
 </script>
 
 <template>
-  <div class="page">
-    <p>插件以 `plugin.json` 清单加载。当前只扫描并注册贡献点，不执行任意原生库。</p>
-    <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
-    <div v-if="manifests.length" class="list">
-      <ElCard v-for="item in manifests" :key="item.id" shadow="never">
-        <div class="card-head">
-          <strong>{{ item.name }}</strong>
-          <span>{{ item.id }} · v{{ item.version }}</span>
-        </div>
-        <p>权限：{{ item.permissions.join(", ") || "无" }}</p>
-        <p>目录：{{ item.dir }}</p>
-      </ElCard>
-    </div>
-    <ElEmpty v-else description="未发现插件。可把插件放到 src-tauri/plugins/<id>/" />
-    <div class="caps">
-      <p>已注册编辑器：{{ editors.map((item) => item.label).join(", ") || "无" }}</p>
-      <p>已注册特效：{{ overlayEffects.map((item) => item.label).join(", ") || "无" }}</p>
-      <p>已注册算法选项：{{ cryptoOptions.map((item) => item.label).join(", ") || "无" }}</p>
-    </div>
+  <div v-loading="loading" class="page">
+    <p class="lead">每种插件同时只能导入并应用一个；导入新文件会覆盖同类型旧插件。</p>
+
+    <PluginTypeCard
+      v-for="kind in kinds"
+      :key="kind"
+      :title="PLUGIN_KIND_META[kind].title"
+      :description="PLUGIN_KIND_META[kind].description"
+      :slot="slotOf(kind)"
+      :coming-soon="PLUGIN_KIND_META[kind].comingSoon"
+      :importing="importingKind === kind"
+      :resetting="resettingKind === kind"
+      @toggle="(enabled) => toggleSlot(kind, enabled)"
+      @import="triggerImport(kind)"
+      @reset="resetSlot(kind)"
+    />
+
+    <input
+      v-for="kind in kinds"
+      :key="`${kind}-file`"
+      :ref="(el) => { fileInputs[kind] = el as HTMLInputElement | null }"
+      type="file"
+      accept=".json,application/json"
+      class="hidden-input"
+      @change="(event) => onFileSelected(kind, event)"
+    />
   </div>
 </template>
 
@@ -59,28 +98,16 @@ async function refresh() {
 .page {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
-.list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.card-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-p,
-span {
+.lead {
+  margin: 0;
   color: var(--text-muted);
-  margin: 6px 0 0;
+  font-size: 13px;
 }
 
-.error {
-  color: var(--danger);
+.hidden-input {
+  display: none;
 }
 </style>

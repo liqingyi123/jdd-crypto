@@ -1,0 +1,26 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "mouse-trail-overlays",
+  "description": "Per-monitor transparent mouse trail overlays",
+  "windows": [
+    "mouse-trail-0",
+    "mouse-trail-1",
+    "mouse-trail-2",
+    "mouse-trail-3",
+    "mouse-trail-4",
+    "mouse-trail-5",
+    "mouse-trail-6",
+    "mouse-trail-7"
+  ],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-close",
+    "core:window:allow-set-size",
+    "core:window:allow-set-position",
+    "core:window:allow-set-ignore-cursor-events",
+    "core:window:allow-set-always-on-top"
+  ]
+}

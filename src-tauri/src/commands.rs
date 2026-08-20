@@ -150,3 +150,49 @@ pub fn begin_shortcut_capture(app: AppHandle) -> Result<(), String> {
 pub fn end_shortcut_capture(app: AppHandle) -> Result<(), String> {
     crate::mouse_follow::register_current(&app)
 }
+
+#[tauri::command]
+pub fn get_plugin_slots(app: AppHandle) -> plugin_host::PluginSlotsState {
+    plugin_host::get_plugin_slots(app)
+}
+
+#[tauri::command]
+pub fn set_plugin_slot_enabled(
+    app: AppHandle,
+    kind: String,
+    enabled: bool,
+) -> Result<plugin_host::PluginSlotsState, String> {
+    plugin_host::set_plugin_slot_enabled(app, kind, enabled)
+}
+
+#[tauri::command]
+pub fn import_plugin(
+    app: AppHandle,
+    kind: String,
+    file_name: String,
+    bytes: Vec<u8>,
+) -> Result<plugin_host::PluginSlotsState, String> {
+    plugin_host::import_plugin(app, kind, file_name, bytes)
+}
+
+#[tauri::command]
+pub fn reset_plugin_slot(
+    app: AppHandle,
+    kind: String,
+) -> Result<plugin_host::PluginSlotsState, String> {
+    plugin_host::reset_plugin_slot(app, kind)
+}
+
+#[tauri::command]
+pub fn get_mouse_trail_monitor_bounds(
+    app: AppHandle,
+    window_label: String,
+) -> Result<crate::mouse_trail::MouseTrailMonitorBounds, String> {
+    crate::mouse_trail::monitor_bounds(&app, &window_label)
+        .ok_or_else(|| "无法读取显示器边界".to_string())
+}
+
+#[tauri::command]
+pub fn get_mouse_trail_effect_options(app: AppHandle) -> plugin_host::MouseTrailEffectOptions {
+    plugin_host::get_mouse_trail_effect_options(app)
+}

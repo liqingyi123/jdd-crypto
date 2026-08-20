@@ -1,17 +1,21 @@
 <script setup lang="ts">
-import { defineAsyncComponent } from "vue";
+import { computed, defineAsyncComponent } from "vue";
+import MouseTrailApp from "@/windows/mouse-trail-app.vue";
 
-defineProps<{
+const props = defineProps<{
   windowLabel: string;
 }>();
 
 const BadgeApp = defineAsyncComponent(() => import("@/windows/badge-app.vue"));
 const MainApp = defineAsyncComponent(() => import("@/windows/main-app.vue"));
 const FeatureApp = defineAsyncComponent(() => import("@/windows/feature-app.vue"));
+
+const isMouseTrail = computed(() => props.windowLabel.startsWith("mouse-trail"));
 </script>
 
 <template>
   <BadgeApp v-if="windowLabel === 'badge'" />
   <MainApp v-else-if="windowLabel === 'main'" />
+  <MouseTrailApp v-else-if="isMouseTrail" />
   <FeatureApp v-else :window-label="windowLabel" />
 </template>

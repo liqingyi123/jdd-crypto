@@ -20,6 +20,7 @@
     "os:default",
     "process:allow-exit",
     "opener:default",
-    "global-shortcut:default"
+    "global-shortcut:default",
+    "core:window:allow-set-ignore-cursor-events"
   ]
 }

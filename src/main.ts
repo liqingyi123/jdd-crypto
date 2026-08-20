@@ -1,7 +1,6 @@
 import { createApp } from "vue";
 import { createPinia } from "pinia";
 import App from "./App.vue";
-import "./styles/theme.css";
 
 async function resolveWindowLabel(): Promise<string> {
   try {
@@ -15,13 +14,15 @@ async function resolveWindowLabel(): Promise<string> {
 
 async function bootstrap() {
   const windowLabel = await resolveWindowLabel();
+  const isOverlayWindow =
+    windowLabel === "badge" || windowLabel.startsWith("mouse-trail");
 
-  if (windowLabel === "badge") {
+  if (isOverlayWindow) {
     document.documentElement.classList.add("badge-window");
     document.body.style.background = "transparent";
   } else {
+    await import("./styles/theme.css");
     document.documentElement.classList.remove("badge-window");
-    // Element Plus dark CSS vars only needed for main/feature windows.
     await import("element-plus/theme-chalk/dark/css-vars.css");
   }
 
