@@ -1,11 +1,18 @@
 <script setup lang="ts">
 import { onMounted, shallowRef } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { ElMessage } from "element-plus";
 import { storeToRefs } from "pinia";
 import { useThemeStore, type ThemePreference } from "@/stores/theme";
 import { useClipboardStore } from "@/stores/clipboard";
 import { useShortcutRecorder } from "@/composables/use-shortcut-recorder";
 import { DEFAULT_BADGE_SIZE } from "@/constants/badge";
+import {
+  DEFAULT_MOUSE_TRAIL_PREF,
+  normalizeMouseTrailEffect,
+  type MouseTrailEffect,
+  type MouseTrailPref,
+} from "@/effects/mouse-trail-types";
 
 const themeStore = useThemeStore();
 const clipboardStore = useClipboardStore();
@@ -31,11 +38,25 @@ const themeOptions: Array<{ value: ThemePreference; label: string }> = [
 
 const badgeSize = shallowRef(DEFAULT_BADGE_SIZE);
 const followPref = shallowRef(true);
+const trailEnabled = shallowRef(DEFAULT_MOUSE_TRAIL_PREF.enabled);
+const trailEffect = shallowRef<MouseTrailEffect>(DEFAULT_MOUSE_TRAIL_PREF.effect);
+const trailResetting = shallowRef(false);
+
 const badgeSizeOptions: Array<{ value: number; label: string }> = [
   { value: 96, label: "大" },
   { value: DEFAULT_BADGE_SIZE, label: "中" },
   { value: 38, label: "小" },
 ];
+
+const trailEffectOptions: Array<{ value: MouseTrailEffect; label: string }> = [
+  { value: "ribbon", label: "躁动线条" },
+  { value: "meteor", label: "绚丽流星" },
+];
+
+function applyTrailPref(pref: MouseTrailPref) {
+  trailEnabled.value = pref.enabled;
+  trailEffect.value = normalizeMouseTrailEffect(pref.effect);
+}
 
 onMounted(async () => {
   try {
@@ -53,6 +74,12 @@ onMounted(async () => {
     followPref.value = await invoke<boolean>("get_mouse_follow_pref");
   } catch {
     // browser preview
+  }
+  try {
+    const pref = await invoke<MouseTrailPref>("get_mouse_trail_pref");
+    applyTrailPref(pref);
+  } catch {
+    applyTrailPref(DEFAULT_MOUSE_TRAIL_PREF);
   }
   await loadShortcut();
 });
@@ -79,6 +106,44 @@ async function onFollowPrefChange(value: string | number | boolean) {
     await cancelRecording();
   }
   await invoke("set_mouse_follow_pref", { enabled }).catch(() => undefined);
+}
+
+async function onTrailEnabledChange(value: string | number | boolean) {
+  const enabled = Boolean(value);
+  trailEnabled.value = enabled;
+  try {
+    const pref = await invoke<MouseTrailPref>("set_mouse_trail_enabled", { enabled });
+    applyTrailPref(pref);
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+    trailEnabled.value = !enabled;
+  }
+}
+
+async function onTrailEffectChange(value: string | number | boolean | undefined) {
+  if (value !== "ribbon" && value !== "meteor") {
+    return;
+  }
+  trailEffect.value = value;
+  try {
+    const pref = await invoke<MouseTrailPref>("set_mouse_trail_effect", { effect: value });
+    applyTrailPref(pref);
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
+}
+
+async function onTrailReset() {
+  trailResetting.value = true;
+  try {
+    const pref = await invoke<MouseTrailPref>("reset_mouse_trail_pref");
+    applyTrailPref(pref);
+    ElMessage.success("已恢复默认");
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  } finally {
+    trailResetting.value = false;
+  }
 }
 
 function onThemeChange(value: string | number | boolean | undefined) {
@@ -122,6 +187,32 @@ function onThemeChange(value: string | number | boolean | undefined) {
       </div>
       <p>
         自动识别剪贴板并提示加解密，关闭后不再轮询剪贴板，避免打扰与隐私风险。</p>
+    </section>
+    <section>
+      <div class="section-head">
+        <h2>鼠标轨迹特效</h2>
+        <label class="row">
+          <ElSwitch :model-value="trailEnabled" @change="onTrailEnabledChange" />
+        </label>
+      </div>
+      <p>在所有显示器工作区跟随鼠标绘制拖尾。默认使用「躁动线条」。</p>
+      <h3>特效预设</h3>
+      <ElRadioGroup
+        :model-value="trailEffect"
+        :disabled="!trailEnabled"
+        @change="onTrailEffectChange"
+      >
+        <ElRadio
+          v-for="item in trailEffectOptions"
+          :key="item.value"
+          :value="item.value"
+        >
+          {{ item.label }}
+        </ElRadio>
+      </ElRadioGroup>
+      <div class="actions">
+        <ElButton :loading="trailResetting" @click="onTrailReset">恢复默认</ElButton>
+      </div>
     </section>
     <section>
       <div class="section-head">
@@ -190,6 +281,10 @@ h3 {
   display: flex;
   gap: 16px;
   align-items: center;
+}
+
+.actions {
+  margin-top: 12px;
 }
 
 p {

@@ -193,6 +193,27 @@ pub fn get_mouse_trail_monitor_bounds(
 }
 
 #[tauri::command]
-pub fn get_mouse_trail_effect_options(app: AppHandle) -> plugin_host::MouseTrailEffectOptions {
-    plugin_host::get_mouse_trail_effect_options(app)
+pub fn get_mouse_trail_pref(app: AppHandle) -> crate::mouse_trail::MouseTrailPref {
+    crate::mouse_trail::get_pref(app)
+}
+
+#[tauri::command]
+pub fn set_mouse_trail_enabled(
+    app: AppHandle,
+    enabled: bool,
+) -> Result<crate::mouse_trail::MouseTrailPref, String> {
+    crate::mouse_trail::set_enabled_pref(app, enabled)
+}
+
+#[tauri::command]
+pub fn set_mouse_trail_effect(
+    app: AppHandle,
+    effect: String,
+) -> Result<crate::mouse_trail::MouseTrailPref, String> {
+    crate::mouse_trail::set_effect_pref(app, effect)
+}
+
+#[tauri::command]
+pub fn reset_mouse_trail_pref(app: AppHandle) -> Result<crate::mouse_trail::MouseTrailPref, String> {
+    crate::mouse_trail::reset_pref(app)
 }

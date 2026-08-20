@@ -1,7 +1,15 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, shallowRef } from "vue";
+import { nextTick, onMounted, onUnmounted, ref, shallowRef } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { MeteorTrail } from "@/effects/meteor-trail";
+import { RibbonTrail } from "@/effects/ribbon-trail";
+import {
+  DEFAULT_MOUSE_TRAIL_PREF,
+  normalizeMouseTrailEffect,
+  type MouseTrailEngine,
+  type MouseTrailEffect,
+  type MouseTrailPref,
+} from "@/effects/mouse-trail-types";
 
 interface MonitorBounds {
   x: number;
@@ -18,9 +26,10 @@ interface CursorPayload {
 
 const hostRef = ref<HTMLElement | null>(null);
 const bounds = shallowRef<MonitorBounds | null>(null);
-const trail = shallowRef<MeteorTrail | null>(null);
+const trail = shallowRef<MouseTrailEngine | null>(null);
+const effect = shallowRef<MouseTrailEffect>(DEFAULT_MOUSE_TRAIL_PREF.effect);
 let unlistenCursor: (() => void) | undefined;
-let unlistenSlots: (() => void) | undefined;
+let unlistenPref: (() => void) | undefined;
 let wasInside = false;
 
 function isInside(area: MonitorBounds, x: number, y: number): boolean {
@@ -32,13 +41,34 @@ function isInside(area: MonitorBounds, x: number, y: number): boolean {
   );
 }
 
-async function loadEffectOptions() {
-  try {
-    const options = await invoke<{ color: string }>("get_mouse_trail_effect_options");
-    trail.value?.setColor(options.color);
-  } catch {
-    trail.value?.setColor("#F8EC85");
+function createEngine(next: MouseTrailEffect): MouseTrailEngine | null {
+  if (!hostRef.value) {
+    return null;
   }
+  if (next === "meteor") {
+    return new MeteorTrail(hostRef.value, { color: "#F8EC85" });
+  }
+  return new RibbonTrail(hostRef.value);
+}
+
+function applyEffect(next: MouseTrailEffect) {
+  const normalized = normalizeMouseTrailEffect(next);
+  if (trail.value && effect.value === normalized) {
+    return;
+  }
+  trail.value?.destroy();
+  trail.value = null;
+  wasInside = false;
+  effect.value = normalized;
+  const engine = createEngine(normalized);
+  if (!engine) {
+    return;
+  }
+  trail.value = engine;
+  engine.start();
+  requestAnimationFrame(() => {
+    trail.value?.resize();
+  });
 }
 
 function applyCursor(payload: CursorPayload) {
@@ -63,6 +93,14 @@ function applyCursor(payload: CursorPayload) {
 }
 
 onMounted(async () => {
+  try {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    await getCurrentWindow().setIgnoreCursorEvents(true);
+  } catch {
+    // browser preview
+  }
+
+  await nextTick();
   if (!hostRef.value) {
     return;
   }
@@ -83,17 +121,20 @@ onMounted(async () => {
     };
   }
 
-  trail.value = new MeteorTrail(hostRef.value, { color: "#F8EC85" });
-  await loadEffectOptions();
-  trail.value.start();
+  try {
+    const pref = await invoke<MouseTrailPref>("get_mouse_trail_pref");
+    applyEffect(normalizeMouseTrailEffect(pref.effect));
+  } catch {
+    applyEffect(DEFAULT_MOUSE_TRAIL_PREF.effect);
+  }
 
   try {
     const { listen } = await import("@tauri-apps/api/event");
     unlistenCursor = await listen<CursorPayload>("app://mouse-trail-cursor", (event) => {
       applyCursor(event.payload);
     });
-    unlistenSlots = await listen("app://plugin-slots", () => {
-      void loadEffectOptions();
+    unlistenPref = await listen<MouseTrailPref>("app://mouse-trail-pref", (event) => {
+      applyEffect(normalizeMouseTrailEffect(event.payload.effect));
     });
   } catch {
     // browser preview
@@ -102,7 +143,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   unlistenCursor?.();
-  unlistenSlots?.();
+  unlistenPref?.();
   trail.value?.destroy();
   trail.value = null;
 });

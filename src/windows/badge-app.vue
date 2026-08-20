@@ -208,10 +208,15 @@ function onPointerUp(event: PointerEvent) {
   flex: 1;
   padding: 8px 10px;
   border-radius: 12px;
+  border: 1px solid var(--border);
   background: var(--bg-elevated);
   color: var(--text);
   box-shadow: var(--shadow);
   font-size: 12px;
+}
+
+:global([data-theme="dark"]) .prompt {
+  border-color: #fff;
 }
 
 .prompt p {

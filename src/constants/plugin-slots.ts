@@ -1,4 +1,4 @@
-export type PluginKind = "mouse-trail" | "editor-theme" | "crypto-preset";
+export type PluginKind = "editor-theme" | "crypto-preset";
 
 export type PluginSource = "preset" | "imported";
 
@@ -19,20 +19,10 @@ export interface PluginSlotsState {
   slots: PluginSlot[];
 }
 
-export const BUILTIN_METEOR = {
-  id: "builtin-meteor",
-  name: "绚丽流星",
-} as const;
-
 export const PLUGIN_KIND_META: Record<
   PluginKind,
   { title: string; description: string; comingSoon: boolean }
 > = {
-  "mouse-trail": {
-    title: "鼠标轨迹特效",
-    description: "跟随鼠标绘制拖尾，覆盖所有显示器。未导入时使用内置预设「绚丽流星」。",
-    comingSoon: false,
-  },
   "editor-theme": {
     title: "编辑器主题",
     description: "为 Monaco 编辑器导入自定义主题配色。",
@@ -48,12 +38,6 @@ export const PLUGIN_KIND_META: Record<
 export function defaultPluginSlots(): PluginSlotsState {
   return {
     slots: [
-      {
-        kind: "mouse-trail",
-        enabled: false,
-        source: "preset",
-        current: { ...BUILTIN_METEOR },
-      },
       {
         kind: "editor-theme",
         enabled: false,

@@ -8,7 +8,7 @@ import {
 } from "@/constants/plugin-slots";
 import { usePluginSlots } from "@/composables/use-plugin-slots";
 
-const kinds: PluginKind[] = ["mouse-trail", "editor-theme", "crypto-preset"];
+const kinds: PluginKind[] = ["editor-theme", "crypto-preset"];
 
 const {
   loading,
@@ -22,7 +22,6 @@ const {
 } = usePluginSlots();
 
 const fileInputs = ref<Record<PluginKind, HTMLInputElement | null>>({
-  "mouse-trail": null,
   "editor-theme": null,
   "crypto-preset": null,
 });

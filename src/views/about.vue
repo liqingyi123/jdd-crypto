@@ -8,9 +8,13 @@ const platform = ref("desktop");
 const roadmap = [
   "转 KV 功能支持密文、明文两种文本格式",
   "网络代理功能，实时捕获任意应用的网络请求",
-  "插件管理功能，支持鼠标轨迹特效、编辑器主题、加解密预设等插件",
+  "插件管理功能支持编辑器主题、加解密预设",
   "彩虹屁 + 节日祝福语功能",
   "将结果自动复制到剪贴板"
+];
+const callmap = [
+  { type: 'QQ', value: '1787750205' },
+  { type: '微信', value: 'qinghe6971' }
 ];
 
 onMounted(async () => {
@@ -46,14 +50,18 @@ onMounted(async () => {
       </div>
       <div>
         <dt>作者</dt>
-        <dd>二六得八（二楼得爬）</dd>
-      </div>
-      <div>
-        <dt>联系方式</dt>
-        <dd>QQ：1787750205 | wx：qinghe6971</dd>
+        <dd>李青逸（二六得八 / 二楼得爬）</dd>
       </div>
     </dl>
-
+    <section class="roadmap">
+      <h3>联系方式</h3>
+      <ol>
+        <li v-for="(item, index) in callmap" :key="item.type">
+          <span class="index">{{ item.type }}</span>
+          <span class="text">{{ item.value }}</span>
+        </li>
+      </ol>
+    </section>
     <section class="roadmap">
       <h3>规划中</h3>
       <ol>
@@ -150,6 +158,7 @@ dd {
   font-weight: 600;
   color: var(--brand);
   background: var(--brand-soft);
+  white-space: nowrap;
 }
 
 .text {

@@ -5,17 +5,11 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_store::StoreExt;
 
-use crate::mouse_trail;
-
-pub const KIND_MOUSE_TRAIL: &str = "mouse-trail";
 pub const KIND_EDITOR_THEME: &str = "editor-theme";
 pub const KIND_CRYPTO_PRESET: &str = "crypto-preset";
 
 const SETTINGS_STORE: &str = "settings.json";
 const PLUGIN_SLOTS_KEY: &str = "pluginSlots";
-const BUILTIN_METEOR_ID: &str = "builtin-meteor";
-const BUILTIN_METEOR_NAME: &str = "绚丽流星";
-const DEFAULT_METEOR_COLOR: &str = "#F8EC85";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PluginManifest {
@@ -56,12 +50,6 @@ pub struct PluginSlot {
 #[serde(rename_all = "camelCase")]
 pub struct PluginSlotsState {
     pub slots: Vec<PluginSlot>,
-}
-
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MouseTrailEffectOptions {
-    pub color: String,
 }
 
 fn default_entry() -> String {
@@ -130,16 +118,6 @@ fn default_slots() -> PluginSlotsState {
     PluginSlotsState {
         slots: vec![
             PluginSlot {
-                kind: KIND_MOUSE_TRAIL.into(),
-                enabled: false,
-                source: "preset".into(),
-                current: Some(PluginSlotCurrent {
-                    id: BUILTIN_METEOR_ID.into(),
-                    name: BUILTIN_METEOR_NAME.into(),
-                    file_name: None,
-                }),
-            },
-            PluginSlot {
                 kind: KIND_EDITOR_THEME.into(),
                 enabled: false,
                 source: "preset".into(),
@@ -157,7 +135,7 @@ fn default_slots() -> PluginSlotsState {
 
 fn normalize_kind(kind: &str) -> Option<String> {
     match kind {
-        KIND_MOUSE_TRAIL | KIND_EDITOR_THEME | KIND_CRYPTO_PRESET => Some(kind.to_string()),
+        KIND_EDITOR_THEME | KIND_CRYPTO_PRESET => Some(kind.to_string()),
         _ => None,
     }
 }
@@ -174,17 +152,6 @@ fn merge_slots(raw: Option<PluginSlotsState>) -> PluginSlotsState {
             slot.enabled = saved.enabled;
             slot.source = saved.source.clone();
             slot.current = saved.current.clone();
-        }
-    }
-
-    if let Some(slot) = merged.iter_mut().find(|item| item.kind == KIND_MOUSE_TRAIL) {
-        if slot.current.is_none() {
-            slot.current = Some(PluginSlotCurrent {
-                id: BUILTIN_METEOR_ID.into(),
-                name: BUILTIN_METEOR_NAME.into(),
-                file_name: None,
-            });
-            slot.source = "preset".into();
         }
     }
 
@@ -215,23 +182,10 @@ fn emit_slots(app: &AppHandle, state: &PluginSlotsState) {
     let _ = app.emit("app://plugin-slots", state);
 }
 
-fn apply_mouse_trail_enabled(app: &AppHandle, enabled: bool) {
-    mouse_trail::set_enabled(app, enabled);
-}
-
 fn reset_slot_defaults(slot: &mut PluginSlot) {
     slot.enabled = false;
     slot.source = "preset".into();
-    match slot.kind.as_str() {
-        KIND_MOUSE_TRAIL => {
-            slot.current = Some(PluginSlotCurrent {
-                id: BUILTIN_METEOR_ID.into(),
-                name: BUILTIN_METEOR_NAME.into(),
-                file_name: None,
-            });
-        }
-        _ => slot.current = None,
-    }
+    slot.current = None;
 }
 
 fn clear_import_dir(dir: &Path) -> Result<(), String> {
@@ -273,17 +227,15 @@ fn validate_import_manifest(raw: &str, kind: &str) -> Result<(String, String), S
     Ok((id.to_string(), name.to_string()))
 }
 
-fn read_imported_manifest(app: &AppHandle, kind: &str) -> Option<serde_json::Value> {
-    let dir = imported_kind_dir(app, kind).ok()?;
-    let raw = fs::read_to_string(dir.join("plugin.json")).ok()?;
-    serde_json::from_str(&raw).ok()
-}
-
 pub fn get_plugin_slots(app: AppHandle) -> PluginSlotsState {
     load_plugin_slots(&app)
 }
 
-pub fn set_plugin_slot_enabled(app: AppHandle, kind: String, enabled: bool) -> Result<PluginSlotsState, String> {
+pub fn set_plugin_slot_enabled(
+    app: AppHandle,
+    kind: String,
+    enabled: bool,
+) -> Result<PluginSlotsState, String> {
     normalize_kind(&kind).ok_or_else(|| format!("未知插件类型: {kind}"))?;
     let mut state = load_plugin_slots(&app);
     let slot = state
@@ -293,9 +245,6 @@ pub fn set_plugin_slot_enabled(app: AppHandle, kind: String, enabled: bool) -> R
         .ok_or_else(|| format!("未找到插件槽位: {kind}"))?;
     slot.enabled = enabled;
     save_plugin_slots(&app, &state)?;
-    if kind == KIND_MOUSE_TRAIL {
-        apply_mouse_trail_enabled(&app, enabled);
-    }
     emit_slots(&app, &state);
     Ok(state)
 }
@@ -349,37 +298,6 @@ pub fn reset_plugin_slot(app: AppHandle, kind: String) -> Result<PluginSlotsStat
         .ok_or_else(|| format!("未找到插件槽位: {kind}"))?;
     reset_slot_defaults(slot);
     save_plugin_slots(&app, &state)?;
-    if kind == KIND_MOUSE_TRAIL {
-        apply_mouse_trail_enabled(&app, false);
-    }
     emit_slots(&app, &state);
     Ok(state)
-}
-
-pub fn get_mouse_trail_effect_options(app: AppHandle) -> MouseTrailEffectOptions {
-    if let Some(value) = read_imported_manifest(&app, KIND_MOUSE_TRAIL) {
-        if let Some(color) = value
-            .pointer("/contributes/options/color")
-            .and_then(|item| item.as_str())
-            .filter(|item| !item.is_empty())
-        {
-            return MouseTrailEffectOptions {
-                color: color.to_string(),
-            };
-        }
-    }
-    MouseTrailEffectOptions {
-        color: DEFAULT_METEOR_COLOR.to_string(),
-    }
-}
-
-pub fn init_plugin_slots(app: &AppHandle) {
-    let state = load_plugin_slots(app);
-    let enabled = state
-        .slots
-        .iter()
-        .find(|item| item.kind == KIND_MOUSE_TRAIL)
-        .map(|slot| slot.enabled)
-        .unwrap_or(false);
-    apply_mouse_trail_enabled(app, enabled);
 }

@@ -2,13 +2,17 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{
     AppHandle, Emitter, EventTarget, LogicalSize, Manager, PhysicalPosition, WebviewUrl,
     WebviewWindowBuilder, window::Color,
 };
+use tauri_plugin_store::StoreExt;
 
 const MAX_OVERLAYS: usize = 8;
+const SETTINGS_STORE: &str = "settings.json";
+const PREF_KEY: &str = "mouseTrail";
+const DEFAULT_EFFECT: &str = "ribbon";
 
 static CURSOR_LOOP_STARTED: AtomicBool = AtomicBool::new(false);
 static TRAIL_ENABLED: AtomicBool = AtomicBool::new(false);
@@ -28,6 +32,22 @@ pub struct MouseTrailMonitorBounds {
     pub width: u32,
     pub height: u32,
     pub scale_factor: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MouseTrailPref {
+    pub enabled: bool,
+    pub effect: String,
+}
+
+impl Default for MouseTrailPref {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            effect: DEFAULT_EFFECT.to_string(),
+        }
+    }
 }
 
 struct MonitorLayout {
@@ -72,10 +92,104 @@ fn is_overlay_target(target: &EventTarget) -> bool {
     }
 }
 
+fn normalize_effect(raw: &str) -> String {
+    match raw {
+        "meteor" => "meteor".to_string(),
+        _ => DEFAULT_EFFECT.to_string(),
+    }
+}
+
+pub fn load_pref(app: &AppHandle) -> MouseTrailPref {
+    let Ok(store) = app.store(SETTINGS_STORE) else {
+        return MouseTrailPref::default();
+    };
+    let Some(value) = store.get(PREF_KEY) else {
+        return MouseTrailPref::default();
+    };
+    let Ok(mut pref) = serde_json::from_value::<MouseTrailPref>(value) else {
+        return MouseTrailPref::default();
+    };
+    pref.effect = normalize_effect(&pref.effect);
+    pref
+}
+
+fn save_pref(app: &AppHandle, pref: &MouseTrailPref) -> Result<(), String> {
+    let store = app.store(SETTINGS_STORE).map_err(|e| e.to_string())?;
+    store.set(
+        PREF_KEY,
+        serde_json::to_value(pref).map_err(|e| e.to_string())?,
+    );
+    store.save().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn emit_pref(app: &AppHandle, pref: &MouseTrailPref) {
+    let _ = app.emit("app://mouse-trail-pref", pref);
+}
+
+pub fn get_pref(app: AppHandle) -> MouseTrailPref {
+    load_pref(&app)
+}
+
+pub fn set_enabled_pref(app: AppHandle, enabled: bool) -> Result<MouseTrailPref, String> {
+    let mut pref = load_pref(&app);
+    pref.enabled = enabled;
+    save_pref(&app, &pref)?;
+    set_enabled(&app, enabled);
+    emit_pref(&app, &pref);
+    Ok(pref)
+}
+
+pub fn set_effect_pref(app: AppHandle, effect: String) -> Result<MouseTrailPref, String> {
+    let mut pref = load_pref(&app);
+    pref.effect = normalize_effect(&effect);
+    save_pref(&app, &pref)?;
+    emit_pref(&app, &pref);
+    Ok(pref)
+}
+
+pub fn reset_pref(app: AppHandle) -> Result<MouseTrailPref, String> {
+    let pref = MouseTrailPref::default();
+    save_pref(&app, &pref)?;
+    set_enabled(&app, false);
+    emit_pref(&app, &pref);
+    Ok(pref)
+}
+
+pub fn init_from_store(app: &AppHandle) {
+    let pref = load_pref(app);
+    set_enabled(app, pref.enabled);
+}
+
+/// Flip the enabled flag and schedule overlay sync off the invoke path
+/// so settings UI does not wait on WebView creation.
 pub fn set_enabled(app: &AppHandle, enabled: bool) {
     TRAIL_ENABLED.store(enabled, Ordering::Relaxed);
-    sync_overlays(app, enabled);
     ensure_cursor_loop(app);
+    schedule_sync_overlays(app, enabled);
+}
+
+fn schedule_sync_overlays(app: &AppHandle, visible: bool) {
+    let handle = app.clone();
+    thread::spawn(move || {
+        let handle_for_main = handle.clone();
+        let _ = handle.run_on_main_thread(move || {
+            sync_overlays(&handle_for_main, visible);
+            if visible {
+                restore_interactive_focus(&handle_for_main);
+            }
+        });
+    });
+}
+
+fn restore_interactive_focus(app: &AppHandle) {
+    if let Some(win) = app.get_webview_window("settings") {
+        let _ = win.set_focus();
+        return;
+    }
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.set_focus();
+    }
 }
 
 pub fn sync_overlays(app: &AppHandle, visible: bool) {
@@ -120,7 +234,7 @@ pub fn sync_overlays(app: &AppHandle, visible: bool) {
             .resizable(false)
             .maximizable(false)
             .minimizable(false)
-            .visible(true)
+            .visible(false)
             .focused(false)
             .position(logical_x, logical_y)
             .inner_size(layout.logical_size.width, layout.logical_size.height)
@@ -128,6 +242,7 @@ pub fn sync_overlays(app: &AppHandle, visible: bool) {
 
         if let Ok(win) = result {
             let _ = win.set_ignore_cursor_events(true);
+            let _ = win.show();
         }
     }
 

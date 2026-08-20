@@ -14,10 +14,22 @@ async function resolveWindowLabel(): Promise<string> {
 
 async function bootstrap() {
   const windowLabel = await resolveWindowLabel();
-  const isOverlayWindow =
-    windowLabel === "badge" || windowLabel.startsWith("mouse-trail");
+  const isMouseTrail = windowLabel.startsWith("mouse-trail");
+  const isBadge = windowLabel === "badge";
 
-  if (isOverlayWindow) {
+  if (isMouseTrail) {
+    // Keep trail overlays free of theme chrome (transparent only).
+    document.documentElement.classList.add("badge-window");
+    document.body.style.background = "transparent";
+    try {
+      const { getCurrentWindow } = await import("@tauri-apps/api/window");
+      await getCurrentWindow().setIgnoreCursorEvents(true);
+    } catch {
+      // browser preview
+    }
+  } else if (isBadge) {
+    // Badge needs theme tokens for the clipboard prompt; stay transparent via badge-window.
+    await import("./styles/theme.css");
     document.documentElement.classList.add("badge-window");
     document.body.style.background = "transparent";
   } else {

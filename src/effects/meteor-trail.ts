@@ -1,3 +1,5 @@
+import type { MouseTrailEngine } from "./mouse-trail-types";
+
 export interface MeteorTrailOptions {
   color?: string;
 }
@@ -70,7 +72,7 @@ function createStarCanvas(color: string, size: number, blur: number): HTMLCanvas
   return canvas;
 }
 
-export class MeteorTrail {
+export class MeteorTrail implements MouseTrailEngine {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private color: string;

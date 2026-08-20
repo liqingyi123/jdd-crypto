@@ -59,7 +59,10 @@ pub fn run() {
             commands::import_plugin,
             commands::reset_plugin_slot,
             commands::get_mouse_trail_monitor_bounds,
-            commands::get_mouse_trail_effect_options,
+            commands::get_mouse_trail_pref,
+            commands::set_mouse_trail_enabled,
+            commands::set_mouse_trail_effect,
+            commands::reset_mouse_trail_pref,
         ])
         .setup(|app| {
             let badge_size = windows::load_badge_size(app.handle());
@@ -86,7 +89,7 @@ pub fn run() {
                 let _ = mouse_follow::register_shortcut(app.handle(), &shortcut);
             }
             mouse_follow::start_follow_loop(app.handle().clone());
-            plugin_host::init_plugin_slots(app.handle());
+            mouse_trail::init_from_store(app.handle());
             Ok(())
         })
         .run(tauri::generate_context!())
