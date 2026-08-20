@@ -15,7 +15,8 @@ async function resolveWindowLabel(): Promise<string> {
 async function bootstrap() {
   const windowLabel = await resolveWindowLabel();
   const isMouseTrail = windowLabel.startsWith("mouse-trail");
-  const isBadge = windowLabel === "badge";
+  const isTransparentChrome =
+    windowLabel === "badge" || windowLabel === "clipboard-prompt";
 
   if (isMouseTrail) {
     // Keep trail overlays free of theme chrome (transparent only).
@@ -27,8 +28,8 @@ async function bootstrap() {
     } catch {
       // browser preview
     }
-  } else if (isBadge) {
-    // Badge needs theme tokens for the clipboard prompt; stay transparent via badge-window.
+  } else if (isTransparentChrome) {
+    // Badge / clipboard prompt need theme tokens; stay transparent via badge-window.
     await import("./styles/theme.css");
     document.documentElement.classList.add("badge-window");
     document.body.style.background = "transparent";

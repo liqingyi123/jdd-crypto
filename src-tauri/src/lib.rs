@@ -40,6 +40,8 @@ pub fn run() {
             commands::navigate_main,
             commands::popup_app_menu,
             commands::set_badge_prompt_mode,
+            commands::hide_clipboard_prompt,
+            commands::get_clipboard_candidate,
             commands::get_badge_size,
             commands::set_badge_size_pref,
             commands::get_theme_pref,

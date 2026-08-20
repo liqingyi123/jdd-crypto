@@ -167,6 +167,10 @@ fn start(app: &AppHandle) {
         windows::apply_badge_window_size(app, MIN_BADGE_SIZE, false);
         let _ = win.set_ignore_cursor_events(true);
     }
+    if let Ok(mut candidate) = state.last_candidate.lock() {
+        *candidate = None;
+    }
+    windows::hide_clipboard_prompt(app);
     let _ = app.emit("app://mouse-follow", true);
 }
 

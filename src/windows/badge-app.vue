@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, shallowRef } from "vue";
 import { invoke } from "@tauri-apps/api/core";
-import { useClipboardPrompt } from "@/composables/use-clipboard-prompt";
-import { useBadgePromptPlacement } from "@/composables/use-badge-prompt-placement";
 import { useSystemTheme } from "@/composables/use-system-theme";
 import { DEFAULT_BADGE_SIZE } from "@/constants/badge";
 
@@ -10,26 +8,10 @@ const appIcon = "/app-icon.png";
 
 useSystemTheme();
 
-const { clipboardStore, accept, dismiss } = useClipboardPrompt();
-
-const promptOpen = computed(() => clipboardStore.candidate !== null);
-const kindLabel = computed(() => {
-  const kind = clipboardStore.candidate?.kind;
-  if (kind === "maybe_cipher") return "疑似密文";
-  if (kind === "maybe_plain") return "疑似明文";
-  return "剪贴板文本";
-});
-
 const pointerOrigin = ref<{ x: number; y: number } | null>(null);
 const didDrag = shallowRef(false);
 const badgeSize = shallowRef(DEFAULT_BADGE_SIZE);
 let unlistenSize: (() => void) | undefined;
-
-const { placementClass, beginExpandedDrag, moveExpandedDrag, endExpandedDrag } =
-  useBadgePromptPlacement({
-    promptOpen,
-    badgeSize,
-  });
 
 const badgeStyle = computed(() => {
   const size = badgeSize.value;
@@ -81,9 +63,6 @@ function onPointerDown(event: PointerEvent) {
   }
   pointerOrigin.value = { x: event.clientX, y: event.clientY };
   didDrag.value = false;
-  if (promptOpen.value) {
-    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-  }
 }
 
 async function onPointerMove(event: PointerEvent) {
@@ -98,44 +77,22 @@ async function onPointerMove(event: PointerEvent) {
       return;
     }
     didDrag.value = true;
-    if (promptOpen.value) {
-      beginExpandedDrag(event);
-      moveExpandedDrag(event);
-      return;
-    }
     try {
       const { getCurrentWindow } = await import("@tauri-apps/api/window");
       await getCurrentWindow().startDragging();
     } catch {
       // browser preview
     }
-    return;
-  }
-
-  if (promptOpen.value) {
-    moveExpandedDrag(event);
   }
 }
 
-function onPointerUp(event: PointerEvent) {
-  const shouldSettle = didDrag.value && promptOpen.value;
+function onPointerUp() {
   pointerOrigin.value = null;
-  if (shouldSettle) {
-    endExpandedDrag();
-  }
-  const target = event.currentTarget as HTMLElement;
-  if (target.hasPointerCapture(event.pointerId)) {
-    target.releasePointerCapture(event.pointerId);
-  }
 }
 </script>
 
 <template>
-  <div
-    class="badge-root"
-    :class="[{ expanded: promptOpen }, placementClass]"
-    :style="badgeStyle"
-  >
+  <div class="badge-root" :style="badgeStyle">
     <button
       class="orb"
       type="button"
@@ -149,15 +106,6 @@ function onPointerUp(event: PointerEvent) {
     >
       <img :src="appIcon" alt="多多解密" />
     </button>
-
-    <div v-if="promptOpen" class="prompt">
-      <p>{{ kindLabel }}，是否立即处理？</p>
-      <div class="actions">
-        <button type="button" @click="accept('encrypt')">加密</button>
-        <button type="button" @click="accept('decrypt')">解密</button>
-        <button type="button" class="ghost" @click="dismiss">忽略</button>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -167,18 +115,9 @@ function onPointerUp(event: PointerEvent) {
   height: 100%;
   display: flex;
   align-items: flex-start;
-  gap: 8px;
   padding: var(--badge-pad, 12px);
   background: transparent;
   user-select: none;
-}
-
-.badge-root.prompt-left {
-  flex-direction: row-reverse;
-}
-
-.badge-root.prompt-up {
-  align-items: flex-end;
 }
 
 .orb {
@@ -202,42 +141,5 @@ function onPointerUp(event: PointerEvent) {
   pointer-events: none;
   filter: drop-shadow(0 0 4px rgba(255, 120, 110, 0.35))
     drop-shadow(0 0 10px rgba(220, 70, 60, 0.1));
-}
-
-.prompt {
-  flex: 1;
-  padding: 8px 10px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: var(--bg-elevated);
-  color: var(--text);
-  box-shadow: var(--shadow);
-  font-size: 12px;
-}
-
-:global([data-theme="dark"]) .prompt {
-  border-color: #fff;
-}
-
-.prompt p {
-  margin: 0 0 8px;
-}
-
-.actions {
-  display: flex;
-  gap: 6px;
-}
-
-.actions button {
-  border: 0;
-  border-radius: 8px;
-  padding: 4px 8px;
-  background: var(--brand);
-  color: #fff;
-}
-
-.actions .ghost {
-  background: var(--bg-muted);
-  color: var(--text);
 }
 </style>

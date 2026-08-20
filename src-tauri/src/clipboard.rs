@@ -2,17 +2,11 @@ use std::sync::atomic::Ordering;
 use std::thread;
 use std::time::Duration;
 
-use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 
-use crate::state::AppState;
-
-#[derive(Clone, Serialize)]
-pub struct ClipboardCandidate {
-    pub text: String,
-    pub kind: String,
-}
+use crate::state::{AppState, ClipboardCandidate};
+use crate::windows;
 
 pub fn classify_clipboard(text: &str) -> &'static str {
     let trimmed = text.trim();
@@ -70,6 +64,10 @@ pub fn start_clipboard_watcher(app: AppHandle) {
             text,
             kind: kind.to_string(),
         };
-        let _ = app.emit("clipboard://candidate", payload);
+        if let Ok(mut candidate) = state.last_candidate.lock() {
+            *candidate = Some(payload.clone());
+        }
+        let _ = app.emit("clipboard://candidate", &payload);
+        windows::schedule_show_clipboard_prompt(&app);
     });
 }

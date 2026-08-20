@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Shared baseline capabilities for both windows",
-  "windows": ["main", "badge", "settings", "feedback", "plugins", "about"],
+  "windows": ["main", "badge", "clipboard-prompt", "settings", "feedback", "plugins", "about"],
   "permissions": [
     "core:default",
     "core:event:default",

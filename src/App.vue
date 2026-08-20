@@ -7,6 +7,9 @@ const props = defineProps<{
 }>();
 
 const BadgeApp = defineAsyncComponent(() => import("@/windows/badge-app.vue"));
+const ClipboardPromptApp = defineAsyncComponent(
+  () => import("@/windows/clipboard-prompt-app.vue"),
+);
 const MainApp = defineAsyncComponent(() => import("@/windows/main-app.vue"));
 const FeatureApp = defineAsyncComponent(() => import("@/windows/feature-app.vue"));
 
@@ -15,6 +18,7 @@ const isMouseTrail = computed(() => props.windowLabel.startsWith("mouse-trail"))
 
 <template>
   <BadgeApp v-if="windowLabel === 'badge'" />
+  <ClipboardPromptApp v-else-if="windowLabel === 'clipboard-prompt'" />
   <MainApp v-else-if="windowLabel === 'main'" />
   <MouseTrailApp v-else-if="isMouseTrail" />
   <FeatureApp v-else :window-label="windowLabel" />

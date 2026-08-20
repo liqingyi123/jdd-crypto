@@ -1,14 +1,23 @@
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Mutex;
 
+use serde::Serialize;
+
 pub const MIN_BADGE_SIZE: u32 = 38;
 /// Default badge diameter in CSS/logical pixels. Keep in sync with `src/constants/badge.ts`.
 pub const DEFAULT_BADGE_SIZE: u32 = 68;
 pub const DEFAULT_MOUSE_FOLLOW_SHORTCUT: &str = "Ctrl+Shift+G";
 
+#[derive(Clone, Serialize)]
+pub struct ClipboardCandidate {
+    pub text: String,
+    pub kind: String,
+}
+
 pub struct AppState {
     pub clipboard_watch_enabled: AtomicBool,
     pub last_clipboard: Mutex<String>,
+    pub last_candidate: Mutex<Option<ClipboardCandidate>>,
     pub badge_size: AtomicU32,
     pub badge_expanded: AtomicBool,
     pub mouse_follow_enabled: AtomicBool,
@@ -23,6 +32,7 @@ impl Default for AppState {
         Self {
             clipboard_watch_enabled: AtomicBool::new(true),
             last_clipboard: Mutex::new(String::new()),
+            last_candidate: Mutex::new(None),
             badge_size: AtomicU32::new(DEFAULT_BADGE_SIZE),
             badge_expanded: AtomicBool::new(false),
             mouse_follow_enabled: AtomicBool::new(false),

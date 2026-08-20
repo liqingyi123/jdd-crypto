@@ -2,7 +2,10 @@ import { onMounted, onUnmounted } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { useClipboardStore, type ClipboardCandidate } from "@/stores/clipboard";
 
-export function useClipboardPrompt() {
+export function useClipboardPrompt(options?: {
+  fetchOnMount?: boolean;
+  hideWindowOnClose?: boolean;
+}) {
   const clipboardStore = useClipboardStore();
   let unlisten: (() => void) | undefined;
   let unlistenFollow: (() => void) | undefined;
@@ -23,6 +26,14 @@ export function useClipboardPrompt() {
           clipboardStore.clearCandidate();
         }
       });
+      if (options?.fetchOnMount) {
+        const existing = await invoke<ClipboardCandidate | null>(
+          "get_clipboard_candidate",
+        ).catch(() => null);
+        if (existing && clipboardStore.watchEnabled) {
+          clipboardStore.setCandidate(existing);
+        }
+      }
     } catch {
       // not running inside Tauri
     }
@@ -32,6 +43,13 @@ export function useClipboardPrompt() {
     unlisten?.();
     unlistenFollow?.();
   });
+
+  async function closePromptWindow() {
+    if (!options?.hideWindowOnClose) {
+      return;
+    }
+    await invoke("hide_clipboard_prompt").catch(() => undefined);
+  }
 
   async function accept(mode: "encrypt" | "decrypt") {
     const candidate = clipboardStore.candidate;
@@ -44,10 +62,12 @@ export function useClipboardPrompt() {
       text: candidate.text,
     });
     clipboardStore.clearCandidate();
+    await closePromptWindow();
   }
 
   async function dismiss() {
     clipboardStore.clearCandidate();
+    await closePromptWindow();
   }
 
   return {

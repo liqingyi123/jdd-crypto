@@ -45,11 +45,30 @@ pub fn popup_app_menu(window: WebviewWindow) -> Result<(), String> {
 
 #[tauri::command]
 pub fn set_badge_prompt_mode(app: AppHandle, state: State<AppState>, expanded: bool) {
-    state.badge_expanded.store(expanded, Ordering::Relaxed);
+    // Badge no longer expands for clipboard prompts; keep collapsed size.
+    let _ = expanded;
+    state.badge_expanded.store(false, Ordering::Relaxed);
     if state.follow_blocks_resize() {
         return;
     }
-    windows::set_badge_size(&app, expanded);
+    windows::set_badge_size(&app, false);
+}
+
+#[tauri::command]
+pub fn hide_clipboard_prompt(app: AppHandle, state: State<AppState>) {
+    if let Ok(mut candidate) = state.last_candidate.lock() {
+        *candidate = None;
+    }
+    windows::schedule_hide_clipboard_prompt(&app);
+}
+
+#[tauri::command]
+pub fn get_clipboard_candidate(state: State<AppState>) -> Option<crate::state::ClipboardCandidate> {
+    state
+        .last_candidate
+        .lock()
+        .ok()
+        .and_then(|guard| guard.clone())
 }
 
 #[tauri::command]
