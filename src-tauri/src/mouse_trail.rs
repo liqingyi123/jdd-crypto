@@ -97,6 +97,7 @@ fn normalize_effect(raw: &str) -> String {
         "meteor" => "meteor".to_string(),
         "graffiti" => "graffiti".to_string(),
         "dots" => "dots".to_string(),
+        "heart" => "heart".to_string(),
         _ => DEFAULT_EFFECT.to_string(),
     }
 }

@@ -5,6 +5,7 @@ import { MeteorTrail } from "@/effects/meteor-trail";
 import { RibbonTrail } from "@/effects/ribbon-trail";
 import { GraffitiTrail } from "@/effects/graffiti-trail";
 import { DotsTrail } from "@/effects/dots-trail";
+import { HeartTrail } from "@/effects/heart-trail";
 import {
   DEFAULT_MOUSE_TRAIL_PREF,
   normalizeMouseTrailEffect,
@@ -55,6 +56,9 @@ function createEngine(next: MouseTrailEffect): MouseTrailEngine | null {
   }
   if (next === "dots") {
     return new DotsTrail(hostRef.value);
+  }
+  if (next === "heart") {
+    return new HeartTrail(hostRef.value);
   }
   return new RibbonTrail(hostRef.value);
 }

@@ -53,6 +53,7 @@ const trailEffectOptions: Array<{ value: MouseTrailEffect; label: string }> = [
   { value: "meteor", label: "绚丽流星" },
   { value: "graffiti", label: "街头涂鸦" },
   { value: "dots", label: "连线点阵" },
+  { value: "heart", label: "粉色回忆" },
 ];
 
 function applyTrailPref(pref: MouseTrailPref) {
@@ -127,7 +128,8 @@ async function onTrailEffectChange(value: string | number | boolean | undefined)
     value !== "ribbon" &&
     value !== "meteor" &&
     value !== "graffiti" &&
-    value !== "dots"
+    value !== "dots" &&
+    value !== "heart"
   ) {
     return;
   }
