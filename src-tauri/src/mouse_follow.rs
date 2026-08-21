@@ -335,16 +335,38 @@ fn lerp_badge(app: &AppHandle, anim: &mut Option<(f64, f64)>, target: (f64, f64)
 }
 
 #[cfg(windows)]
+fn clipboard_sequence() -> u32 {
+    use windows_sys::Win32::System::DataExchange::GetClipboardSequenceNumber;
+
+    // SAFETY: GetClipboardSequenceNumber is a parameterless system query.
+    unsafe { GetClipboardSequenceNumber() }
+}
+
+#[cfg(windows)]
 fn capture_selection(app: &AppHandle) {
     // Slightly longer wait so double-click word selection can settle.
     thread::sleep(Duration::from_millis(70));
+    let seq_before = clipboard_sequence();
     send_ctrl_c();
-    thread::sleep(Duration::from_millis(80));
 
-    let Ok(text) = app.clipboard().read_text() else {
-        return;
-    };
-    if text.trim().is_empty() {
+    let deadline = Instant::now() + Duration::from_millis(450);
+    let mut text = String::new();
+    while Instant::now() < deadline {
+        thread::sleep(Duration::from_millis(30));
+        if clipboard_sequence() == seq_before {
+            continue;
+        }
+        let Ok(current) = app.clipboard().read_text() else {
+            continue;
+        };
+        if current.trim().is_empty() {
+            continue;
+        }
+        text = current;
+        break;
+    }
+    // No clipboard update → abort (avoid substituting stale clipboard).
+    if text.is_empty() {
         return;
     }
 

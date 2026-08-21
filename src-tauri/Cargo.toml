@@ -1,6 +1,6 @@
 [package]
 name = "jdd-crypto"
-version = "0.3.2"
+version = "0.3.3"
 description = "Desktop encrypt/decrypt utility with badge, tray, and plugins"
 authors = ["you"]
 edition = "2021"
@@ -30,6 +30,7 @@ windows-sys = { version = "0.59", features = [
   "Win32_Foundation",
   "Win32_UI_Input_KeyboardAndMouse",
   "Win32_UI_WindowsAndMessaging",
+  "Win32_System_DataExchange",
 ] }
 
 # Release-only: keeps `cargo run` / `tauri dev` debug builds unaffected.
