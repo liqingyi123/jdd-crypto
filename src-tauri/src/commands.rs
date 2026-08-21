@@ -89,10 +89,11 @@ pub fn set_badge_size_pref(app: AppHandle, state: State<AppState>, size: u32) {
 }
 
 #[tauri::command]
-pub fn set_clipboard_watch(state: State<AppState>, enabled: bool) {
+pub fn set_clipboard_watch(app: AppHandle, state: State<AppState>, enabled: bool) {
     state
         .clipboard_watch_enabled
         .store(enabled, Ordering::Relaxed);
+    crate::clipboard::save_watch(&app, enabled);
 }
 
 #[tauri::command]

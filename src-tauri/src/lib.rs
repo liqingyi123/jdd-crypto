@@ -88,6 +88,10 @@ pub fn run() {
                 windows::bind_close_to_hide(&main);
             }
             tray::setup_tray(app)?;
+            let clipboard_watch = clipboard::load_watch(app.handle());
+            app.state::<AppState>()
+                .clipboard_watch_enabled
+                .store(clipboard_watch, Ordering::Relaxed);
             clipboard::start_clipboard_watcher(app.handle().clone());
             let shortcut = mouse_follow::load_shortcut(app.handle());
             if let Ok(mut current) = app.state::<AppState>().mouse_follow_shortcut.lock() {

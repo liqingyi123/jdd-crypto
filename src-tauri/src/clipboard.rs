@@ -4,9 +4,30 @@ use std::time::Duration;
 
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_clipboard_manager::ClipboardExt;
+use tauri_plugin_store::StoreExt;
 
 use crate::state::{AppState, ClipboardCandidate};
 use crate::windows;
+
+const SETTINGS_STORE: &str = "settings.json";
+const WATCH_KEY: &str = "clipboardWatchEnabled";
+
+pub fn load_watch(app: &AppHandle) -> bool {
+    let Ok(store) = app.store(SETTINGS_STORE) else {
+        return true;
+    };
+    store
+        .get(WATCH_KEY)
+        .and_then(|value| value.as_bool())
+        .unwrap_or(true)
+}
+
+pub fn save_watch(app: &AppHandle, enabled: bool) {
+    if let Ok(store) = app.store(SETTINGS_STORE) {
+        store.set(WATCH_KEY, serde_json::json!(enabled));
+        let _ = store.save();
+    }
+}
 
 pub fn classify_clipboard(text: &str) -> &'static str {
     let trimmed = text.trim();

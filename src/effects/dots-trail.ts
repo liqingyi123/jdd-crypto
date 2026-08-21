@@ -24,7 +24,7 @@ interface MouseAnchor {
 function hexToRgba(hex: string, opacity: number): string {
   const cleaned = hex.replace(/^#/, "");
   if (cleaned.length !== 6) {
-    return `rgba(165,251,255,${opacity})`;
+    return `rgba(245,158,11,${opacity})`;
   }
   const r = parseInt(cleaned.slice(0, 2), 16);
   const g = parseInt(cleaned.slice(2, 4), 16);
@@ -47,9 +47,9 @@ export class DotsTrail implements MouseTrailEngine {
   private running = false;
 
   constructor(host: HTMLElement, options: DotsTrailOptions = {}) {
-    this.color = options.color ?? "#A5FBFF";
+    this.color = options.color ?? "#00D1CE";
     this.linkDistanceSq = options.linkDistanceSq ?? 8000;
-    this.count = Math.max(40, options.count ?? 300);
+    this.count = Math.max(40, options.count ?? 420);
     this.mouse = { x: null, y: null, max: this.linkDistanceSq };
 
     this.canvas = document.createElement("canvas");

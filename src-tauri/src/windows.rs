@@ -319,7 +319,8 @@ pub fn show_clipboard_prompt(app: &AppHandle) {
         ));
         let _ = win.set_position(PhysicalPosition::new(target.0, target.1));
         let _ = win.set_always_on_top(true);
-        focus_window(&win);
+        // Do not focus — keep the user's original input focused.
+        let _ = win.show();
         ensure_emit(&win);
         return;
     }
@@ -339,7 +340,7 @@ pub fn show_clipboard_prompt(app: &AppHandle) {
     .resizable(false)
     .maximizable(false)
     .minimizable(false)
-    .focused(true)
+    .focused(false)
     .visible(true)
     .inner_size(CLIPBOARD_PROMPT_WIDTH, CLIPBOARD_PROMPT_HEIGHT)
     .build();
