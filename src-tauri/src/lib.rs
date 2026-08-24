@@ -74,6 +74,8 @@ pub fn run() {
             commands::get_mouse_trail_pref,
             commands::set_mouse_trail_enabled,
             commands::set_mouse_trail_effect,
+            commands::set_mouse_trail_color,
+            commands::reset_mouse_trail_colors,
             commands::reset_mouse_trail_pref,
         ])
         .setup(|app| {

@@ -1,15 +1,20 @@
 <script setup lang="ts">
-import { onMounted, shallowRef } from "vue";
+import { computed, onMounted, shallowRef } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { ElMessage } from "element-plus";
 import { storeToRefs } from "pinia";
 import { useThemeStore, type ThemePreference } from "@/stores/theme";
 import { useClipboardStore } from "@/stores/clipboard";
 import { useShortcutRecorder } from "@/composables/use-shortcut-recorder";
-import { DEFAULT_BADGE_SIZE } from "@/constants/badge";
+import { BADGE_HIDDEN_SIZE, DEFAULT_BADGE_SIZE } from "@/constants/badge";
 import {
+  DEFAULT_MOUSE_TRAIL_COLORS,
   DEFAULT_MOUSE_TRAIL_PREF,
+  isColorableTrailEffect,
+  normalizeMouseTrailColors,
   normalizeMouseTrailEffect,
+  type ColorableTrailEffect,
+  type MouseTrailColors,
   type MouseTrailEffect,
   type MouseTrailPref,
 } from "@/effects/mouse-trail-types";
@@ -40,12 +45,23 @@ const badgeSize = shallowRef(DEFAULT_BADGE_SIZE);
 const followPref = shallowRef(true);
 const trailEnabled = shallowRef(DEFAULT_MOUSE_TRAIL_PREF.enabled);
 const trailEffect = shallowRef<MouseTrailEffect>(DEFAULT_MOUSE_TRAIL_PREF.effect);
-const trailResetting = shallowRef(false);
+const trailColors = shallowRef<MouseTrailColors>({ ...DEFAULT_MOUSE_TRAIL_COLORS });
+const trailColorsResetting = shallowRef(false);
+
+const activeColorEffect = computed((): ColorableTrailEffect | null => {
+  const effect = trailEffect.value;
+  return isColorableTrailEffect(effect) ? effect : null;
+});
+
+const showTrailColor = computed(
+  () => trailEnabled.value && activeColorEffect.value !== null,
+);
 
 const badgeSizeOptions: Array<{ value: number; label: string }> = [
   { value: 96, label: "大" },
   { value: DEFAULT_BADGE_SIZE, label: "中" },
   { value: 38, label: "小" },
+  { value: BADGE_HIDDEN_SIZE, label: "隐藏" },
 ];
 
 const trailEffectOptions: Array<{ value: MouseTrailEffect; label: string }> = [
@@ -53,12 +69,13 @@ const trailEffectOptions: Array<{ value: MouseTrailEffect; label: string }> = [
   { value: "meteor", label: "绚丽流星" },
   { value: "graffiti", label: "街头涂鸦" },
   { value: "dots", label: "连线点阵" },
-  { value: "heart", label: "粉色回忆" },
+  { value: "heart", label: "心动回忆" },
 ];
 
 function applyTrailPref(pref: MouseTrailPref) {
   trailEnabled.value = pref.enabled;
   trailEffect.value = normalizeMouseTrailEffect(pref.effect);
+  trailColors.value = normalizeMouseTrailColors(pref.colors);
 }
 
 onMounted(async () => {
@@ -142,16 +159,33 @@ async function onTrailEffectChange(value: string | number | boolean | undefined)
   }
 }
 
-async function onTrailReset() {
-  trailResetting.value = true;
+async function onTrailColorChange(color: string | null) {
+  const effect = activeColorEffect.value;
+  if (!color || !effect) {
+    return;
+  }
   try {
-    const pref = await invoke<MouseTrailPref>("reset_mouse_trail_pref");
+    const pref = await invoke<MouseTrailPref>("set_mouse_trail_color", { effect, color });
     applyTrailPref(pref);
-    ElMessage.success("已恢复默认");
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
+}
+
+async function onTrailColorReset() {
+  const effect = activeColorEffect.value;
+  if (!effect) {
+    return;
+  }
+  trailColorsResetting.value = true;
+  try {
+    const pref = await invoke<MouseTrailPref>("reset_mouse_trail_colors", { effect });
+    applyTrailPref(pref);
+    ElMessage.success("已恢复默认颜色");
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : String(error));
   } finally {
-    trailResetting.value = false;
+    trailColorsResetting.value = false;
   }
 }
 
@@ -218,9 +252,18 @@ function onThemeChange(value: string | number | boolean | undefined) {
           {{ item.label }}
         </ElRadio>
       </ElRadioGroup>
-      <div class="actions">
-        <ElButton :loading="trailResetting" @click="onTrailReset">恢复默认</ElButton>
-      </div>
+      <template v-if="showTrailColor && activeColorEffect">
+        <h3>特效颜色</h3>
+        <div class="row trail-color-row">
+          <ElColorPicker
+            :model-value="trailColors[activeColorEffect]"
+            @change="onTrailColorChange"
+          />
+          <ElButton :loading="trailColorsResetting" @click="onTrailColorReset">
+            恢复默认颜色
+          </ElButton>
+        </div>
+      </template>
     </section>
     <section>
       <div class="section-head">
@@ -293,6 +336,13 @@ h3 {
 
 .actions {
   margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.trail-color-row {
+  margin-top: 8px;
 }
 
 p {

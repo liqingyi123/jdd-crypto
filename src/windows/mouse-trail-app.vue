@@ -7,8 +7,12 @@ import { GraffitiTrail } from "@/effects/graffiti-trail";
 import { DotsTrail } from "@/effects/dots-trail";
 import { HeartTrail } from "@/effects/heart-trail";
 import {
+  DEFAULT_MOUSE_TRAIL_COLORS,
   DEFAULT_MOUSE_TRAIL_PREF,
+  isColorableTrailEffect,
+  normalizeMouseTrailColors,
   normalizeMouseTrailEffect,
+  type MouseTrailColors,
   type MouseTrailEngine,
   type MouseTrailEffect,
   type MouseTrailPref,
@@ -31,6 +35,7 @@ const hostRef = ref<HTMLElement | null>(null);
 const bounds = shallowRef<MonitorBounds | null>(null);
 const trail = shallowRef<MouseTrailEngine | null>(null);
 const effect = shallowRef<MouseTrailEffect>(DEFAULT_MOUSE_TRAIL_PREF.effect);
+const colors = shallowRef<MouseTrailColors>({ ...DEFAULT_MOUSE_TRAIL_COLORS });
 let unlistenCursor: (() => void) | undefined;
 let unlistenPref: (() => void) | undefined;
 let wasInside = false;
@@ -44,35 +49,32 @@ function isInside(area: MonitorBounds, x: number, y: number): boolean {
   );
 }
 
-function createEngine(next: MouseTrailEffect): MouseTrailEngine | null {
+function createEngine(next: MouseTrailEffect, trailColors: MouseTrailColors): MouseTrailEngine | null {
   if (!hostRef.value) {
     return null;
   }
   if (next === "meteor") {
-    return new MeteorTrail(hostRef.value, { color: "#F8EC85" });
+    return new MeteorTrail(hostRef.value, { color: trailColors.meteor });
   }
   if (next === "graffiti") {
     return new GraffitiTrail(hostRef.value);
   }
   if (next === "dots") {
-    return new DotsTrail(hostRef.value);
+    return new DotsTrail(hostRef.value, { color: trailColors.dots });
   }
   if (next === "heart") {
-    return new HeartTrail(hostRef.value);
+    return new HeartTrail(hostRef.value, { color: trailColors.heart });
   }
   return new RibbonTrail(hostRef.value);
 }
 
-function applyEffect(next: MouseTrailEffect) {
-  const normalized = normalizeMouseTrailEffect(next);
-  if (trail.value && effect.value === normalized) {
-    return;
-  }
+function rebuildEngine(next: MouseTrailEffect, trailColors: MouseTrailColors) {
   trail.value?.destroy();
   trail.value = null;
   wasInside = false;
-  effect.value = normalized;
-  const engine = createEngine(normalized);
+  effect.value = next;
+  colors.value = { ...trailColors };
+  const engine = createEngine(next, trailColors);
   if (!engine) {
     return;
   }
@@ -81,6 +83,33 @@ function applyEffect(next: MouseTrailEffect) {
   requestAnimationFrame(() => {
     trail.value?.resize();
   });
+}
+
+function applyColorToEngine(next: MouseTrailEffect, trailColors: MouseTrailColors) {
+  const engine = trail.value;
+  if (!engine?.setColor || !isColorableTrailEffect(next)) {
+    return;
+  }
+  engine.setColor(trailColors[next]);
+}
+
+function applyPref(pref: MouseTrailPref) {
+  const normalized = normalizeMouseTrailEffect(pref.effect);
+  const normalizedColors = normalizeMouseTrailColors(pref.colors);
+  const effectChanged = effect.value !== normalized;
+  const colorsChanged =
+    colors.value.meteor !== normalizedColors.meteor ||
+    colors.value.dots !== normalizedColors.dots ||
+    colors.value.heart !== normalizedColors.heart;
+
+  if (effectChanged) {
+    rebuildEngine(normalized, normalizedColors);
+    return;
+  }
+  colors.value = { ...normalizedColors };
+  if (colorsChanged) {
+    applyColorToEngine(normalized, normalizedColors);
+  }
 }
 
 function applyCursor(payload: CursorPayload) {
@@ -135,9 +164,9 @@ onMounted(async () => {
 
   try {
     const pref = await invoke<MouseTrailPref>("get_mouse_trail_pref");
-    applyEffect(normalizeMouseTrailEffect(pref.effect));
+    applyPref(pref);
   } catch {
-    applyEffect(DEFAULT_MOUSE_TRAIL_PREF.effect);
+    rebuildEngine(DEFAULT_MOUSE_TRAIL_PREF.effect, DEFAULT_MOUSE_TRAIL_COLORS);
   }
 
   try {
@@ -146,7 +175,7 @@ onMounted(async () => {
       applyCursor(event.payload);
     });
     unlistenPref = await listen<MouseTrailPref>("app://mouse-trail-pref", (event) => {
-      applyEffect(normalizeMouseTrailEffect(event.payload.effect));
+      applyPref(event.payload);
     });
   } catch {
     // browser preview

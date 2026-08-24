@@ -92,8 +92,8 @@ function createHeartSprite(color: string, size: number): HTMLCanvasElement {
 export class HeartTrail implements MouseTrailEngine {
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
-  private readonly glowSprite: HTMLCanvasElement;
-  private readonly heartSprite: HTMLCanvasElement;
+  private glowSprite: HTMLCanvasElement;
+  private heartSprite: HTMLCanvasElement;
   private glow: GlowNode[] = [];
   private hearts: HeartStamp[] = [];
   private lastX = 0;
@@ -120,6 +120,11 @@ export class HeartTrail implements MouseTrailEngine {
     this.ctx = ctx;
     this.resize();
     window.addEventListener("resize", this.onResize);
+  }
+
+  setColor(color: string) {
+    this.glowSprite = createSoftGlowSprite(color, GLOW_SPRITE);
+    this.heartSprite = createHeartSprite(color, HEART_SPRITE);
   }
 
   private onResize = () => {

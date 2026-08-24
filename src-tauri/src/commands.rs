@@ -234,6 +234,23 @@ pub fn set_mouse_trail_effect(
 }
 
 #[tauri::command]
+pub fn set_mouse_trail_color(
+    app: AppHandle,
+    effect: String,
+    color: String,
+) -> Result<crate::mouse_trail::MouseTrailPref, String> {
+    crate::mouse_trail::set_color_pref(app, effect, color)
+}
+
+#[tauri::command]
+pub fn reset_mouse_trail_colors(
+    app: AppHandle,
+    effect: String,
+) -> Result<crate::mouse_trail::MouseTrailPref, String> {
+    crate::mouse_trail::reset_color_pref(app, effect)
+}
+
+#[tauri::command]
 pub fn reset_mouse_trail_pref(app: AppHandle) -> Result<crate::mouse_trail::MouseTrailPref, String> {
     crate::mouse_trail::reset_pref(app)
 }

@@ -3,6 +3,7 @@ use std::sync::Mutex;
 
 use serde::Serialize;
 
+pub const BADGE_HIDDEN_SIZE: u32 = 0;
 pub const MIN_BADGE_SIZE: u32 = 38;
 /// Default badge diameter in CSS/logical pixels. Keep in sync with `src/constants/badge.ts`.
 pub const DEFAULT_BADGE_SIZE: u32 = 68;
@@ -53,7 +54,7 @@ impl AppState {
 
 pub fn normalize_badge_size(size: u32) -> u32 {
     match size {
-        MIN_BADGE_SIZE | 68 | 96 => size,
+        BADGE_HIDDEN_SIZE | MIN_BADGE_SIZE | 68 | 96 => size,
         _ => DEFAULT_BADGE_SIZE,
     }
 }

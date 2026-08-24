@@ -290,8 +290,12 @@ pub fn set_badge_size(app: &AppHandle, expanded: bool) {
 
 pub fn apply_badge_window_size(app: &AppHandle, size: u32, expanded: bool) {
     if let Some(win) = app.get_webview_window("badge") {
-        // Clipboard prompt is a separate window; badge stays collapsed.
         let _ = expanded;
+        if size == crate::state::BADGE_HIDDEN_SIZE {
+            let _ = win.hide();
+            return;
+        }
+        let _ = win.show();
         let _ = win.set_size(tauri::LogicalSize::new(f64::from(size), f64::from(size)));
         let _ = win.emit("app://badge-size", size);
     }

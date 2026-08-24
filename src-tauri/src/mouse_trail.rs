@@ -13,6 +13,9 @@ const MAX_OVERLAYS: usize = 8;
 const SETTINGS_STORE: &str = "settings.json";
 const PREF_KEY: &str = "mouseTrail";
 const DEFAULT_EFFECT: &str = "ribbon";
+const DEFAULT_METEOR_COLOR: &str = "#F8EC85";
+const DEFAULT_DOTS_COLOR: &str = "#00D1CE";
+const DEFAULT_HEART_COLOR: &str = "#FF2EC8";
 
 static CURSOR_LOOP_STARTED: AtomicBool = AtomicBool::new(false);
 static TRAIL_ENABLED: AtomicBool = AtomicBool::new(false);
@@ -36,9 +39,44 @@ pub struct MouseTrailMonitorBounds {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct MouseTrailColors {
+    #[serde(default = "default_meteor_color")]
+    pub meteor: String,
+    #[serde(default = "default_dots_color")]
+    pub dots: String,
+    #[serde(default = "default_heart_color")]
+    pub heart: String,
+}
+
+impl Default for MouseTrailColors {
+    fn default() -> Self {
+        Self {
+            meteor: default_meteor_color(),
+            dots: default_dots_color(),
+            heart: default_heart_color(),
+        }
+    }
+}
+
+fn default_meteor_color() -> String {
+    DEFAULT_METEOR_COLOR.to_string()
+}
+
+fn default_dots_color() -> String {
+    DEFAULT_DOTS_COLOR.to_string()
+}
+
+fn default_heart_color() -> String {
+    DEFAULT_HEART_COLOR.to_string()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MouseTrailPref {
     pub enabled: bool,
     pub effect: String,
+    #[serde(default)]
+    pub colors: MouseTrailColors,
 }
 
 impl Default for MouseTrailPref {
@@ -46,6 +84,7 @@ impl Default for MouseTrailPref {
         Self {
             enabled: false,
             effect: DEFAULT_EFFECT.to_string(),
+            colors: MouseTrailColors::default(),
         }
     }
 }
@@ -102,6 +141,29 @@ fn normalize_effect(raw: &str) -> String {
     }
 }
 
+fn normalize_color(raw: &str, fallback: &str) -> String {
+    let cleaned = raw.trim().trim_start_matches('#').to_ascii_lowercase();
+    if cleaned.len() == 6 && cleaned.chars().all(|c| c.is_ascii_hexdigit()) {
+        return format!("#{cleaned}");
+    }
+    let fb = fallback.trim().trim_start_matches('#').to_ascii_lowercase();
+    if fb.len() == 6 && fb.chars().all(|c| c.is_ascii_hexdigit()) {
+        return format!("#{fb}");
+    }
+    "#ffffff".to_string()
+}
+
+fn normalize_colors(colors: &mut MouseTrailColors) {
+    colors.meteor = normalize_color(&colors.meteor, DEFAULT_METEOR_COLOR);
+    colors.dots = normalize_color(&colors.dots, DEFAULT_DOTS_COLOR);
+    colors.heart = normalize_color(&colors.heart, DEFAULT_HEART_COLOR);
+}
+
+fn normalize_pref(pref: &mut MouseTrailPref) {
+    pref.effect = normalize_effect(&pref.effect);
+    normalize_colors(&mut pref.colors);
+}
+
 pub fn load_pref(app: &AppHandle) -> MouseTrailPref {
     let Ok(store) = app.store(SETTINGS_STORE) else {
         return MouseTrailPref::default();
@@ -112,7 +174,7 @@ pub fn load_pref(app: &AppHandle) -> MouseTrailPref {
     let Ok(mut pref) = serde_json::from_value::<MouseTrailPref>(value) else {
         return MouseTrailPref::default();
     };
-    pref.effect = normalize_effect(&pref.effect);
+    normalize_pref(&mut pref);
     pref
 }
 
@@ -146,6 +208,43 @@ pub fn set_enabled_pref(app: AppHandle, enabled: bool) -> Result<MouseTrailPref,
 pub fn set_effect_pref(app: AppHandle, effect: String) -> Result<MouseTrailPref, String> {
     let mut pref = load_pref(&app);
     pref.effect = normalize_effect(&effect);
+    save_pref(&app, &pref)?;
+    emit_pref(&app, &pref);
+    Ok(pref)
+}
+
+pub fn set_color_pref(app: AppHandle, effect: String, color: String) -> Result<MouseTrailPref, String> {
+    let normalized_effect = normalize_effect(&effect);
+    if normalized_effect != "meteor" && normalized_effect != "dots" && normalized_effect != "heart" {
+        return Err("该特效不支持自定义颜色".into());
+    }
+    let mut pref = load_pref(&app);
+    let normalized_color = match normalized_effect.as_str() {
+        "meteor" => normalize_color(&color, DEFAULT_METEOR_COLOR),
+        "dots" => normalize_color(&color, DEFAULT_DOTS_COLOR),
+        _ => normalize_color(&color, DEFAULT_HEART_COLOR),
+    };
+    match normalized_effect.as_str() {
+        "meteor" => pref.colors.meteor = normalized_color,
+        "dots" => pref.colors.dots = normalized_color,
+        _ => pref.colors.heart = normalized_color,
+    }
+    save_pref(&app, &pref)?;
+    emit_pref(&app, &pref);
+    Ok(pref)
+}
+
+pub fn reset_color_pref(app: AppHandle, effect: String) -> Result<MouseTrailPref, String> {
+    let normalized_effect = normalize_effect(&effect);
+    if normalized_effect != "meteor" && normalized_effect != "dots" && normalized_effect != "heart" {
+        return Err("该特效不支持自定义颜色".into());
+    }
+    let mut pref = load_pref(&app);
+    match normalized_effect.as_str() {
+        "meteor" => pref.colors.meteor = default_meteor_color(),
+        "dots" => pref.colors.dots = default_dots_color(),
+        _ => pref.colors.heart = default_heart_color(),
+    }
     save_pref(&app, &pref)?;
     emit_pref(&app, &pref);
     Ok(pref)

@@ -38,7 +38,7 @@ function hexToRgba(hex: string, opacity: number): string {
 export class DotsTrail implements MouseTrailEngine {
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
-  private readonly color: string;
+  private color: string;
   private readonly linkDistanceSq: number;
   private readonly count: number;
   private dots: Dot[] = [];
@@ -98,6 +98,13 @@ export class DotsTrail implements MouseTrailEngine {
         this.seedDots();
       }
     }
+  }
+
+  setColor(color: string) {
+    if (this.color === color) {
+      return;
+    }
+    this.color = color;
   }
 
   setMouse(x: number, y: number) {
