@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Build a Universal macOS DMG (Intel + Apple Silicon). Must run on macOS.
+# Expect roughly 2x build time and bundle size vs single-arch.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -6,15 +8,20 @@ cd "$root"
 
 npm ci
 npm run build
-npx tauri build
+rustup target add aarch64-apple-darwin x86_64-apple-darwin
+npx tauri build -- --target universal-apple-darwin
 
 version="$(node -p "require('./package.json').version")"
 product_name="多多解密"
-expected_name="${product_name}_${version}_aarch64.dmg"
-dmg_dir="$root/src-tauri/target/release/bundle/dmg"
+expected_name="${product_name}_${version}_universal.dmg"
+dmg_dir="$root/src-tauri/target/universal-apple-darwin/release/bundle/dmg"
 
 if [[ ! -d "$dmg_dir" ]]; then
-  echo "[error] DMG output directory not found: $dmg_dir"
+  dmg_dir="$root/src-tauri/target/release/bundle/dmg"
+fi
+
+if [[ ! -d "$dmg_dir" ]]; then
+  echo "[error] DMG output directory not found under src-tauri/target"
   exit 1
 fi
 
@@ -37,4 +44,4 @@ else
   echo "[ok] DMG already named $expected_name"
 fi
 
-echo "[ok] macOS bundle: $target_path"
+echo "[ok] macOS Universal bundle: $target_path"

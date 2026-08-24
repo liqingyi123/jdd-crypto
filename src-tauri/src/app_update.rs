@@ -16,6 +16,7 @@ pub struct UpdateCheckResult {
     pub current_version: String,
     pub latest_version: Option<String>,
     pub notes: Option<String>,
+    pub install_kind: String,
 }
 
 #[derive(Clone, Serialize)]
@@ -42,6 +43,26 @@ fn version_lt(current: &str, latest: &str) -> bool {
     }
 }
 
+fn install_kind() -> &'static str {
+    if cfg!(target_os = "macos") {
+        "dmg"
+    } else if cfg!(target_os = "windows") {
+        "nsis"
+    } else {
+        "unsupported"
+    }
+}
+
+fn no_update_result(current_version: String) -> UpdateCheckResult {
+    UpdateCheckResult {
+        available: false,
+        current_version,
+        latest_version: None,
+        notes: None,
+        install_kind: install_kind().to_string(),
+    }
+}
+
 fn http_client(timeout: Duration) -> Result<reqwest::blocking::Client, String> {
     reqwest::blocking::Client::builder()
         .timeout(timeout)
@@ -58,8 +79,19 @@ fn installer_url(version: &str) -> String {
     format!("{}/{}", UPDATE_BASE, urlencoding::encode(&file_name))
 }
 
+#[cfg(target_os = "macos")]
+fn installer_file_name(version: &str) -> String {
+    format!("多多解密_{version}_universal.dmg")
+}
+
+#[cfg(target_os = "windows")]
 fn installer_file_name(version: &str) -> String {
     format!("多多解密_{version}_x64-setup.exe")
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+fn installer_file_name(_version: &str) -> String {
+    String::new()
 }
 
 fn fetch_changelog() -> Result<String, String> {
@@ -119,18 +151,21 @@ fn parse_latest_release(text: &str) -> Option<(String, String)> {
 pub fn check_update(app: &AppHandle, manual: bool) -> Result<UpdateCheckResult, String> {
     let current_version = app.package_info().version.to_string();
 
+    if install_kind() == "unsupported" {
+        return if manual {
+            Err("当前平台不支持自动更新".to_string())
+        } else {
+            Ok(no_update_result(current_version))
+        };
+    }
+
     let changelog = match fetch_changelog() {
         Ok(text) => text,
         Err(error) => {
             if manual {
                 return Err(error);
             }
-            return Ok(UpdateCheckResult {
-                available: false,
-                current_version,
-                latest_version: None,
-                notes: None,
-            });
+            return Ok(no_update_result(current_version));
         }
     };
 
@@ -138,12 +173,7 @@ pub fn check_update(app: &AppHandle, manual: bool) -> Result<UpdateCheckResult, 
         if manual {
             return Err("更新日志格式无效".to_string());
         }
-        return Ok(UpdateCheckResult {
-            available: false,
-            current_version,
-            latest_version: None,
-            notes: None,
-        });
+        return Ok(no_update_result(current_version));
     };
 
     Ok(UpdateCheckResult {
@@ -151,6 +181,7 @@ pub fn check_update(app: &AppHandle, manual: bool) -> Result<UpdateCheckResult, 
         current_version,
         latest_version: Some(latest_version),
         notes: Some(notes),
+        install_kind: install_kind().to_string(),
     })
 }
 
@@ -162,6 +193,9 @@ fn emit_progress(app: &AppHandle, downloaded: u64, total: Option<u64>) {
 }
 
 pub fn download_installer(app: &AppHandle, version: &str) -> Result<String, String> {
+    if install_kind() == "unsupported" {
+        return Err("当前平台不支持自动更新".to_string());
+    }
     if parse_version(version).is_none() {
         return Err("版本号无效".to_string());
     }
@@ -206,11 +240,32 @@ pub fn download_installer(app: &AppHandle, version: &str) -> Result<String, Stri
 }
 
 pub fn install_update(app: &AppHandle, path: &str) -> Result<(), String> {
-    std::process::Command::new(path)
-        .spawn()
-        .map_err(|error| error.to_string())?;
-    app.exit(0);
-    Ok(())
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new(path)
+            .spawn()
+            .map_err(|error| error.to_string())?;
+        app.exit(0);
+        return Ok(());
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("xattr")
+            .args(["-dr", "com.apple.quarantine", path])
+            .status();
+        std::process::Command::new("open")
+            .arg(path)
+            .spawn()
+            .map_err(|_| "无法打开安装包".to_string())?;
+        return Ok(());
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        let _ = (app, path);
+        Err("当前平台不支持自动更新".to_string())
+    }
 }
 
 #[cfg(test)]
@@ -232,5 +287,23 @@ mod tests {
         assert_eq!(version, "0.4.3");
         assert!(notes.contains("new ui"));
         assert!(notes.contains("update check"));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn windows_installer_file_name() {
+        assert_eq!(
+            super::installer_file_name("0.4.3"),
+            "多多解密_0.4.3_x64-setup.exe"
+        );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_installer_file_name() {
+        assert_eq!(
+            super::installer_file_name("0.4.3"),
+            "多多解密_0.4.3_universal.dmg"
+        );
     }
 }

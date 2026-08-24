@@ -8,6 +8,7 @@ const {
   notes,
   downloading,
   installing,
+  isDmgInstall,
   progressPercent,
   downloadedLabel,
   totalLabel,
@@ -47,7 +48,15 @@ const {
     </div>
 
     <div v-else class="body">
-      <p class="hint">安装包已下载完成，可立即安装新版本。</p>
+      <p class="hint">
+        <template v-if="isDmgInstall">
+          安装镜像已下载。点击后将打开 dmg，请将「多多解密」拖入「应用程序」文件夹。
+        </template>
+        <template v-else>安装包已下载完成，可立即安装新版本。</template>
+      </p>
+      <p v-if="isDmgInstall" class="hint sub">
+        若提示无法验证开发者，请在新应用中右键选择「打开」。
+      </p>
     </div>
 
     <template #footer>
@@ -61,7 +70,7 @@ const {
       <template v-else>
         <ElButton @click="dismissDialog">稍后</ElButton>
         <ElButton type="primary" :loading="installing" @click="installUpdate">
-          立即安装
+          {{ isDmgInstall ? "打开安装包" : "立即安装" }}
         </ElButton>
       </template>
     </template>
@@ -79,6 +88,10 @@ const {
   margin: 0;
   color: var(--text-muted);
   font-size: 13px;
+}
+
+.hint.sub {
+  font-size: 12px;
 }
 
 .notes {

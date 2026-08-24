@@ -9,6 +9,7 @@ export interface UpdateCheckResult {
   current_version: string;
   latest_version?: string | null;
   notes?: string | null;
+  install_kind?: string | null;
 }
 
 export interface DownloadProgressPayload {
@@ -24,6 +25,7 @@ const installing = ref(false);
 const currentVersion = ref("");
 const latestVersion = ref("");
 const notes = ref("");
+const installKind = ref("nsis");
 const installerPath = ref("");
 const downloadedBytes = ref(0);
 const totalBytes = ref<number | null>(null);
@@ -39,6 +41,8 @@ const downloadedLabel = computed(() => formatBytes(downloadedBytes.value));
 const totalLabel = computed(() =>
   totalBytes.value ? formatBytes(totalBytes.value) : null,
 );
+
+const isDmgInstall = computed(() => installKind.value === "dmg");
 
 function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024) {
@@ -60,6 +64,7 @@ function openPrompt(result: UpdateCheckResult) {
   latestVersion.value = result.latest_version ?? "";
   notes.value = result.notes ?? "";
   currentVersion.value = result.current_version;
+  installKind.value = result.install_kind ?? "nsis";
   resetDialogState();
   visible.value = true;
 }
@@ -142,6 +147,10 @@ export function useAppUpdate() {
     installing.value = true;
     try {
       await invoke("install_app_update", { path: installerPath.value });
+      if (isDmgInstall.value) {
+        ElMessage.success("已打开安装镜像，请将应用拖入「应用程序」文件夹");
+        installing.value = false;
+      }
     } catch (error) {
       ElMessage.error(error instanceof Error ? error.message : "安装失败");
       installing.value = false;
@@ -164,6 +173,8 @@ export function useAppUpdate() {
     currentVersion,
     latestVersion,
     notes,
+    installKind,
+    isDmgInstall,
     installerPath,
     downloadedBytes,
     totalBytes,
