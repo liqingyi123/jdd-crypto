@@ -18,7 +18,7 @@
 前置条件：
 
 - Node.js 18+
-- Rust（[rustup](https://www.rust-lang.org/learn/get-started)，Windows 使用 `stable-x86_64-pc-windows-msvc`；仓库已通过 `rust-toolchain.toml` 固定）
+- Rust（[rustup](https://www.rust-lang.org/learn/get-started)，仓库通过 `rust-toolchain.toml` 固定 `stable` channel；Windows 需 `stable-x86_64-pc-windows-msvc` 工具链）
 - Windows：Visual Studio 2022（含“使用 C++ 的桌面开发”）。`npm run tauri` 经 `scripts/run-tauri.mjs` 调用 `scripts/tauri.cmd`，自动加载 MSVC 环境，避免 Git Bash 误用 GNU/`dlltool`
 - 各平台系统依赖见 [Tauri prerequisites](https://tauri.app/start/prerequisites/)
 
@@ -44,8 +44,47 @@ npm run dev
 打包：
 
 ```bash
+# Windows（NSIS 安装包）
 npm run tauri build
 ```
+
+## macOS 打包
+
+**说明**：DMG 只能在 macOS 上构建，无法在 Windows 上交叉编译。Gitee 无免费 macOS Runner，需 Apple Silicon Mac 本机或自建 Mac 构建机。
+
+### 环境（在 Mac 上执行）
+
+- Apple Silicon Mac（M 系列），macOS 12+
+- Xcode Command Line Tools：`xcode-select --install`
+- Node.js 18+
+- Rust stable（`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`）
+
+### 命令
+
+```bash
+git clone <gitee-repo>
+cd jdd-crypto
+npm install
+npm run build:mac
+# 或
+npm run build && npx tauri build
+```
+
+### 产物
+
+- `src-tauri/target/release/bundle/dmg/多多解密_<version>_aarch64.dmg`
+- `src-tauri/target/release/bundle/macos/多多解密.app`
+
+`build-mac.sh` 会将 dmg 复制/对齐为内网商店命名：`多多解密_{version}_aarch64.dmg`。
+
+### 上传内网商店
+
+与 Windows 同目录，文件名区分：
+
+- Windows: `多多解密_{version}_x64-setup.exe`
+- macOS: `多多解密_{version}_aarch64.dmg`
+
+Gitee 流水线接入说明见 [`docs/gitee-mac-build.md`](docs/gitee-mac-build.md)。
 
 ## 目录约定
 

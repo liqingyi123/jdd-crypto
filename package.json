@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "tauri": "node ./scripts/run-tauri.mjs"
+    "tauri": "node ./scripts/run-tauri.mjs",
+    "build:mac": "bash ./scripts/build-mac.sh"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
