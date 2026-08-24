@@ -7,9 +7,8 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
 
 npm ci
-npm run build
 rustup target add aarch64-apple-darwin x86_64-apple-darwin
-npx tauri build -- --target universal-apple-darwin
+npm run tauri -- build --target universal-apple-darwin
 
 version="$(node -p "require('./package.json').version")"
 product_name="多多解密"

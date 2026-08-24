@@ -11,6 +11,9 @@ jobs:
     name: Build macOS Universal DMG
     runs-on: macos-latest
 
+    env:
+      CI: true
+
     steps:
       - uses: actions/checkout@v4
 
@@ -28,6 +31,9 @@ jobs:
         with:
           workspaces: src-tauri
 
+      - name: Use crates.io on CI
+        run: rm -f src-tauri/.cargo/config.toml
+
       - name: Install dependencies
         run: npm ci
 
@@ -35,7 +41,7 @@ jobs:
         run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
       - name: Build Tauri (Universal DMG)
-        run: npm run tauri build -- --target universal-apple-darwin
+        run: npm run tauri -- build --target universal-apple-darwin
 
       - name: Rename macOS DMG
         shell: bash
