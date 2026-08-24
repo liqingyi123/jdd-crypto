@@ -35,6 +35,9 @@ windows-sys = { version = "0.59", features = [
   "Win32_System_DataExchange",
 ] }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+core-graphics = "0.24"
+
 # Release-only: keeps `cargo run` / `tauri dev` debug builds unaffected.
 [profile.release]
 codegen-units = 16

@@ -16,13 +16,13 @@ const SETTINGS_STORE: &str = "settings.json";
 const SHORTCUT_KEY: &str = "mouseFollowShortcut";
 const PREF_KEY: &str = "mouseFollowEnabled";
 const MAX_KEYS: usize = 4;
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 const CURSOR_OFFSET: i32 = 16;
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 const DRAG_THRESHOLD: i32 = 12;
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 const LERP: f64 = 0.35;
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 const SETTLE: f64 = 1.0;
 
 pub fn load_shortcut(app: &AppHandle) -> String {
@@ -181,7 +181,7 @@ fn stop(app: &AppHandle) {
     state.mouse_follow_enabled.store(false, Ordering::Relaxed);
     let _ = app.emit("app://mouse-follow", false);
 
-    #[cfg(not(windows))]
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         snap_home_and_restore(app);
     }
@@ -213,7 +213,7 @@ pub fn start_follow_loop(app: AppHandle) {
         let mut anim: Option<(f64, f64)> = None;
         let mut was_down = false;
         let mut press = (0, 0);
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "macos"))]
         let mut last_short_up: Option<(Instant, i32, i32)> = None;
 
         loop {
@@ -226,7 +226,7 @@ pub fn start_follow_loop(app: AppHandle) {
             if !enabled && !returning {
                 anim = None;
                 was_down = false;
-                #[cfg(windows)]
+                #[cfg(any(windows, target_os = "macos"))]
                 {
                     last_short_up = None;
                 }
@@ -234,7 +234,7 @@ pub fn start_follow_loop(app: AppHandle) {
                 continue;
             }
 
-            #[cfg(windows)]
+            #[cfg(any(windows, target_os = "macos"))]
             {
                 if returning && !enabled {
                     let target = state
@@ -258,7 +258,7 @@ pub fn start_follow_loop(app: AppHandle) {
                     continue;
                 }
 
-                let Some(cursor) = cursor_pos() else {
+                let Some(cursor) = cursor_physical_pos(&app) else {
                     thread::sleep(Duration::from_millis(16));
                     continue;
                 };
@@ -292,17 +292,12 @@ pub fn start_follow_loop(app: AppHandle) {
                 was_down = down;
             }
 
-            #[cfg(not(windows))]
-            {
-                let _ = (anim, was_down, press);
-            }
-
             thread::sleep(Duration::from_millis(16));
         }
     });
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 fn lerp_badge(app: &AppHandle, anim: &mut Option<(f64, f64)>, target: (f64, f64)) -> f64 {
     let Some(win) = app.get_webview_window("badge") else {
         return 0.0;
@@ -334,42 +329,8 @@ fn lerp_badge(app: &AppHandle, anim: &mut Option<(f64, f64)>, target: (f64, f64)
     (dx * dx + dy * dy).sqrt()
 }
 
-#[cfg(windows)]
-fn clipboard_sequence() -> u32 {
-    use windows_sys::Win32::System::DataExchange::GetClipboardSequenceNumber;
-
-    // SAFETY: GetClipboardSequenceNumber is a parameterless system query.
-    unsafe { GetClipboardSequenceNumber() }
-}
-
-#[cfg(windows)]
-fn capture_selection(app: &AppHandle) {
-    // Slightly longer wait so double-click word selection can settle.
-    thread::sleep(Duration::from_millis(70));
-    let seq_before = clipboard_sequence();
-    send_ctrl_c();
-
-    let deadline = Instant::now() + Duration::from_millis(450);
-    let mut text = String::new();
-    while Instant::now() < deadline {
-        thread::sleep(Duration::from_millis(30));
-        if clipboard_sequence() == seq_before {
-            continue;
-        }
-        let Ok(current) = app.clipboard().read_text() else {
-            continue;
-        };
-        if current.trim().is_empty() {
-            continue;
-        }
-        text = current;
-        break;
-    }
-    // No clipboard update → abort (avoid substituting stale clipboard).
-    if text.is_empty() {
-        return;
-    }
-
+#[cfg(any(windows, target_os = "macos"))]
+fn open_main_with_capture(app: &AppHandle, text: String) {
     if let Ok(mut last) = app.state::<AppState>().last_clipboard.lock() {
         *last = text.clone();
     }
@@ -391,6 +352,68 @@ fn capture_selection(app: &AppHandle) {
 }
 
 #[cfg(windows)]
+fn clipboard_sequence() -> u32 {
+    use windows_sys::Win32::System::DataExchange::GetClipboardSequenceNumber;
+
+    // SAFETY: GetClipboardSequenceNumber is a parameterless system query.
+    unsafe { GetClipboardSequenceNumber() }
+}
+
+#[cfg(windows)]
+fn capture_selection(app: &AppHandle) {
+    // Slightly longer wait so double-click word selection can settle.
+    thread::sleep(Duration::from_millis(70));
+    let seq_before = clipboard_sequence();
+    send_copy_shortcut();
+
+    let deadline = Instant::now() + Duration::from_millis(450);
+    let mut text = String::new();
+    while Instant::now() < deadline {
+        thread::sleep(Duration::from_millis(30));
+        if clipboard_sequence() == seq_before {
+            continue;
+        }
+        let Ok(current) = app.clipboard().read_text() else {
+            continue;
+        };
+        if current.trim().is_empty() {
+            continue;
+        }
+        text = current;
+        break;
+    }
+    if text.is_empty() {
+        return;
+    }
+    open_main_with_capture(app, text);
+}
+
+#[cfg(target_os = "macos")]
+fn capture_selection(app: &AppHandle) {
+    thread::sleep(Duration::from_millis(70));
+    let before = app.clipboard().read_text().unwrap_or_default();
+    send_copy_shortcut();
+
+    let deadline = Instant::now() + Duration::from_millis(450);
+    let mut text = String::new();
+    while Instant::now() < deadline {
+        thread::sleep(Duration::from_millis(30));
+        let Ok(current) = app.clipboard().read_text() else {
+            continue;
+        };
+        if current.trim().is_empty() || current == before {
+            continue;
+        }
+        text = current;
+        break;
+    }
+    if text.is_empty() {
+        return;
+    }
+    open_main_with_capture(app, text);
+}
+
+#[cfg(any(windows, target_os = "macos"))]
 fn is_double_click(last_short_up: &Option<(Instant, i32, i32)>, press: (i32, i32)) -> bool {
     let Some((prev_at, prev_x, prev_y)) = *last_short_up else {
         return false;
@@ -413,6 +436,11 @@ fn double_click_interval() -> Duration {
     Duration::from_millis(u64::from(ms.max(1)))
 }
 
+#[cfg(target_os = "macos")]
+fn double_click_interval() -> Duration {
+    Duration::from_millis(500)
+}
+
 #[cfg(windows)]
 fn double_click_tolerance() -> (i32, i32) {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
@@ -423,6 +451,38 @@ fn double_click_tolerance() -> (i32, i32) {
     let cx = unsafe { GetSystemMetrics(SM_CXDOUBLECLK) };
     let cy = unsafe { GetSystemMetrics(SM_CYDOUBLECLK) };
     (cx.max(4), cy.max(4))
+}
+
+#[cfg(target_os = "macos")]
+fn double_click_tolerance() -> (i32, i32) {
+    (5, 5)
+}
+
+#[cfg(any(windows, target_os = "macos"))]
+fn cursor_physical_pos(app: &AppHandle) -> Option<(i32, i32)> {
+    let (x, y) = cursor_pos()?;
+    #[cfg(windows)]
+    {
+        let _ = app;
+        return Some((x, y));
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let scale = app
+            .get_webview_window("badge")
+            .and_then(|win| win.scale_factor().ok())
+            .or_else(|| {
+                app.primary_monitor()
+                    .ok()
+                    .flatten()
+                    .map(|monitor| monitor.scale_factor())
+            })
+            .unwrap_or(1.0);
+        Some((
+            (f64::from(x) * scale).round() as i32,
+            (f64::from(y) * scale).round() as i32,
+        ))
+    }
 }
 
 #[cfg(windows)]
@@ -439,6 +499,17 @@ fn cursor_pos() -> Option<(i32, i32)> {
     Some((point.x, point.y))
 }
 
+#[cfg(target_os = "macos")]
+fn cursor_pos() -> Option<(i32, i32)> {
+    use core_graphics::event::CGEvent;
+    use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
+
+    let source = CGEventSource::new(CGEventSourceStateID::CombinedSessionState).ok()?;
+    let event = CGEvent::new(source).ok()?;
+    let loc = event.location();
+    Some((loc.x.round() as i32, loc.y.round() as i32))
+}
+
 #[cfg(windows)]
 fn left_button_down() -> bool {
     use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
@@ -447,11 +518,23 @@ fn left_button_down() -> bool {
     unsafe { GetAsyncKeyState(i32::from(VK_LBUTTON)) as u16 & 0x8000 != 0 }
 }
 
+#[cfg(target_os = "macos")]
+fn left_button_down() -> bool {
+    use core_graphics::event::CGMouseButton;
+    use core_graphics::event::CGEventSourceButtonState;
+    use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
+
+    CGEventSource::button_state(
+        CGEventSourceStateID::CombinedSessionState,
+        CGMouseButton::Left,
+    ) == CGEventSourceButtonState::Down
+}
+
 #[cfg(windows)]
-fn send_ctrl_c() {
+fn send_copy_shortcut() {
     use std::mem::{size_of, zeroed};
     use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-        SendInput, INPUT, KEYBDINPUT, KEYEVENTF_KEYUP, VK_C, VK_CONTROL, INPUT_KEYBOARD,
+        SendInput, INPUT, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VK_C, VK_CONTROL,
     };
 
     fn key_event(vk: u16, flags: u32) -> INPUT {
@@ -477,5 +560,25 @@ fn send_ctrl_c() {
     unsafe {
         // SAFETY: `inputs` is a contiguous array of fully initialized INPUT_KEYBOARD structs.
         SendInput(inputs.len() as u32, inputs.as_ptr(), size_of::<INPUT>() as i32);
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn send_copy_shortcut() {
+    use core_graphics::event::{CGEvent, CGEventFlags, CGEventTapLocation, CGKeyCode};
+    use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
+
+    const KEY_C: CGKeyCode = 8;
+    let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) else {
+        return;
+    };
+    let flags = CGEventFlags::CGEventFlagCommand;
+    if let Ok(down) = CGEvent::new_keyboard_event(source.clone(), KEY_C, true) {
+        down.set_flags(flags);
+        down.post(CGEventTapLocation::HID);
+    }
+    if let Ok(up) = CGEvent::new_keyboard_event(source, KEY_C, false) {
+        up.set_flags(flags);
+        up.post(CGEventTapLocation::HID);
     }
 }
