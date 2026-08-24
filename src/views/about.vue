@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
+import { useAppUpdate } from "@/composables/use-app-update";
 
 const appIcon = "/app-icon.png";
 const version = ref("0.1.0");
 const platform = ref("desktop");
+const { checking, checkUpdate } = useAppUpdate();
 
 const roadmap = [
   "转 KV 功能支持密文、明文两种文本格式",
@@ -31,6 +33,10 @@ onMounted(async () => {
     platform.value = navigator.platform;
   }
 });
+
+function onCheckUpdate() {
+  void checkUpdate(true);
+}
 </script>
 
 <template>
@@ -42,7 +48,12 @@ onMounted(async () => {
     <dl class="meta">
       <div>
         <dt>版本</dt>
-        <dd>{{ version }}</dd>
+        <dd class="version-row">
+          <span>{{ version }}</span>
+          <ElButton link type="primary" :loading="checking" @click="onCheckUpdate">
+            检查更新
+          </ElButton>
+        </dd>
       </div>
       <div>
         <dt>平台</dt>
@@ -120,6 +131,12 @@ dt {
 dd {
   margin: 0;
   color: var(--text-muted);
+}
+
+.version-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .roadmap h3 {

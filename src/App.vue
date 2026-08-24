@@ -12,6 +12,9 @@ const ClipboardPromptApp = defineAsyncComponent(
 );
 const MainApp = defineAsyncComponent(() => import("@/windows/main-app.vue"));
 const FeatureApp = defineAsyncComponent(() => import("@/windows/feature-app.vue"));
+const AppUpdateHost = defineAsyncComponent(
+  () => import("@/components/app-update-host.vue"),
+);
 
 const isMouseTrail = computed(() => props.windowLabel.startsWith("mouse-trail"));
 </script>
@@ -22,4 +25,5 @@ const isMouseTrail = computed(() => props.windowLabel.startsWith("mouse-trail"))
   <MainApp v-else-if="windowLabel === 'main'" />
   <MouseTrailApp v-else-if="isMouseTrail" />
   <FeatureApp v-else :window-label="windowLabel" />
+  <AppUpdateHost v-if="windowLabel === 'about'" />
 </template>

@@ -1,3 +1,4 @@
+mod app_update;
 mod clipboard;
 mod commands;
 mod mouse_follow;
@@ -10,7 +11,7 @@ mod windows;
 use state::AppState;
 use std::sync::atomic::Ordering;
 
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -77,6 +78,10 @@ pub fn run() {
             commands::set_mouse_trail_color,
             commands::reset_mouse_trail_colors,
             commands::reset_mouse_trail_pref,
+            commands::check_app_update,
+            commands::download_app_update,
+            commands::install_app_update,
+            commands::take_pending_app_update,
         ])
         .setup(|app| {
             let badge_size = windows::load_badge_size(app.handle());
@@ -108,6 +113,18 @@ pub fn run() {
             }
             mouse_follow::start_follow_loop(app.handle().clone());
             mouse_trail::init_from_store(app.handle());
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                if let Ok(result) = app_update::check_update(&handle, false) {
+                    if result.available {
+                        if let Ok(mut pending) = handle.state::<AppState>().pending_update.lock() {
+                            *pending = Some(result.clone());
+                        }
+                        let _ = handle.emit("app://update-available", &result);
+                        windows::show_feature(&handle, "about");
+                    }
+                }
+            });
             Ok(())
         })
         .run(tauri::generate_context!())

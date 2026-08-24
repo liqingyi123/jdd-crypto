@@ -3,6 +3,8 @@ use std::sync::Mutex;
 
 use serde::Serialize;
 
+use crate::app_update::UpdateCheckResult;
+
 pub const BADGE_HIDDEN_SIZE: u32 = 0;
 pub const MIN_BADGE_SIZE: u32 = 38;
 /// Default badge diameter in CSS/logical pixels. Keep in sync with `src/constants/badge.ts`.
@@ -26,6 +28,7 @@ pub struct AppState {
     pub mouse_follow_returning: AtomicBool,
     pub saved_badge_pos: Mutex<Option<(i32, i32)>>,
     pub mouse_follow_shortcut: Mutex<String>,
+    pub pending_update: Mutex<Option<UpdateCheckResult>>,
 }
 
 impl Default for AppState {
@@ -41,6 +44,7 @@ impl Default for AppState {
             mouse_follow_returning: AtomicBool::new(false),
             saved_badge_pos: Mutex::new(None),
             mouse_follow_shortcut: Mutex::new(DEFAULT_MOUSE_FOLLOW_SHORTCUT.to_string()),
+            pending_update: Mutex::new(None),
         }
     }
 }
