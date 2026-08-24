@@ -34,7 +34,14 @@ jobs:
       - name: Use crates.io on CI
         run: rm -f src-tauri/.cargo/config.toml
 
+      - name: Use npmjs registry on CI
+        run: |
+          # package-lock.json 在本机通过内网 npm 源生成，GitHub Runner 无法访问
+          sed -i '' 's|http://maven.jiangduoduo.com/repository/npm-public/|https://registry.npmjs.org/|g' package-lock.json
+
       - name: Install dependencies
+        env:
+          npm_config_registry: https://registry.npmjs.org
         run: npm ci
 
       - name: Add macOS universal targets
