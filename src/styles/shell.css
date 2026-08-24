@@ -1,0 +1,7 @@
+html,
+body,
+#app {
+  margin: 0;
+  overflow: hidden;
+  background: transparent !important;
+}
