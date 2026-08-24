@@ -521,13 +521,22 @@ fn left_button_down() -> bool {
 #[cfg(target_os = "macos")]
 fn left_button_down() -> bool {
     use core_graphics::event::CGMouseButton;
-    use core_graphics::event::CGEventSourceButtonState;
-    use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
+    use core_graphics::event_source::CGEventSourceStateID;
 
-    CGEventSource::button_state(
-        CGEventSourceStateID::CombinedSessionState,
-        CGMouseButton::Left,
-    ) == CGEventSourceButtonState::Down
+    extern "C" {
+        fn CGEventSourceButtonState(
+            state_id: CGEventSourceStateID,
+            button: CGMouseButton,
+        ) -> bool;
+    }
+
+    // SAFETY: 只读查询当前鼠标按键状态，无内存副作用。
+    unsafe {
+        CGEventSourceButtonState(
+            CGEventSourceStateID::CombinedSessionState,
+            CGMouseButton::Left,
+        )
+    }
 }
 
 #[cfg(windows)]

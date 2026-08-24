@@ -239,13 +239,13 @@ pub fn download_installer(app: &AppHandle, version: &str) -> Result<String, Stri
     Ok(dest.to_string_lossy().into_owned())
 }
 
-pub fn install_update(app: &AppHandle, path: &str) -> Result<(), String> {
+pub fn install_update(_app: &AppHandle, path: &str) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         std::process::Command::new(path)
             .spawn()
             .map_err(|error| error.to_string())?;
-        app.exit(0);
+        _app.exit(0);
         return Ok(());
     }
 
@@ -263,7 +263,7 @@ pub fn install_update(app: &AppHandle, path: &str) -> Result<(), String> {
 
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     {
-        let _ = (app, path);
+        let _ = (_app, path);
         Err("当前平台不支持自动更新".to_string())
     }
 }
