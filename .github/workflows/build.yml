@@ -1,0 +1,61 @@
+name: Tauri Build
+
+on:
+  workflow_dispatch: # 支持手动点击触发打包（最适合调试）
+  push:
+    tags:
+      - 'v*' # 打 v 开头 tag 时自动构建正式包
+
+jobs:
+  build-tauri:
+    name: Build Tauri App
+    runs-on: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Build Tauri
+        uses: tauri-apps/tauri-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # macOS: Universal Binary (Apple Silicon + Intel)，未配置证书时默认不签名
+          args: ${{ matrix.platform == 'macos-latest' && '--target universal-apple-darwin' || '' }}
+
+      - name: Rename macOS DMG
+        if: matrix.platform == 'macos-latest'
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          DMG_DIR="src-tauri/target/universal-apple-darwin/release/bundle/dmg"
+          if [[ ! -d "$DMG_DIR" ]]; then
+            echo "[error] DMG directory not found: $DMG_DIR"
+            exit 1
+          fi
+          SRC=$(ls "$DMG_DIR"/*.dmg | head -1)
+          DEST="$DMG_DIR/多多解密_${VERSION}_universal.dmg"
+          cp -f "$SRC" "$DEST"
+          echo "[ok] $DEST"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}-bundle
+          path: |
+            src-tauri/target/release/bundle/**/*
+            src-tauri/target/universal-apple-darwin/release/bundle/**/*
