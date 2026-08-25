@@ -54,15 +54,27 @@ jobs:
         shell: bash
         run: |
           VERSION=$(node -p "require('./package.json').version")
+          EXPECTED_NAME="多多解密_${VERSION}_universal.dmg"
           DMG_DIR="src-tauri/target/universal-apple-darwin/release/bundle/dmg"
           if [[ ! -d "$DMG_DIR" ]]; then
             echo "[error] DMG directory not found: $DMG_DIR"
             exit 1
           fi
-          SRC=$(ls "$DMG_DIR"/*.dmg | head -1)
-          DEST="$DMG_DIR/多多解密_${VERSION}_universal.dmg"
-          cp -f "$SRC" "$DEST"
-          echo "[ok] $DEST"
+          shopt -s nullglob
+          dmgs=("$DMG_DIR"/*.dmg)
+          shopt -u nullglob
+          if ((${#dmgs[@]} == 0)); then
+            echo "[error] No DMG artifact found under $DMG_DIR"
+            exit 1
+          fi
+          SRC="${dmgs[0]}"
+          DEST="$DMG_DIR/$EXPECTED_NAME"
+          if [[ "$(basename "$SRC")" != "$EXPECTED_NAME" ]]; then
+            cp -f "$SRC" "$DEST"
+            echo "[ok] Copied $(basename "$SRC") -> $EXPECTED_NAME"
+          else
+            echo "[ok] DMG already named $EXPECTED_NAME"
+          fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
