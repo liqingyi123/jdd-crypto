@@ -22,6 +22,9 @@ interface MouseTracker {
 }
 
 const MAX_PARTICLES = 400;
+/** Stop spawning / clear frozen velocity after cursor emits pause (~2 frames @ 33ms). */
+const IDLE_MS = 80;
+const SPAWN_SPEED_MIN = 0.002;
 
 function parseColor(input: string): ["rgba", number, number, number, number] | null {
   const hex = input.replace(/^\s*#|\s*$/g, "").toLowerCase();
@@ -85,6 +88,7 @@ export class MeteorTrail implements MouseTrailEngine {
   private rafId = 0;
   private onScreen = false;
   private spawning = false;
+  private lastMoveAt = 0;
 
   constructor(host: HTMLElement, options: MeteorTrailOptions = {}) {
     this.color = options.color ?? "#F8EC85";
@@ -145,6 +149,7 @@ export class MeteorTrail implements MouseTrailEngine {
   setMouse(x: number, y: number) {
     this.onScreen = true;
     this.spawning = true;
+    this.lastMoveAt = performance.now();
     this.mouse.update(x, y);
     this.kick();
   }
@@ -225,6 +230,15 @@ export class MeteorTrail implements MouseTrailEngine {
   /** @returns whether another frame is needed */
   private render(): boolean {
     const ctx = this.ctx;
+    if (
+      this.spawning &&
+      performance.now() - this.lastMoveAt > IDLE_MS
+    ) {
+      this.spawning = false;
+      this.mouse.speedX = 0;
+      this.mouse.speedY = 0;
+    }
+
     if (!this.spawning && this.particles.length === 0) {
       ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
       return false;
@@ -237,7 +251,11 @@ export class MeteorTrail implements MouseTrailEngine {
       1,
     );
 
-    if (this.spawning && this.particles.length < MAX_PARTICLES) {
+    if (
+      this.spawning &&
+      speed > SPAWN_SPEED_MIN &&
+      this.particles.length < MAX_PARTICLES
+    ) {
       const burst = 2 + ((12 * speed) | 0);
       for (let i = 0; i < burst; i += 1) {
         this.spawnParticle(0.1 + 0.5 * speed, 0.5 + 4.5 * speed, 0.5 + 0.5 * speed);
