@@ -38,7 +38,9 @@ const effect = shallowRef<MouseTrailEffect>(DEFAULT_MOUSE_TRAIL_PREF.effect);
 const colors = shallowRef<MouseTrailColors>({ ...DEFAULT_MOUSE_TRAIL_COLORS });
 let unlistenCursor: (() => void) | undefined;
 let unlistenPref: (() => void) | undefined;
+let unlistenMonitors: (() => void) | undefined;
 let wasInside = false;
+let windowLabel = "";
 
 function isInside(area: MonitorBounds, x: number, y: number): boolean {
   return (
@@ -47,6 +49,28 @@ function isInside(area: MonitorBounds, x: number, y: number): boolean {
     y >= area.y &&
     y < area.y + area.height
   );
+}
+
+async function refreshBounds() {
+  try {
+    if (!windowLabel) {
+      const { getCurrentWindow } = await import("@tauri-apps/api/window");
+      windowLabel = getCurrentWindow().label;
+    }
+    bounds.value = await invoke<MonitorBounds>("get_mouse_trail_monitor_bounds", {
+      windowLabel,
+    });
+  } catch {
+    bounds.value = {
+      x: 0,
+      y: 0,
+      width: window.innerWidth,
+      height: window.innerHeight,
+      scaleFactor: window.devicePixelRatio || 1,
+    };
+  }
+  wasInside = false;
+  trail.value?.resize();
 }
 
 function createEngine(next: MouseTrailEffect, trailColors: MouseTrailColors): MouseTrailEngine | null {
@@ -146,21 +170,7 @@ onMounted(async () => {
     return;
   }
 
-  try {
-    const { getCurrentWindow } = await import("@tauri-apps/api/window");
-    const label = getCurrentWindow().label;
-    bounds.value = await invoke<MonitorBounds>("get_mouse_trail_monitor_bounds", {
-      windowLabel: label,
-    });
-  } catch {
-    bounds.value = {
-      x: 0,
-      y: 0,
-      width: window.innerWidth,
-      height: window.innerHeight,
-      scaleFactor: window.devicePixelRatio || 1,
-    };
-  }
+  await refreshBounds();
 
   try {
     const pref = await invoke<MouseTrailPref>("get_mouse_trail_pref");
@@ -177,6 +187,9 @@ onMounted(async () => {
     unlistenPref = await listen<MouseTrailPref>("app://mouse-trail-pref", (event) => {
       applyPref(event.payload);
     });
+    unlistenMonitors = await listen("app://mouse-trail-monitors-changed", () => {
+      void refreshBounds();
+    });
   } catch {
     // browser preview
   }
@@ -185,6 +198,7 @@ onMounted(async () => {
 onUnmounted(() => {
   unlistenCursor?.();
   unlistenPref?.();
+  unlistenMonitors?.();
   trail.value?.destroy();
   trail.value = null;
 });

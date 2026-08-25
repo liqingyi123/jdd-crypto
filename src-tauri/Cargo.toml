@@ -1,6 +1,6 @@
 [package]
 name = "jdd-crypto"
-version = "0.4.3"
+version = "0.4.4"
 description = "Desktop encrypt/decrypt utility with badge, tray, and plugins"
 authors = ["you"]
 edition = "2021"
@@ -30,6 +30,8 @@ urlencoding = "2"
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = [
   "Win32_Foundation",
+  "Win32_Graphics_Gdi",
+  "Win32_System_LibraryLoader",
   "Win32_UI_Input_KeyboardAndMouse",
   "Win32_UI_WindowsAndMessaging",
   "Win32_System_DataExchange",

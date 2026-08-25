@@ -247,6 +247,131 @@ pub fn watch_badge_position(app: &AppHandle) {
     });
 }
 
+/// Move app windows that no longer intersect any monitor onto the nearest work area.
+/// Skips mouse-trail overlays (managed by mouse_trail::sync_overlays).
+pub fn relocate_windows_to_visible_monitors(app: &AppHandle) {
+    let monitors = app.available_monitors().unwrap_or_default();
+    if monitors.is_empty() {
+        return;
+    }
+
+    let work_areas: Vec<WorkArea> = monitors
+        .iter()
+        .map(|m| {
+            let work = m.work_area();
+            WorkArea {
+                x: work.position.x,
+                y: work.position.y,
+                width: work.size.width as i32,
+                height: work.size.height as i32,
+            }
+        })
+        .collect();
+
+    for (label, win) in app.webview_windows() {
+        if label.starts_with("mouse-trail-") {
+            continue;
+        }
+        let Ok(pos) = win.outer_position() else {
+            continue;
+        };
+        let Ok(size) = win.outer_size() else {
+            continue;
+        };
+        let width = size.width as i32;
+        let height = size.height as i32;
+        if width <= 0 || height <= 0 {
+            continue;
+        }
+
+        if work_areas.iter().any(|work| {
+            rects_intersect(
+                pos.x,
+                pos.y,
+                width,
+                height,
+                work.x,
+                work.y,
+                work.width,
+                work.height,
+            )
+        }) {
+            continue;
+        }
+
+        let cx = pos.x + width / 2;
+        let cy = pos.y + height / 2;
+        let Some(work) = nearest_work_area(cx, cy, &work_areas) else {
+            continue;
+        };
+        let (nx, ny) = clamp_origin_to_work_area(pos.x, pos.y, width, height, work);
+        if label == "badge" {
+            set_badge_position(&win, nx, ny);
+            save_badge_position(app, nx, ny);
+        } else {
+            let _ = win.set_position(PhysicalPosition::new(nx, ny));
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+struct WorkArea {
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+}
+
+fn rects_intersect(
+    ax: i32,
+    ay: i32,
+    aw: i32,
+    ah: i32,
+    bx: i32,
+    by: i32,
+    bw: i32,
+    bh: i32,
+) -> bool {
+    ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by
+}
+
+fn nearest_work_area(cx: i32, cy: i32, work_areas: &[WorkArea]) -> Option<&WorkArea> {
+    let mut best: Option<&WorkArea> = None;
+    let mut best_dist = i64::MAX;
+    for work in work_areas {
+        let left = work.x;
+        let top = work.y;
+        let right = left + work.width;
+        let bottom = top + work.height;
+        let nearest_x = cx.clamp(left, right.saturating_sub(1).max(left));
+        let nearest_y = cy.clamp(top, bottom.saturating_sub(1).max(top));
+        let dx = i64::from(cx - nearest_x);
+        let dy = i64::from(cy - nearest_y);
+        let dist = dx * dx + dy * dy;
+        if dist < best_dist {
+            best_dist = dist;
+            best = Some(work);
+        }
+    }
+    best
+}
+
+fn clamp_origin_to_work_area(
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+    work: &WorkArea,
+) -> (i32, i32) {
+    let left = work.x;
+    let top = work.y;
+    let right = left + work.width;
+    let bottom = top + work.height;
+    let max_x = (right - width).max(left);
+    let max_y = (bottom - height).max(top);
+    (x.clamp(left, max_x), y.clamp(top, max_y))
+}
+
 pub fn normalize_theme_pref(raw: &str) -> String {
     match raw {
         "system" | "light" | "dark" => raw.to_string(),

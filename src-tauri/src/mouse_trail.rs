@@ -1,4 +1,5 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::OnceLock;
 use std::thread;
 use std::time::Duration;
 
@@ -16,9 +17,13 @@ const DEFAULT_EFFECT: &str = "ribbon";
 const DEFAULT_METEOR_COLOR: &str = "#F8EC85";
 const DEFAULT_DOTS_COLOR: &str = "#00D1CE";
 const DEFAULT_HEART_COLOR: &str = "#FF2EC8";
+const DISPLAY_CHANGE_DEBOUNCE: Duration = Duration::from_millis(300);
 
 static CURSOR_LOOP_STARTED: AtomicBool = AtomicBool::new(false);
 static TRAIL_ENABLED: AtomicBool = AtomicBool::new(false);
+static DISPLAY_LISTENER_STARTED: AtomicBool = AtomicBool::new(false);
+static DISPLAY_CHANGE_SEQ: AtomicU64 = AtomicU64::new(0);
+static APP_FOR_DISPLAY: OnceLock<AppHandle> = OnceLock::new();
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -259,6 +264,7 @@ pub fn reset_pref(app: AppHandle) -> Result<MouseTrailPref, String> {
 }
 
 pub fn init_from_store(app: &AppHandle) {
+    ensure_display_listener(app);
     let pref = load_pref(app);
     set_enabled(app, pref.enabled);
 }
@@ -266,9 +272,52 @@ pub fn init_from_store(app: &AppHandle) {
 /// Flip the enabled flag and schedule overlay sync off the invoke path
 /// so settings UI does not wait on WebView creation.
 pub fn set_enabled(app: &AppHandle, enabled: bool) {
+    ensure_display_listener(app);
     TRAIL_ENABLED.store(enabled, Ordering::Relaxed);
     ensure_cursor_loop(app);
     schedule_sync_overlays(app, enabled);
+}
+
+fn ensure_display_listener(app: &AppHandle) {
+    let _ = APP_FOR_DISPLAY.set(app.clone());
+    if DISPLAY_LISTENER_STARTED.swap(true, Ordering::Relaxed) {
+        return;
+    }
+    #[cfg(windows)]
+    start_windows_display_listener();
+    #[cfg(target_os = "macos")]
+    start_macos_display_listener();
+}
+
+fn notify_display_changed() {
+    let seq = DISPLAY_CHANGE_SEQ.fetch_add(1, Ordering::Relaxed) + 1;
+    thread::spawn(move || {
+        thread::sleep(DISPLAY_CHANGE_DEBOUNCE);
+        if DISPLAY_CHANGE_SEQ.load(Ordering::Relaxed) != seq {
+            return;
+        }
+        let Some(app) = APP_FOR_DISPLAY.get() else {
+            return;
+        };
+        on_display_changed(app);
+    });
+}
+
+fn on_display_changed(app: &AppHandle) {
+    let handle = app.clone();
+    let trail_on = TRAIL_ENABLED.load(Ordering::Relaxed);
+    let _ = app.run_on_main_thread(move || {
+        crate::windows::relocate_windows_to_visible_monitors(&handle);
+        if !trail_on {
+            return;
+        }
+        sync_overlays(&handle, true);
+        let _ = handle.emit_filter(
+            "app://mouse-trail-monitors-changed",
+            (),
+            is_overlay_target,
+        );
+    });
 }
 
 fn schedule_sync_overlays(app: &AppHandle, visible: bool) {
@@ -412,4 +461,125 @@ fn cursor_pos() -> Option<(i32, i32)> {
 #[cfg(not(windows))]
 fn cursor_pos() -> Option<(i32, i32)> {
     None
+}
+
+#[cfg(windows)]
+fn start_windows_display_listener() {
+    thread::spawn(|| {
+        use std::ptr;
+        use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
+        use windows_sys::Win32::Graphics::Gdi::HBRUSH;
+        use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, RegisterClassW,
+            TranslateMessage, CS_HREDRAW, CS_VREDRAW, MSG, WM_DISPLAYCHANGE, WNDCLASSW,
+            WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP,
+        };
+
+        unsafe extern "system" fn wnd_proc(
+            hwnd: HWND,
+            msg: u32,
+            wparam: WPARAM,
+            lparam: LPARAM,
+        ) -> LRESULT {
+            if msg == WM_DISPLAYCHANGE {
+                notify_display_changed();
+                return 0;
+            }
+            // SAFETY: forward unhandled messages to the default window procedure.
+            unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+        }
+
+        // SAFETY: Win32 window class registration and message loop for display broadcasts.
+        unsafe {
+            let class_name: Vec<u16> = "jdd_crypto_display_listener\0"
+                .encode_utf16()
+                .collect();
+            let hinstance = GetModuleHandleW(ptr::null());
+            let class = WNDCLASSW {
+                style: CS_HREDRAW | CS_VREDRAW,
+                lpfnWndProc: Some(wnd_proc),
+                cbClsExtra: 0,
+                cbWndExtra: 0,
+                hInstance: hinstance,
+                hIcon: ptr::null_mut(),
+                hCursor: ptr::null_mut(),
+                hbrBackground: 0 as HBRUSH,
+                lpszMenuName: ptr::null(),
+                lpszClassName: class_name.as_ptr(),
+            };
+            if RegisterClassW(&class) == 0 {
+                return;
+            }
+
+            let hwnd = CreateWindowExW(
+                WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
+                class_name.as_ptr(),
+                ptr::null(),
+                WS_POPUP,
+                0,
+                0,
+                0,
+                0,
+                ptr::null_mut(),
+                ptr::null_mut(),
+                hinstance,
+                ptr::null(),
+            );
+            if hwnd.is_null() {
+                return;
+            }
+
+            let mut msg = MSG {
+                hwnd: ptr::null_mut(),
+                message: 0,
+                wParam: 0,
+                lParam: 0,
+                time: 0,
+                pt: windows_sys::Win32::Foundation::POINT { x: 0, y: 0 },
+            };
+            while GetMessageW(&mut msg, ptr::null_mut(), 0, 0) > 0 {
+                let _ = TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+        }
+    });
+}
+
+#[cfg(target_os = "macos")]
+fn start_macos_display_listener() {
+    use std::ffi::c_void;
+
+    type CgDirectDisplayId = u32;
+    type CgDisplayChangeSummaryFlags = u32;
+    type CgError = i32;
+
+    type CgDisplayReconfigurationCallback = Option<
+        unsafe extern "C" fn(
+            display: CgDirectDisplayId,
+            flags: CgDisplayChangeSummaryFlags,
+            user_info: *mut c_void,
+        ),
+    >;
+
+    extern "C" {
+        fn CGDisplayRegisterReconfigurationCallback(
+            callback: CgDisplayReconfigurationCallback,
+            user_info: *mut c_void,
+        ) -> CgError;
+    }
+
+    unsafe extern "C" fn on_reconfig(
+        _display: CgDirectDisplayId,
+        _flags: CgDisplayChangeSummaryFlags,
+        _user_info: *mut c_void,
+    ) {
+        notify_display_changed();
+    }
+
+    // SAFETY: registers a process-lifetime display reconfiguration callback.
+    let status = unsafe {
+        CGDisplayRegisterReconfigurationCallback(Some(on_reconfig), std::ptr::null_mut())
+    };
+    let _ = status;
 }
