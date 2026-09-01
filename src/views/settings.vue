@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, shallowRef } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { disable as disableAutostart, enable as enableAutostart, isEnabled as isAutostartEnabled } from "@tauri-apps/plugin-autostart";
 import { ElMessage } from "element-plus";
 import { storeToRefs } from "pinia";
 import { useThemeStore, type ThemePreference } from "@/stores/theme";
@@ -44,6 +45,7 @@ const themeOptions: Array<{ value: ThemePreference; label: string }> = [
 
 const badgeSize = shallowRef(DEFAULT_BADGE_SIZE);
 const followPref = shallowRef(true);
+const autostartEnabled = shallowRef(false);
 const trailEnabled = shallowRef(DEFAULT_MOUSE_TRAIL_PREF.enabled);
 const trailEffect = shallowRef<MouseTrailEffect>(DEFAULT_MOUSE_TRAIL_PREF.effect);
 const trailColors = shallowRef<MouseTrailColors>({ ...DEFAULT_MOUSE_TRAIL_COLORS });
@@ -98,6 +100,11 @@ onMounted(async () => {
     // browser preview
   }
   try {
+    autostartEnabled.value = await isAutostartEnabled();
+  } catch {
+    autostartEnabled.value = false;
+  }
+  try {
     const pref = await invoke<MouseTrailPref>("get_mouse_trail_pref");
     applyTrailPref(pref);
   } catch {
@@ -139,6 +146,22 @@ async function onFollowPrefChange(value: string | number | boolean) {
     await cancelRecording();
   }
   await invoke("set_mouse_follow_pref", { enabled }).catch(() => undefined);
+}
+
+async function onAutostartChange(value: string | number | boolean) {
+  const enabled = Boolean(value);
+  const previous = autostartEnabled.value;
+  autostartEnabled.value = enabled;
+  try {
+    if (enabled) {
+      await enableAutostart();
+    } else {
+      await disableAutostart();
+    }
+  } catch (error) {
+    autostartEnabled.value = previous;
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
 }
 
 async function onTrailEnabledChange(value: string | number | boolean) {
@@ -233,6 +256,15 @@ function onThemeChange(value: string | number | boolean | undefined) {
           {{ item.label }}
         </ElRadio>
       </ElRadioGroup>
+    </section>
+    <section>
+      <div class="section-head">
+        <h2>开机自启动</h2>
+        <label class="row">
+          <ElSwitch :model-value="autostartEnabled" @change="onAutostartChange" />
+        </label>
+      </div>
+      <p>开启后登录系统时自动启动多多解密；默认关闭。</p>
     </section>
     <section>
       <div class="section-head">

@@ -21,6 +21,9 @@
     "process:allow-exit",
     "opener:default",
     "global-shortcut:default",
-    "core:window:allow-set-ignore-cursor-events"
+    "core:window:allow-set-ignore-cursor-events",
+    "autostart:allow-enable",
+    "autostart:allow-disable",
+    "autostart:allow-is-enabled"
   ]
 }
