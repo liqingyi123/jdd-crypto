@@ -11,7 +11,9 @@ const isMacos = detectPlatform() === "macos";
     <div class="container">
       <p class="section-kicker">Features</p>
       <h1 class="section-title display-font">功能介绍</h1>
-      <p class="section-lead">围绕加解密日常场景打磨的桌面能力，从角标到插件均可按需开关。</p>
+      <p class="section-lead">
+        围绕加解密日常场景打磨的桌面能力：从角标、剪贴板气泡到文本对比，均可按需开关与自定义快捷键。
+      </p>
       <div class="feature-grid">
         <article v-for="item in FEATURE_ITEMS" :key="item.id" class="feature-card">
           <h2>{{ item.title }}</h2>
@@ -34,7 +36,8 @@ const isMacos = detectPlatform() === "macos";
         <ol>
           <li>
             鼠标跟随（macOS）与 Windows 相同，默认快捷键为
-            <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd>（Mac 键盘上的 Control 即 Ctrl）。首次使用若快捷键无反应、或选中文本后无法自动复制，请在
+            <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd>（Mac 键盘上的 Control 即 Ctrl）；文本对比模式默认为
+            <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>，均可在设置中自定义。首次使用若快捷键无反应、或选中文本后无法自动复制，请在
             <strong>系统设置 → 隐私与安全性 → 辅助功能</strong>
             中为「多多解密」开启权限（全局快捷键与模拟 ⌘C 均依赖此项）。
           </li>
