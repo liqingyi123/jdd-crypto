@@ -1,4 +1,4 @@
-name: Tauri Build (macOS)
+name: Tauri Build (macOS) 0.4.5
 
 on:
   workflow_dispatch: # 支持手动点击触发打包（最适合调试）

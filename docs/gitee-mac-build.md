@@ -46,7 +46,7 @@ stages:
 ## 注意事项
 
 - 代码签名与 Apple 公证（Notarization）未在本仓库配置，内网分发可按需后续补充
-- Mac / Windows 共用 [`更新日志.txt`](../src-tauri/src/app_update.rs) 与内网目录；发布新版本时需上传对应平台安装包：
+- Mac / Windows 共用内网目录与同一份 `更新日志.txt`（仅维护在商店目录，仓库内不另存）；发布新版本时需上传对应平台安装包：
   - Windows: `多多解密_{version}_x64-setup.exe`
   - macOS: `多多解密_{version}_universal.dmg`
 - Mac 检查更新：下载 dmg 后点击「打开安装包」，将应用拖入「应用程序」；未签名时可能需要「右键 → 打开」

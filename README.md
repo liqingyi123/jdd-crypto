@@ -42,6 +42,15 @@ npm run dev
 # 插件：  http://localhost:1420/?window=plugins
 ```
 
+官网（独立于桌面端构建）：
+
+```bash
+npm run dev:website
+# http://localhost:5173/
+npm run build:website
+# 产物：dist-website/（根目录含 index.html）
+```
+
 打包：
 
 ```bash
@@ -97,11 +106,38 @@ Gitee 流水线接入说明见 [`docs/gitee-mac-build.md`](docs/gitee-mac-build.
 
 ### 内网检查更新
 
-macOS 与 Windows **共用**内网目录与 [`更新日志.txt`](src-tauri/src/app_update.rs)：
+macOS 与 Windows **共用**内网目录与同一份更新日志：
 
 - 目录：`http://172.20.2.169:7101/appStore/Software/PC/developer/jdd-crypto/`
+- 更新日志：`http://172.20.2.169:7101/appStore/Software/PC/developer/jdd-crypto/更新日志.txt`（桌面端检查更新与官网「更新日志 / 下载最新版」均从此拉取，**仓库内不再维护副本**）
 - 发现新版本后，Mac 下载 `多多解密_{version}_universal.dmg`，打开 dmg 后手动拖入「应用程序」
 - 未签名包若被 Gatekeeper 拦截，请右键应用选择「打开」
+
+## 版本号更新清单
+
+本项目**不走发布平台**，每次发版（如 `0.4.3` → `0.4.4`）需**手动**同步下列文件中的版本与更新说明，保持一致。
+
+| 文件 | 是否必改 | 说明 |
+|------|----------|------|
+| `package.json` → `version` | **是** | 权威版本；`npm run build:mac` / CI 用它拼安装包名，需手动修改 |
+| `src-tauri/tauri.conf.json` → `version` | **是** | Tauri 打包产物版本；关于页等通过 `getVersion()` 读到的也来自这里 |
+| `src-tauri/Cargo.toml` → `[package].version` | **是** | Rust crate 版本，需与 `tauri.conf.json` 一致 |
+| 内网 `更新日志.txt` | **是** | 直接更新商店目录中的文件；解析取最高版本号；官网不再另存一份 |
+
+发版时还需上传到内网目录（文件名中的 `{version}` 与上面版本一致）：
+
+- Windows：`多多解密_{version}_x64-setup.exe`
+- macOS：`多多解密_{version}_universal.dmg`
+
+`更新日志.txt` 条目格式示例：
+
+```text
+【0.4.4】
+1.说明一
+2.说明二
+```
+
+**不必改**：各 `src-tauri/plugins/*/plugin.json` 的 `version`（插件独立版本，与应用发版无关）。
 
 ## 目录约定
 
@@ -113,6 +149,7 @@ src/                         Vue 前端
   composables/               主题、剪贴板提示、窗口拖动
   plugins-runtime/           JS 插件加载器与沙箱扩展点
   services/crypto.ts         加解密 invoke 接口（Rust stub）
+  website/                   官网（独立 Vite 构建）
 src-tauri/                   Rust 核心
   src/windows.rs             窗口显示、按需创建功能窗、角标尺寸
   src/tray.rs                托盘与统一菜单
