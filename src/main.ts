@@ -17,7 +17,9 @@ async function bootstrap() {
   const windowLabel = await resolveWindowLabel();
   const isMouseTrail = windowLabel.startsWith("mouse-trail");
   const isTransparentChrome =
-    windowLabel === "badge" || windowLabel === "clipboard-prompt";
+    windowLabel === "badge" ||
+    windowLabel === "clipboard-prompt" ||
+    windowLabel === "crypto-bubble";
 
   if (isMouseTrail) {
     // Keep trail overlays free of theme chrome (transparent only).

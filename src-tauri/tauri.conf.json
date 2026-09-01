@@ -42,6 +42,23 @@
         "resizable": true,
         "minimizable": true,
         "maximizable": true
+      },
+      {
+        "label": "crypto-bubble",
+        "title": "快速解密结果",
+        "url": "index.html",
+        "width": 480,
+        "height": 360,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "visible": false,
+        "focus": false,
+        "maximizable": false,
+        "minimizable": false
       }
     ],
     "security": {

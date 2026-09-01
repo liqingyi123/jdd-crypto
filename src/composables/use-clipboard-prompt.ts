@@ -5,6 +5,8 @@ import { useClipboardStore, type ClipboardCandidate } from "@/stores/clipboard";
 export function useClipboardPrompt(options?: {
   fetchOnMount?: boolean;
   hideWindowOnClose?: boolean;
+  /** Set true before any async work so blur-dismiss cannot race with button clicks. */
+  onSuppressBlurDismiss?: () => void;
 }) {
   const clipboardStore = useClipboardStore();
   let unlisten: (() => void) | undefined;
@@ -12,7 +14,7 @@ export function useClipboardPrompt(options?: {
 
   onMounted(async () => {
     try {
-      const enabled = await invoke<boolean>("get_clipboard_watch");
+      const enabled = await invoke<boolean>("get_clipboard_watch").catch(() => true);
       clipboardStore.setWatchEnabled(enabled);
       const { listen } = await import("@tauri-apps/api/event");
       unlisten = await listen<ClipboardCandidate>("clipboard://candidate", (event) => {
@@ -52,20 +54,21 @@ export function useClipboardPrompt(options?: {
   }
 
   async function accept(mode: "encrypt" | "decrypt") {
-    const candidate = clipboardStore.candidate;
-    if (!candidate) {
-      return;
-    }
-    await invoke("navigate_main", {
-      route: "/",
-      mode,
-      text: candidate.text,
-    });
+    options?.onSuppressBlurDismiss?.();
+    const text = clipboardStore.candidate?.text ?? null;
+    // Rust 端打开气泡/主窗；text 作为 last_candidate 被失焦清掉时的兜底
+    const ok = await invoke<boolean>("accept_clipboard_action", { mode, text }).catch(
+      () => false,
+    );
     clipboardStore.clearCandidate();
-    await closePromptWindow();
+    if (!ok) {
+      await invoke("clear_clipboard_dedup").catch(() => undefined);
+      await closePromptWindow();
+    }
   }
 
   async function dismiss() {
+    options?.onSuppressBlurDismiss?.();
     clipboardStore.clearCandidate();
     await closePromptWindow();
   }

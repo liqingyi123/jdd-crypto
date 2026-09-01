@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::Ordering;
 use tauri::{AppHandle, Manager, State, WebviewWindow};
+use tauri_plugin_clipboard_manager::ClipboardExt;
 
 use crate::state::AppState;
 use crate::windows::{self, CryptoHint};
@@ -59,7 +60,92 @@ pub fn hide_clipboard_prompt(app: AppHandle, state: State<AppState>) {
     if let Ok(mut candidate) = state.last_candidate.lock() {
         *candidate = None;
     }
-    windows::schedule_hide_clipboard_prompt(&app);
+    windows::hide_clipboard_prompt(&app);
+}
+
+/// Clear clipboard dedup so the same text can trigger the ask prompt again.
+#[tauri::command]
+pub fn clear_clipboard_dedup(state: State<AppState>) {
+    if let Ok(mut last) = state.last_clipboard.lock() {
+        last.clear();
+    }
+}
+
+/// Write clipboard without triggering the ask prompt (marks text as already seen).
+#[tauri::command]
+pub fn copy_text_silent(app: AppHandle, state: State<AppState>, text: String) -> Result<(), String> {
+    if let Ok(mut last) = state.last_clipboard.lock() {
+        *last = text.clone();
+    }
+    app.clipboard()
+        .write_text(text)
+        .map_err(|e| e.to_string())
+}
+
+/// Handle 加密/解密 from the clipboard ask prompt on the Rust side.
+/// `text` is a frontend fallback when blur races cleared `last_candidate`.
+/// Returns false when there is no text to act on.
+#[tauri::command]
+pub fn accept_clipboard_action(
+    app: AppHandle,
+    state: State<AppState>,
+    mode: String,
+    text: Option<String>,
+) -> bool {
+    let mode = if mode == "encrypt" {
+        "encrypt"
+    } else {
+        "decrypt"
+    };
+    let from_state = state
+        .last_candidate
+        .lock()
+        .ok()
+        .and_then(|guard| guard.as_ref().map(|c| c.text.clone()));
+    let text = text
+        .map(|t| t.trim().to_string())
+        .filter(|t| !t.is_empty())
+        .or(from_state);
+    let Some(text) = text else {
+        return false;
+    };
+    if let Ok(mut candidate) = state.last_candidate.lock() {
+        *candidate = None;
+    }
+    windows::hide_clipboard_prompt(&app);
+
+    let hint = CryptoHint {
+        text: text.clone(),
+        mode: mode.to_string(),
+    };
+    if windows::is_short_bubble_text(&text) {
+        windows::show_crypto_bubble(&app, hint);
+    } else {
+        windows::show_main(&app, Some(hint));
+    }
+    true
+}
+
+#[tauri::command]
+pub fn show_crypto_bubble(app: AppHandle, mode: String, text: String) {
+    // Direct call: commands already run where window APIs are usable.
+    windows::show_crypto_bubble(
+        &app,
+        CryptoHint {
+            text,
+            mode,
+        },
+    );
+}
+
+#[tauri::command]
+pub fn hide_crypto_bubble(app: AppHandle) {
+    windows::hide_crypto_bubble(&app);
+}
+
+#[tauri::command]
+pub fn get_crypto_bubble_payload() -> Option<CryptoHint> {
+    windows::get_pending_crypto_bubble()
 }
 
 #[tauri::command]

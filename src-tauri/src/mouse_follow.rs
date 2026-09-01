@@ -340,13 +340,16 @@ fn open_main_with_capture(app: &AppHandle, text: String) {
     } else {
         "encrypt"
     };
-    windows::show_main(
-        app,
-        Some(CryptoHint {
-            text,
-            mode: mode.to_string(),
-        }),
-    );
+    let use_bubble = windows::is_short_bubble_text(&text);
+    let hint = CryptoHint {
+        text,
+        mode: mode.to_string(),
+    };
+    if use_bubble {
+        windows::schedule_show_crypto_bubble(app, hint);
+    } else {
+        windows::show_main(app, Some(hint));
+    }
     stop(app);
 }
 

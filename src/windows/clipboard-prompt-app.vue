@@ -5,14 +5,22 @@ import { useSystemTheme } from "@/composables/use-system-theme";
 
 useSystemTheme();
 
+let suppressBlurDismiss = false;
+
+function onSuppressBlurDismiss() {
+  suppressBlurDismiss = true;
+}
+
 const { clipboardStore, accept, dismiss } = useClipboardPrompt({
   fetchOnMount: true,
   hideWindowOnClose: true,
+  onSuppressBlurDismiss,
 });
 
 const visible = computed(() => clipboardStore.candidate !== null);
 
 let blurArmed = false;
+let hadFocus = false;
 let armTimer: ReturnType<typeof setTimeout> | undefined;
 let unlistenFocus: (() => void) | undefined;
 
@@ -26,10 +34,18 @@ function clearArmTimer() {
 function armBlurDismiss() {
   clearArmTimer();
   blurArmed = false;
+  hadFocus = false;
+  suppressBlurDismiss = false;
+  // 询问窗默认不抢焦点；延长武装时间，避免刚显示就被系统焦点抖动关掉
   armTimer = setTimeout(() => {
     blurArmed = true;
     armTimer = undefined;
-  }, 280);
+  }, 600);
+}
+
+function onActionPointerDown() {
+  // pointerdown 早于 click/blur，先锁住失焦关闭，避免点「解密」时窗体被先 dismiss
+  suppressBlurDismiss = true;
 }
 
 onMounted(async () => {
@@ -37,9 +53,10 @@ onMounted(async () => {
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
     unlistenFocus = await getCurrentWindow().onFocusChanged(({ payload: focused }) => {
       if (focused) {
+        hadFocus = true;
         return;
       }
-      if (!blurArmed || !clipboardStore.candidate) {
+      if (suppressBlurDismiss || !hadFocus || !blurArmed || !clipboardStore.candidate) {
         return;
       }
       void dismiss();
@@ -64,6 +81,7 @@ watch(visible, (open) => {
   }
   clearArmTimer();
   blurArmed = false;
+  hadFocus = false;
 });
 </script>
 
@@ -72,9 +90,20 @@ watch(visible, (open) => {
     <div class="prompt">
       <p>你复制了这段文本，是想要？</p>
       <div class="actions">
-        <button type="button" @click="accept('encrypt')">加密</button>
-        <button type="button" @click="accept('decrypt')">解密</button>
-        <button type="button" class="ghost" @click="dismiss">忽略</button>
+        <button type="button" @pointerdown="onActionPointerDown" @click="accept('encrypt')">
+          加密
+        </button>
+        <button type="button" @pointerdown="onActionPointerDown" @click="accept('decrypt')">
+          解密
+        </button>
+        <button
+          type="button"
+          class="ghost"
+          @pointerdown="onActionPointerDown"
+          @click="dismiss"
+        >
+          忽略
+        </button>
       </div>
     </div>
   </div>

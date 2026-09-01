@@ -1,5 +1,6 @@
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 use tauri::{
@@ -12,6 +13,8 @@ pub struct CryptoHint {
     pub text: String,
     pub mode: String,
 }
+
+static PENDING_CRYPTO_BUBBLE: Mutex<Option<CryptoHint>> = Mutex::new(None);
 
 struct FeatureSpec {
     label: &'static str,
@@ -70,7 +73,15 @@ pub fn show_main(app: &AppHandle, hint: Option<CryptoHint>) {
     if let Some(win) = app.get_webview_window("main") {
         focus_window(&win);
         if let Some(hint) = hint {
-            let _ = win.emit("app://crypto-payload", hint);
+            let _ = win.emit("app://crypto-payload", &hint);
+            let handle = app.clone();
+            let delayed = hint.clone();
+            thread::spawn(move || {
+                thread::sleep(Duration::from_millis(250));
+                if let Some(win) = handle.get_webview_window("main") {
+                    let _ = win.emit("app://crypto-payload", &delayed);
+                }
+            });
         }
     }
 }
@@ -127,6 +138,10 @@ pub const CLIPBOARD_PROMPT_LABEL: &str = "clipboard-prompt";
 /// Logical size of the near-cursor clipboard prompt card window.
 const CLIPBOARD_PROMPT_WIDTH: f64 = 244.0;
 const CLIPBOARD_PROMPT_HEIGHT: f64 = 116.0;
+pub const CRYPTO_BUBBLE_LABEL: &str = "crypto-bubble";
+const CRYPTO_BUBBLE_WIDTH: f64 = 480.0;
+const CRYPTO_BUBBLE_HEIGHT: f64 = 360.0;
+const SHORT_TEXT_BUBBLE_LIMIT: usize = 1100;
 #[cfg(windows)]
 const CLIPBOARD_PROMPT_CURSOR_OFFSET: i32 = 16;
 
@@ -430,8 +445,17 @@ pub fn apply_badge_window_size(app: &AppHandle, size: u32, expanded: bool) {
 pub fn show_clipboard_prompt(app: &AppHandle) {
     use crate::state::AppState;
 
+    // Only hide the bubble window; do not clear pending mid-flight with a concurrent show.
+    hide_crypto_bubble_window(app);
+
     let (cursor_x, cursor_y) = cursor_pos().unwrap_or((0, 0));
-    let target = clamp_prompt_origin(app, cursor_x, cursor_y);
+    let target = clamp_popup_origin(
+        app,
+        cursor_x,
+        cursor_y,
+        CLIPBOARD_PROMPT_WIDTH,
+        CLIPBOARD_PROMPT_HEIGHT,
+    );
 
     let ensure_emit = |win: &WebviewWindow| {
         if let Ok(guard) = app.state::<AppState>().last_candidate.lock() {
@@ -451,6 +475,17 @@ pub fn show_clipboard_prompt(app: &AppHandle) {
         // Do not focus — keep the user's original input focused.
         let _ = win.show();
         ensure_emit(&win);
+        let handle = app.clone();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(200));
+            if let Some(win) = handle.get_webview_window(CLIPBOARD_PROMPT_LABEL) {
+                if let Ok(guard) = handle.state::<AppState>().last_candidate.lock() {
+                    if let Some(payload) = guard.as_ref() {
+                        let _ = win.emit("clipboard://candidate", payload);
+                    }
+                }
+            }
+        });
         return;
     }
 
@@ -482,6 +517,17 @@ pub fn show_clipboard_prompt(app: &AppHandle) {
         }
         let _ = win.set_always_on_top(true);
         ensure_emit(&win);
+        let handle = app.clone();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(250));
+            if let Some(win) = handle.get_webview_window(CLIPBOARD_PROMPT_LABEL) {
+                if let Ok(guard) = handle.state::<AppState>().last_candidate.lock() {
+                    if let Some(payload) = guard.as_ref() {
+                        let _ = win.emit("clipboard://candidate", payload);
+                    }
+                }
+            }
+        });
     }
 }
 
@@ -498,6 +544,7 @@ pub fn schedule_show_clipboard_prompt(app: &AppHandle) {
     });
 }
 
+#[allow(dead_code)]
 pub fn schedule_hide_clipboard_prompt(app: &AppHandle) {
     let handle = app.clone();
     let _ = handle.clone().run_on_main_thread(move || {
@@ -505,7 +552,145 @@ pub fn schedule_hide_clipboard_prompt(app: &AppHandle) {
     });
 }
 
-fn clamp_prompt_origin(app: &AppHandle, cursor_x: i32, cursor_y: i32) -> (i32, i32) {
+pub fn is_short_bubble_text(text: &str) -> bool {
+    // 不超过 1100 字用气泡；超出打开主窗口
+    text.chars().count() <= SHORT_TEXT_BUBBLE_LIMIT
+}
+
+fn emit_crypto_bubble_hint(app: &AppHandle, win: &WebviewWindow, hint: &CryptoHint) {
+    let _ = win.emit("app://crypto-bubble", hint);
+    // Also broadcast so a ready listener never misses the first show.
+    let _ = app.emit("app://crypto-bubble", hint);
+    let handle = app.clone();
+    let delayed = hint.clone();
+    thread::spawn(move || {
+        for wait_ms in [80_u64, 200, 450] {
+            thread::sleep(Duration::from_millis(wait_ms));
+            if let Some(win) = handle.get_webview_window(CRYPTO_BUBBLE_LABEL) {
+                let _ = win.emit("app://crypto-bubble", &delayed);
+            }
+            let _ = handle.emit("app://crypto-bubble", &delayed);
+        }
+    });
+}
+
+/// Show (or create) a near-cursor bubble that displays short crypto results.
+pub fn show_crypto_bubble(app: &AppHandle, hint: CryptoHint) {
+    if let Ok(mut pending) = PENDING_CRYPTO_BUBBLE.lock() {
+        *pending = Some(hint.clone());
+    }
+
+    let (cursor_x, cursor_y) = cursor_pos().unwrap_or((0, 0));
+    let target = clamp_popup_origin(
+        app,
+        cursor_x,
+        cursor_y,
+        CRYPTO_BUBBLE_WIDTH,
+        CRYPTO_BUBBLE_HEIGHT,
+    );
+
+    // Prefer the startup window from tauri.conf; create lazily if missing.
+    if let Some(win) = app.get_webview_window(CRYPTO_BUBBLE_LABEL) {
+        let _ = win.set_size(tauri::LogicalSize::new(
+            CRYPTO_BUBBLE_WIDTH,
+            CRYPTO_BUBBLE_HEIGHT,
+        ));
+        let _ = win.set_position(PhysicalPosition::new(target.0, target.1));
+        let _ = win.set_always_on_top(true);
+        let _ = win.show();
+        let _ = win.set_focus();
+        emit_crypto_bubble_hint(app, &win, &hint);
+        hide_clipboard_prompt(app);
+        return;
+    }
+
+    let result = WebviewWindowBuilder::new(
+        app,
+        CRYPTO_BUBBLE_LABEL,
+        WebviewUrl::App("index.html".into()),
+    )
+    .title("加解密结果")
+    .decorations(false)
+    .transparent(true)
+    .shadow(false)
+    .background_color(Color(0, 0, 0, 0))
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .resizable(false)
+    .maximizable(false)
+    .minimizable(false)
+    .focused(true)
+    .visible(true)
+    .inner_size(CRYPTO_BUBBLE_WIDTH, CRYPTO_BUBBLE_HEIGHT)
+    .build();
+
+    match result {
+        Ok(win) => {
+            let _ = win.set_position(PhysicalPosition::new(target.0, target.1));
+            let _ = win.set_always_on_top(true);
+            if let Some(badge) = app.get_webview_window("badge") {
+                let _ = badge.set_always_on_top(true);
+            }
+            let _ = win.set_always_on_top(true);
+            let _ = win.show();
+            let _ = win.set_focus();
+            emit_crypto_bubble_hint(app, &win, &hint);
+            hide_clipboard_prompt(app);
+        }
+        Err(err) => {
+            eprintln!("[crypto-bubble] create failed: {err}");
+            if let Ok(mut pending) = PENDING_CRYPTO_BUBBLE.lock() {
+                *pending = None;
+            }
+            hide_clipboard_prompt(app);
+            show_main(app, Some(hint));
+        }
+    }
+}
+
+/// Hide bubble window only; keep pending payload so a concurrent show can still read it.
+pub fn hide_crypto_bubble_window(app: &AppHandle) {
+    if let Some(win) = app.get_webview_window(CRYPTO_BUBBLE_LABEL) {
+        let _ = win.hide();
+    }
+}
+
+pub fn get_pending_crypto_bubble() -> Option<CryptoHint> {
+    PENDING_CRYPTO_BUBBLE
+        .lock()
+        .ok()
+        .and_then(|guard| guard.clone())
+}
+
+pub fn hide_crypto_bubble(app: &AppHandle) {
+    if let Ok(mut pending) = PENDING_CRYPTO_BUBBLE.lock() {
+        *pending = None;
+    }
+    hide_crypto_bubble_window(app);
+}
+
+pub fn schedule_show_crypto_bubble(app: &AppHandle, hint: CryptoHint) {
+    let handle = app.clone();
+    let _ = handle.clone().run_on_main_thread(move || {
+        show_crypto_bubble(&handle, hint);
+    });
+}
+
+#[allow(dead_code)]
+pub fn schedule_hide_crypto_bubble(app: &AppHandle) {
+    let handle = app.clone();
+    let _ = handle.clone().run_on_main_thread(move || {
+        hide_crypto_bubble(&handle);
+    });
+}
+
+fn clamp_popup_origin(
+    app: &AppHandle,
+    cursor_x: i32,
+    cursor_y: i32,
+    logical_width: f64,
+    logical_height: f64,
+) -> (i32, i32) {
     #[cfg(windows)]
     let (mut x, mut y) = (
         cursor_x + CLIPBOARD_PROMPT_CURSOR_OFFSET,
@@ -540,8 +725,8 @@ fn clamp_prompt_origin(app: &AppHandle, cursor_x: i32, cursor_y: i32) -> (i32, i
         })
         .map(|m| m.scale_factor())
         .unwrap_or(1.0);
-    let prompt_w = (CLIPBOARD_PROMPT_WIDTH * scale).round() as i32;
-    let prompt_h = (CLIPBOARD_PROMPT_HEIGHT * scale).round() as i32;
+    let prompt_w = (logical_width * scale).round() as i32;
+    let prompt_h = (logical_height * scale).round() as i32;
     let left = work.position.x;
     let top = work.position.y;
     let right = left + work.size.width as i32;

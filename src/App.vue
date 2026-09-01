@@ -10,6 +10,9 @@ const BadgeApp = defineAsyncComponent(() => import("@/windows/badge-app.vue"));
 const ClipboardPromptApp = defineAsyncComponent(
   () => import("@/windows/clipboard-prompt-app.vue"),
 );
+const CryptoBubbleApp = defineAsyncComponent(
+  () => import("@/windows/crypto-bubble-app.vue"),
+);
 const MainApp = defineAsyncComponent(() => import("@/windows/main-app.vue"));
 const FeatureApp = defineAsyncComponent(() => import("@/windows/feature-app.vue"));
 const AppUpdateHost = defineAsyncComponent(
@@ -22,6 +25,7 @@ const isMouseTrail = computed(() => props.windowLabel.startsWith("mouse-trail"))
 <template>
   <BadgeApp v-if="windowLabel === 'badge'" />
   <ClipboardPromptApp v-else-if="windowLabel === 'clipboard-prompt'" />
+  <CryptoBubbleApp v-else-if="windowLabel === 'crypto-bubble'" />
   <MainApp v-else-if="windowLabel === 'main'" />
   <MouseTrailApp v-else-if="isMouseTrail" />
   <FeatureApp v-else :window-label="windowLabel" />

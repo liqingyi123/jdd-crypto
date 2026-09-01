@@ -56,6 +56,12 @@ pub fn run() {
             commands::popup_app_menu,
             commands::set_badge_prompt_mode,
             commands::hide_clipboard_prompt,
+            commands::clear_clipboard_dedup,
+            commands::copy_text_silent,
+            commands::accept_clipboard_action,
+            commands::show_crypto_bubble,
+            commands::hide_crypto_bubble,
+            commands::get_crypto_bubble_payload,
             commands::get_clipboard_candidate,
             commands::get_badge_size,
             commands::set_badge_size_pref,
@@ -97,6 +103,9 @@ pub fn run() {
             windows::watch_badge_position(app.handle());
             if let Some(main) = app.get_webview_window("main") {
                 windows::bind_close_to_hide(&main);
+            }
+            if let Some(bubble) = app.get_webview_window("crypto-bubble") {
+                windows::bind_close_to_hide(&bubble);
             }
             tray::setup_tray(app)?;
             let clipboard_watch = clipboard::load_watch(app.handle());
