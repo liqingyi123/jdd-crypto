@@ -91,11 +91,11 @@ onUnmounted(() => {
         <section class="col">
           <h3>后段文本</h3>
           <div class="col-body">
-            <pre class="diff-pre"><template
+            <pre class="diff-pre"><span
               v-for="(seg, idx) in rightSegments"
               :key="idx"
-              ><span :class="['seg', seg.kind]">{{ seg.text }}</span></template
-            ></pre>
+              :class="['seg', seg.kind]"
+            >{{ seg.text }}</span></pre>
           </div>
         </section>
       </div>
