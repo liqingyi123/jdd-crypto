@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { FEATURE_ITEMS } from "../data/features";
 import TrailDemo from "../components/trail-demo.vue";
+import { detectPlatform } from "../composables/use-website-download";
+
+const isMacos = detectPlatform() === "macos";
 </script>
 
 <template>
@@ -9,7 +12,6 @@ import TrailDemo from "../components/trail-demo.vue";
       <p class="section-kicker">Features</p>
       <h1 class="section-title display-font">功能介绍</h1>
       <p class="section-lead">围绕加解密日常场景打磨的桌面能力，从角标到插件均可按需开关。</p>
-
       <div class="feature-grid">
         <article v-for="item in FEATURE_ITEMS" :key="item.id" class="feature-card">
           <h2>{{ item.title }}</h2>
@@ -27,11 +29,74 @@ import TrailDemo from "../components/trail-demo.vue";
         </div>
         <TrailDemo />
       </section>
+      <aside v-if="isMacos" class="macos-tips" aria-label="macOS 使用提示">
+        <p class="macos-tips-title">macOS 使用提示</p>
+        <ol>
+          <li>
+            鼠标跟随（macOS）与 Windows 相同，默认快捷键为
+            <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd>（Mac 键盘上的 Control 即 Ctrl）。首次使用若快捷键无反应、或选中文本后无法自动复制，请在
+            <strong>系统设置 → 隐私与安全性 → 辅助功能</strong>
+            中为「多多解密」开启权限（全局快捷键与模拟 ⌘C 均依赖此项）。
+          </li>
+          <li>
+            内网检查更新，发现新版本后，Mac 下载
+            <code>多多解密_{version}_universal.dmg</code>，打开 dmg 后手动拖入「应用程序」；未签名包若被 Gatekeeper 拦截，请右键应用选择「打开」。
+          </li>
+        </ol>
+      </aside>
     </div>
   </div>
 </template>
 
 <style scoped>
+.macos-tips {
+  margin-top: 28px;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow);
+}
+
+.macos-tips-title {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.macos-tips ol {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 0.95rem;
+  line-height: 1.65;
+}
+
+.macos-tips kbd,
+.macos-tips code {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.88em;
+}
+
+.macos-tips kbd {
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-muted);
+  color: var(--text);
+}
+
+.macos-tips code {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--bg-muted);
+  color: var(--text);
+}
+
 .feature-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
