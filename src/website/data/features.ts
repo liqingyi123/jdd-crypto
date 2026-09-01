@@ -30,11 +30,11 @@ export const FEATURE_ITEMS: FeatureItem[] = [
     title: "深浅色主题",
     summary: "跟随系统外观，也可强制浅色或深色，与编辑器、角标界面保持一致。",
   },
-  {
-    id: "plugins",
-    title: "插件扩展",
-    summary: "以插件槽位管理拖尾特效等能力，后续将扩展编辑器主题与加解密预设。",
-  },
+  // {
+  //   id: "plugins",
+  //   title: "插件扩展",
+  //   summary: "后续将扩展编辑器主题与加解密预设。",
+  // },
   {
     id: "update",
     title: "内网检查更新",

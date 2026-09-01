@@ -5,7 +5,7 @@ import {
   type MouseTrailEffect,
 } from "@/effects/mouse-trail-types";
 
-const effect = shallowRef<MouseTrailEffect>("ribbon");
+const effect = shallowRef<MouseTrailEffect>("dots");
 const color = shallowRef(DEFAULT_MOUSE_TRAIL_COLORS.meteor);
 
 function defaultColorFor(next: MouseTrailEffect): string {
