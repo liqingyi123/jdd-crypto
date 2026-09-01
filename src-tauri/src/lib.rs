@@ -1,6 +1,7 @@
 mod app_update;
 mod clipboard;
 mod commands;
+mod global_shortcuts;
 mod mouse_follow;
 mod mouse_trail;
 mod plugin_host;
@@ -34,14 +35,13 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(|app, _shortcut, event| {
-                    if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed
-                        && app
-                            .state::<AppState>()
-                            .mouse_follow_pref_enabled
-                            .load(Ordering::Relaxed)
-                    {
-                        mouse_follow::toggle(app);
+                .with_handler(|app, shortcut, event| {
+                    let state = event.state();
+                    if mouse_trail::handle_trail_shortcut(app, shortcut, state) {
+                        return;
+                    }
+                    if state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                        mouse_follow::handle_follow_shortcut(app, shortcut);
                     }
                 })
                 .build(),
@@ -108,10 +108,8 @@ pub fn run() {
             app.state::<AppState>()
                 .mouse_follow_pref_enabled
                 .store(pref, Ordering::Relaxed);
-            if pref {
-                let _ = mouse_follow::register_shortcut(app.handle(), &shortcut);
-            }
             mouse_follow::start_follow_loop(app.handle().clone());
+            let _ = global_shortcuts::register_all(app.handle());
             mouse_trail::init_from_store(app.handle());
             let handle = app.handle().clone();
             std::thread::spawn(move || {

@@ -31,14 +31,22 @@ interface CursorPayload {
   y: number;
 }
 
+interface TrailSwitchedPayload {
+  effect: string;
+  label: string;
+}
+
 const hostRef = ref<HTMLElement | null>(null);
 const bounds = shallowRef<MonitorBounds | null>(null);
 const trail = shallowRef<MouseTrailEngine | null>(null);
 const effect = shallowRef<MouseTrailEffect>(DEFAULT_MOUSE_TRAIL_PREF.effect);
 const colors = shallowRef<MouseTrailColors>({ ...DEFAULT_MOUSE_TRAIL_COLORS });
+const toastText = shallowRef("");
 let unlistenCursor: (() => void) | undefined;
 let unlistenPref: (() => void) | undefined;
 let unlistenMonitors: (() => void) | undefined;
+let unlistenSwitched: (() => void) | undefined;
+let toastTimer: ReturnType<typeof setTimeout> | undefined;
 let wasInside = false;
 let windowLabel = "";
 
@@ -157,6 +165,21 @@ function applyCursor(payload: CursorPayload) {
   }
 }
 
+function showSwitchToast(payload: TrailSwitchedPayload) {
+  const label = payload.label?.trim();
+  if (!label) {
+    return;
+  }
+  toastText.value = `鼠标拖尾特效已切换至${label}`;
+  if (toastTimer) {
+    clearTimeout(toastTimer);
+  }
+  toastTimer = setTimeout(() => {
+    toastText.value = "";
+    toastTimer = undefined;
+  }, 1600);
+}
+
 onMounted(async () => {
   try {
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
@@ -190,6 +213,12 @@ onMounted(async () => {
     unlistenMonitors = await listen("app://mouse-trail-monitors-changed", () => {
       void refreshBounds();
     });
+    unlistenSwitched = await listen<TrailSwitchedPayload>(
+      "app://mouse-trail-switched",
+      (event) => {
+        showSwitchToast(event.payload);
+      },
+    );
   } catch {
     // browser preview
   }
@@ -199,21 +228,51 @@ onUnmounted(() => {
   unlistenCursor?.();
   unlistenPref?.();
   unlistenMonitors?.();
+  unlistenSwitched?.();
+  if (toastTimer) {
+    clearTimeout(toastTimer);
+  }
   trail.value?.destroy();
   trail.value = null;
 });
 </script>
 
 <template>
-  <div ref="hostRef" class="overlay-host" />
+  <div class="overlay-root">
+    <div ref="hostRef" class="overlay-host" />
+    <div v-if="toastText" class="trail-toast" aria-live="polite">{{ toastText }}</div>
+  </div>
 </template>
 
 <style scoped>
-.overlay-host {
+.overlay-root {
   position: fixed;
   inset: 0;
   overflow: hidden;
   background: transparent;
+}
+
+.overlay-host {
+  position: absolute;
+  inset: 0;
+}
+
+.trail-toast {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  pointer-events: none;
+  padding: 12px 20px;
+  border-radius: 12px;
+  background: rgba(20, 24, 32, 0.78);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
 }
 </style>
 

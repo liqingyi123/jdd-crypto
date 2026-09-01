@@ -1,3 +1,4 @@
+use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::OnceLock;
 use std::thread;
@@ -8,6 +9,7 @@ use tauri::{
     AppHandle, Emitter, EventTarget, LogicalSize, Manager, PhysicalPosition, WebviewUrl,
     WebviewWindowBuilder, window::Color,
 };
+use tauri_plugin_global_shortcut::{Shortcut, ShortcutState};
 use tauri_plugin_store::StoreExt;
 
 const MAX_OVERLAYS: usize = 8;
@@ -18,6 +20,19 @@ const DEFAULT_METEOR_COLOR: &str = "#F8EC85";
 const DEFAULT_DOTS_COLOR: &str = "#00D1CE";
 const DEFAULT_HEART_COLOR: &str = "#FF2EC8";
 const DISPLAY_CHANGE_DEBOUNCE: Duration = Duration::from_millis(300);
+const TRAIL_ARM_SHORTCUT: &str = "Ctrl+T";
+const TRAIL_EFFECT_SHORTCUTS: [&str; 5] = [
+    "Ctrl+1",
+    "Ctrl+2",
+    "Ctrl+3",
+    "Ctrl+4",
+    "Ctrl+5",
+];
+const TRAIL_EFFECTS: [&str; 5] = ["ribbon", "meteor", "graffiti", "dots", "heart"];
+
+/// Ctrl 仍按住时，已按下过 T，等待数字键完成 Ctrl+T+数字 组合。
+static TRAIL_CHORD_ARMED: AtomicBool = AtomicBool::new(false);
+static TRAIL_SHORTCUT_IDS: OnceLock<(u32, [u32; 5])> = OnceLock::new();
 
 static CURSOR_LOOP_STARTED: AtomicBool = AtomicBool::new(false);
 static TRAIL_ENABLED: AtomicBool = AtomicBool::new(false);
@@ -267,6 +282,160 @@ pub fn init_from_store(app: &AppHandle) {
     ensure_display_listener(app);
     let pref = load_pref(app);
     set_enabled(app, pref.enabled);
+}
+
+fn trail_shortcut_ids() -> Result<(u32, [u32; 5]), String> {
+    if let Some(ids) = TRAIL_SHORTCUT_IDS.get() {
+        return Ok(*ids);
+    }
+    let arm = Shortcut::from_str(TRAIL_ARM_SHORTCUT).map_err(|err| err.to_string())?;
+    let mut digits = [0_u32; 5];
+    for (index, shortcut) in TRAIL_EFFECT_SHORTCUTS.iter().enumerate() {
+        let parsed = Shortcut::from_str(shortcut).map_err(|err| err.to_string())?;
+        digits[index] = parsed.id();
+    }
+    let ids = (arm.id(), digits);
+    let _ = TRAIL_SHORTCUT_IDS.set(ids);
+    Ok(ids)
+}
+
+fn control_key_down() -> bool {
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+            GetAsyncKeyState, VK_CONTROL, VK_LCONTROL, VK_RCONTROL,
+        };
+        // SAFETY: read-only VK state queries.
+        unsafe {
+            (GetAsyncKeyState(i32::from(VK_CONTROL)) as u16 & 0x8000) != 0
+                || (GetAsyncKeyState(i32::from(VK_LCONTROL)) as u16 & 0x8000) != 0
+                || (GetAsyncKeyState(i32::from(VK_RCONTROL)) as u16 & 0x8000) != 0
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        use core_graphics::event::CGKeyCode;
+        use core_graphics::event_source::CGEventSourceStateID;
+
+        extern "C" {
+            fn CGEventSourceKeyState(
+                state_id: CGEventSourceStateID,
+                key: CGKeyCode,
+            ) -> bool;
+        }
+
+        const KEY_CONTROL: CGKeyCode = 59;
+        const KEY_RIGHT_CONTROL: CGKeyCode = 62;
+        // SAFETY: CoreGraphics key-state query for Control keys.
+        unsafe {
+            CGEventSourceKeyState(CGEventSourceStateID::CombinedSessionState, KEY_CONTROL)
+                || CGEventSourceKeyState(
+                    CGEventSourceStateID::CombinedSessionState,
+                    KEY_RIGHT_CONTROL,
+                )
+        }
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
+    {
+        false
+    }
+}
+
+/// Ctrl+T+数字：按住 Ctrl，按下 T 后再按 1–5；松开 Ctrl 后组合失效。
+pub fn handle_trail_shortcut(
+    app: &AppHandle,
+    shortcut: &Shortcut,
+    state: ShortcutState,
+) -> bool {
+    let Ok((arm_id, digit_ids)) = trail_shortcut_ids() else {
+        return false;
+    };
+    let id = shortcut.id();
+
+    if id == arm_id {
+        match state {
+            ShortcutState::Pressed => {
+                TRAIL_CHORD_ARMED.store(true, Ordering::Relaxed);
+            }
+            ShortcutState::Released => {
+                if !control_key_down() {
+                    TRAIL_CHORD_ARMED.store(false, Ordering::Relaxed);
+                }
+            }
+        }
+        return true;
+    }
+
+    for (index, digit_id) in digit_ids.iter().enumerate() {
+        if id != *digit_id {
+            continue;
+        }
+        if state != ShortcutState::Pressed {
+            return true;
+        }
+        let armed = TRAIL_CHORD_ARMED.load(Ordering::Relaxed);
+        let ctrl_down = control_key_down();
+        if !armed || !ctrl_down {
+            if !ctrl_down {
+                TRAIL_CHORD_ARMED.store(false, Ordering::Relaxed);
+            }
+            return true;
+        }
+        TRAIL_CHORD_ARMED.store(false, Ordering::Relaxed);
+        let _ = switch_effect_by_index(app, index);
+        return true;
+    }
+
+    false
+}
+
+fn effect_label(effect: &str) -> &'static str {
+    match effect {
+        "meteor" => "绚丽流星",
+        "graffiti" => "街头涂鸦",
+        "dots" => "连线点阵",
+        "heart" => "心动回忆",
+        _ => "躁动线条",
+    }
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MouseTrailSwitched {
+    effect: String,
+    label: String,
+}
+
+fn emit_switched(app: &AppHandle, effect: &str) {
+    let payload = MouseTrailSwitched {
+        effect: effect.to_string(),
+        label: effect_label(effect).to_string(),
+    };
+    let _ = app.emit("app://mouse-trail-switched", &payload);
+}
+
+fn switch_effect_by_index(app: &AppHandle, index: usize) -> Result<MouseTrailPref, String> {
+    let effect = TRAIL_EFFECTS
+        .get(index)
+        .ok_or_else(|| "无效的特效快捷键".to_string())?
+        .to_string();
+    let pref = load_pref(app);
+    let was_disabled = !pref.enabled;
+    if was_disabled {
+        set_enabled_pref(app.clone(), true)?;
+    }
+    let updated = set_effect_pref(app.clone(), effect.clone())?;
+    if was_disabled {
+        let handle = app.clone();
+        let effect_for_delay = effect.clone();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(300));
+            emit_switched(&handle, &effect_for_delay);
+        });
+    } else {
+        emit_switched(app, &effect);
+    }
+    Ok(updated)
 }
 
 /// Flip the enabled flag and schedule overlay sync off the invoke path

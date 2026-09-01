@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_clipboard_manager::ClipboardExt;
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+use tauri_plugin_global_shortcut::Shortcut;
 use tauri_plugin_store::StoreExt;
 
 use crate::clipboard::classify_clipboard;
@@ -112,30 +112,29 @@ fn is_modifier(part: &str) -> bool {
 }
 
 pub fn register_current(app: &AppHandle) -> Result<(), String> {
+    crate::global_shortcuts::register_all(app)
+}
+
+pub fn unregister_all(app: &AppHandle) -> Result<(), String> {
+    crate::global_shortcuts::unregister_all(app)
+}
+
+pub fn handle_follow_shortcut(app: &AppHandle, shortcut: &Shortcut) {
     let state = app.state::<AppState>();
     if !state.mouse_follow_pref_enabled.load(Ordering::Relaxed) {
-        return unregister_all(app);
+        return;
     }
-    let shortcut = state
+    let expected = state
         .mouse_follow_shortcut
         .lock()
         .map(|guard| guard.clone())
         .unwrap_or_else(|_| DEFAULT_MOUSE_FOLLOW_SHORTCUT.to_string());
-    register_shortcut(app, &shortcut)
-}
-
-pub fn unregister_all(app: &AppHandle) -> Result<(), String> {
-    app.global_shortcut()
-        .unregister_all()
-        .map_err(|err| err.to_string())
-}
-
-pub fn register_shortcut(app: &AppHandle, shortcut: &str) -> Result<(), String> {
-    let parsed = Shortcut::from_str(shortcut).map_err(|err| err.to_string())?;
-    let _ = app.global_shortcut().unregister_all();
-    app.global_shortcut()
-        .register(parsed)
-        .map_err(|err| err.to_string())
+    let Ok(expected_shortcut) = Shortcut::from_str(&expected) else {
+        return;
+    };
+    if shortcut.id() == expected_shortcut.id() {
+        toggle(app);
+    }
 }
 
 pub fn toggle(app: &AppHandle) {

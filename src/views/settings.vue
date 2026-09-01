@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, shallowRef } from "vue";
+import { computed, onMounted, onUnmounted, shallowRef } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { ElMessage } from "element-plus";
 import { storeToRefs } from "pinia";
 import { useThemeStore, type ThemePreference } from "@/stores/theme";
@@ -64,14 +65,15 @@ const badgeSizeOptions: Array<{ value: number; label: string }> = [
   { value: BADGE_HIDDEN_SIZE, label: "隐藏" },
 ];
 
-const trailEffectOptions: Array<{ value: MouseTrailEffect; label: string }> = [
-  { value: "ribbon", label: "躁动线条" },
-  { value: "meteor", label: "绚丽流星" },
-  { value: "graffiti", label: "街头涂鸦" },
-  { value: "dots", label: "连线点阵" },
-  { value: "heart", label: "心动回忆" },
+const trailEffectOptions: Array<{ value: MouseTrailEffect; label: string; shortcutKey: string }> = [
+  { value: "ribbon", label: "躁动线条", shortcutKey: "1" },
+  { value: "meteor", label: "绚丽流星", shortcutKey: "2" },
+  { value: "graffiti", label: "街头涂鸦", shortcutKey: "3" },
+  { value: "dots", label: "连线点阵", shortcutKey: "4" },
+  { value: "heart", label: "心动回忆", shortcutKey: "5" },
 ];
 
+let unlistenTrailPref: UnlistenFn | null = null;
 function applyTrailPref(pref: MouseTrailPref) {
   trailEnabled.value = pref.enabled;
   trailEffect.value = normalizeMouseTrailEffect(pref.effect);
@@ -102,6 +104,17 @@ onMounted(async () => {
     applyTrailPref(DEFAULT_MOUSE_TRAIL_PREF);
   }
   await loadShortcut();
+  try {
+    unlistenTrailPref = await listen<MouseTrailPref>("app://mouse-trail-pref", (event) => {
+      applyTrailPref(event.payload);
+    });
+  } catch {
+    // browser preview
+  }
+});
+
+onUnmounted(() => {
+  void unlistenTrailPref?.();
 });
 
 async function onWatchChange(value: string | number | boolean) {
@@ -239,6 +252,9 @@ function onThemeChange(value: string | number | boolean | undefined) {
         </label>
       </div>
       <p>我的鼠标指针哪去啦？？！！<br />在所有显示器工作区跟随鼠标绘制炫酷好玩的拖尾特效以帮助更好的寻找鼠标位置。</p>
+      <p class="trail-shortcut-hint">
+        快捷键：按住 Ctrl，依次按下 T 与数字键 1–5（Ctrl+T+数字）切换特效；松开 Ctrl 后需重新按下 T。
+      </p>
       <ElRadioGroup
         :model-value="trailEffect"
         :disabled="!trailEnabled"
@@ -250,6 +266,7 @@ function onThemeChange(value: string | number | boolean | undefined) {
           :value="item.value"
         >
           {{ item.label }}
+          <span class="trail-key">Ctrl+T+{{ item.shortcutKey }}</span>
         </ElRadio>
       </ElRadioGroup>
       <template v-if="showTrailColor && activeColorEffect">
@@ -343,6 +360,18 @@ h3 {
 
 .trail-color-row {
   margin-top: 8px;
+}
+
+.trail-shortcut-hint {
+  margin-top: 8px;
+  font-size: 0.92rem;
+}
+
+.trail-key {
+  margin-left: 8px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
 }
 
 p {

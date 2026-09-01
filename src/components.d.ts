@@ -27,6 +27,8 @@ declare module 'vue' {
     ElTag: typeof import('element-plus/es')['ElTag']
     MonacoEditor: typeof import('./components/monaco-editor.vue')['default']
     PluginTypeCard: typeof import('./components/plugin-type-card.vue')['default']
+    RouterLink: typeof import('vue-router')['RouterLink']
+    RouterView: typeof import('vue-router')['RouterView']
   }
   export interface GlobalDirectives {
     vLoading: typeof import('element-plus/es')['ElLoadingDirective']
