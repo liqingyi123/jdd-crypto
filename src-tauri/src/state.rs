@@ -10,6 +10,7 @@ pub const MIN_BADGE_SIZE: u32 = 38;
 /// Default badge diameter in CSS/logical pixels. Keep in sync with `src/constants/badge.ts`.
 pub const DEFAULT_BADGE_SIZE: u32 = 68;
 pub const DEFAULT_MOUSE_FOLLOW_SHORTCUT: &str = "Ctrl+Shift+G";
+pub const DEFAULT_COMPARE_MODE_SHORTCUT: &str = "Ctrl+Shift+D";
 
 #[derive(Clone, Serialize)]
 pub struct ClipboardCandidate {
@@ -28,6 +29,9 @@ pub struct AppState {
     pub mouse_follow_returning: AtomicBool,
     pub saved_badge_pos: Mutex<Option<(i32, i32)>>,
     pub mouse_follow_shortcut: Mutex<String>,
+    pub compare_pref_enabled: AtomicBool,
+    pub compare_active: AtomicBool,
+    pub compare_mode_shortcut: Mutex<String>,
     pub pending_update: Mutex<Option<UpdateCheckResult>>,
 }
 
@@ -44,6 +48,9 @@ impl Default for AppState {
             mouse_follow_returning: AtomicBool::new(false),
             saved_badge_pos: Mutex::new(None),
             mouse_follow_shortcut: Mutex::new(DEFAULT_MOUSE_FOLLOW_SHORTCUT.to_string()),
+            compare_pref_enabled: AtomicBool::new(true),
+            compare_active: AtomicBool::new(false),
+            compare_mode_shortcut: Mutex::new(DEFAULT_COMPARE_MODE_SHORTCUT.to_string()),
             pending_update: Mutex::new(None),
         }
     }

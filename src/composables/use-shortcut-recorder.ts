@@ -59,8 +59,14 @@ function partsFromEvent(event: KeyboardEvent): string[] {
   return parts;
 }
 
-export function useShortcutRecorder() {
-  const shortcut = shallowRef("Ctrl+Shift+G");
+export function useShortcutRecorder(options?: {
+  getCommand?: string;
+  setCommand?: string;
+  defaultShortcut?: string;
+}) {
+  const getCommand = options?.getCommand ?? "get_mouse_follow_shortcut";
+  const setCommand = options?.setCommand ?? "set_mouse_follow_shortcut";
+  const shortcut = shallowRef(options?.defaultShortcut ?? "Ctrl+Shift+G");
   const recording = shallowRef(false);
   const preview = shallowRef("");
   const errorMessage = shallowRef("");
@@ -113,7 +119,7 @@ export function useShortcutRecorder() {
     }
     const next = parts.join("+");
     try {
-      const saved = await invoke<string>("set_mouse_follow_shortcut", {
+      const saved = await invoke<string>(setCommand, {
         shortcut: next,
       });
       unbindOutsideListener();
@@ -166,7 +172,7 @@ export function useShortcutRecorder() {
     onRecordKey,
     loadShortcut: async () => {
       try {
-        shortcut.value = await invoke<string>("get_mouse_follow_shortcut");
+        shortcut.value = await invoke<string>(getCommand);
       } catch {
         // browser preview
       }

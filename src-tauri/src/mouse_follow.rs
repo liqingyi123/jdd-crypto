@@ -222,7 +222,8 @@ pub fn start_follow_loop(app: AppHandle) {
             };
             let enabled = state.mouse_follow_enabled.load(Ordering::Relaxed);
             let returning = state.mouse_follow_returning.load(Ordering::Relaxed);
-            if !enabled && !returning {
+            let compare_active = state.compare_active.load(Ordering::Relaxed);
+            if !enabled && !returning && !compare_active {
                 anim = None;
                 was_down = false;
                 #[cfg(any(windows, target_os = "macos"))]
@@ -235,6 +236,10 @@ pub fn start_follow_loop(app: AppHandle) {
 
             #[cfg(any(windows, target_os = "macos"))]
             {
+                if compare_active {
+                    crate::compare_mode::update_tip_position(&app);
+                }
+
                 if returning && !enabled {
                     let target = state
                         .saved_badge_pos
@@ -253,42 +258,53 @@ pub fn start_follow_loop(app: AppHandle) {
                         }
                         None => snap_home_and_restore(&app),
                     }
-                    thread::sleep(Duration::from_millis(16));
-                    continue;
-                }
-
-                let Some(cursor) = cursor_physical_pos(&app) else {
-                    thread::sleep(Duration::from_millis(16));
-                    continue;
-                };
-                let _ = lerp_badge(
-                    &app,
-                    &mut anim,
-                    (
-                        f64::from(cursor.0 + CURSOR_OFFSET),
-                        f64::from(cursor.1 + CURSOR_OFFSET),
-                    ),
-                );
-
-                let down = left_button_down();
-                if down && !was_down {
-                    press = cursor;
-                }
-                if !down && was_down {
-                    let dx = cursor.0 - press.0;
-                    let dy = cursor.1 - press.1;
-                    let dragged = dx * dx + dy * dy >= DRAG_THRESHOLD * DRAG_THRESHOLD;
-                    if dragged {
-                        last_short_up = None;
-                        capture_selection(&app);
-                    } else if is_double_click(&last_short_up, press) {
-                        last_short_up = None;
-                        capture_selection(&app);
-                    } else {
-                        last_short_up = Some((Instant::now(), press.0, press.1));
+                    // Still allow compare selection while badge is returning.
+                    if !compare_active {
+                        thread::sleep(Duration::from_millis(16));
+                        continue;
                     }
                 }
-                was_down = down;
+
+                if enabled {
+                    let Some(cursor) = cursor_physical_pos(&app) else {
+                        thread::sleep(Duration::from_millis(16));
+                        continue;
+                    };
+                    let _ = lerp_badge(
+                        &app,
+                        &mut anim,
+                        (
+                            f64::from(cursor.0 + CURSOR_OFFSET),
+                            f64::from(cursor.1 + CURSOR_OFFSET),
+                        ),
+                    );
+                }
+
+                if enabled || compare_active {
+                    let Some(cursor) = cursor_physical_pos(&app) else {
+                        thread::sleep(Duration::from_millis(16));
+                        continue;
+                    };
+                    let down = left_button_down();
+                    if down && !was_down {
+                        press = cursor;
+                    }
+                    if !down && was_down {
+                        let dx = cursor.0 - press.0;
+                        let dy = cursor.1 - press.1;
+                        let dragged = dx * dx + dy * dy >= DRAG_THRESHOLD * DRAG_THRESHOLD;
+                        if dragged {
+                            last_short_up = None;
+                            capture_selection(&app);
+                        } else if is_double_click(&last_short_up, press) {
+                            last_short_up = None;
+                            capture_selection(&app);
+                        } else {
+                            last_short_up = Some((Instant::now(), press.0, press.1));
+                        }
+                    }
+                    was_down = down;
+                }
             }
 
             thread::sleep(Duration::from_millis(16));
@@ -362,14 +378,13 @@ fn clipboard_sequence() -> u32 {
 }
 
 #[cfg(windows)]
-fn capture_selection(app: &AppHandle) {
+fn capture_selection_text(app: &AppHandle) -> Option<String> {
     // Slightly longer wait so double-click word selection can settle.
     thread::sleep(Duration::from_millis(70));
     let seq_before = clipboard_sequence();
     send_copy_shortcut();
 
     let deadline = Instant::now() + Duration::from_millis(450);
-    let mut text = String::new();
     while Instant::now() < deadline {
         thread::sleep(Duration::from_millis(30));
         if clipboard_sequence() == seq_before {
@@ -381,23 +396,18 @@ fn capture_selection(app: &AppHandle) {
         if current.trim().is_empty() {
             continue;
         }
-        text = current;
-        break;
+        return Some(current);
     }
-    if text.is_empty() {
-        return;
-    }
-    open_main_with_capture(app, text);
+    None
 }
 
 #[cfg(target_os = "macos")]
-fn capture_selection(app: &AppHandle) {
+fn capture_selection_text(app: &AppHandle) -> Option<String> {
     thread::sleep(Duration::from_millis(70));
     let before = app.clipboard().read_text().unwrap_or_default();
     send_copy_shortcut();
 
     let deadline = Instant::now() + Duration::from_millis(450);
-    let mut text = String::new();
     while Instant::now() < deadline {
         thread::sleep(Duration::from_millis(30));
         let Ok(current) = app.clipboard().read_text() else {
@@ -406,10 +416,18 @@ fn capture_selection(app: &AppHandle) {
         if current.trim().is_empty() || current == before {
             continue;
         }
-        text = current;
-        break;
+        return Some(current);
     }
-    if text.is_empty() {
+    None
+}
+
+#[cfg(any(windows, target_os = "macos"))]
+fn capture_selection(app: &AppHandle) {
+    let Some(text) = capture_selection_text(app) else {
+        return;
+    };
+    if crate::compare_mode::is_active(app) {
+        crate::compare_mode::handle_captured_cipher(app, text);
         return;
     }
     open_main_with_capture(app, text);

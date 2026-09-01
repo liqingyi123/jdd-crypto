@@ -59,6 +59,40 @@
         "focus": false,
         "maximizable": false,
         "minimizable": false
+      },
+      {
+        "label": "compare-tip",
+        "title": "对比模式提示",
+        "url": "index.html",
+        "width": 280,
+        "height": 44,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "visible": false,
+        "focus": false,
+        "maximizable": false,
+        "minimizable": false
+      },
+      {
+        "label": "compare-bubble",
+        "title": "文本对比",
+        "url": "index.html",
+        "width": 1000,
+        "height": 600,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "visible": false,
+        "focus": false,
+        "maximizable": false,
+        "minimizable": false
       }
     ],
     "security": {

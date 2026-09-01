@@ -30,6 +30,16 @@ pub fn register_all(app: &AppHandle) -> Result<(), String> {
         global.register(parsed).map_err(|err| err.to_string())?;
     }
 
+    if state.compare_pref_enabled.load(Ordering::Relaxed) {
+        let shortcut = state
+            .compare_mode_shortcut
+            .lock()
+            .map(|guard| guard.clone())
+            .unwrap_or_else(|_| crate::state::DEFAULT_COMPARE_MODE_SHORTCUT.to_string());
+        let compare = Shortcut::from_str(&shortcut).map_err(|err| err.to_string())?;
+        global.register(compare).map_err(|err| err.to_string())?;
+    }
+
     let arm = Shortcut::from_str(TRAIL_ARM_SHORTCUT).map_err(|err| err.to_string())?;
     global.register(arm).map_err(|err| err.to_string())?;
 

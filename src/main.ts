@@ -19,10 +19,22 @@ async function bootstrap() {
   const isTransparentChrome =
     windowLabel === "badge" ||
     windowLabel === "clipboard-prompt" ||
-    windowLabel === "crypto-bubble";
+    windowLabel === "crypto-bubble" ||
+    windowLabel === "compare-tip" ||
+    windowLabel === "compare-bubble";
 
   if (isMouseTrail) {
     // Keep trail overlays free of theme chrome (transparent only).
+    document.documentElement.classList.add("badge-window");
+    document.body.style.background = "transparent";
+    try {
+      const { getCurrentWindow } = await import("@tauri-apps/api/window");
+      await getCurrentWindow().setIgnoreCursorEvents(true);
+    } catch {
+      // browser preview
+    }
+  } else if (windowLabel === "compare-tip") {
+    await import("./styles/theme.css");
     document.documentElement.classList.add("badge-window");
     document.body.style.background = "transparent";
     try {

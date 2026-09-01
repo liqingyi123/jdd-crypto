@@ -692,12 +692,46 @@ fn clamp_popup_origin(
     logical_height: f64,
 ) -> (i32, i32) {
     #[cfg(windows)]
-    let (mut x, mut y) = (
-        cursor_x + CLIPBOARD_PROMPT_CURSOR_OFFSET,
-        cursor_y + CLIPBOARD_PROMPT_CURSOR_OFFSET,
-    );
+    let offset = CLIPBOARD_PROMPT_CURSOR_OFFSET;
     #[cfg(not(windows))]
-    let (mut x, mut y) = (cursor_x + 16, cursor_y + 16);
+    let offset = 16;
+    clamp_popup_origin_with_offset(
+        app,
+        cursor_x,
+        cursor_y,
+        logical_width,
+        logical_height,
+        offset,
+    )
+}
+
+pub fn clamp_popup_origin_public(
+    app: &AppHandle,
+    cursor_x: i32,
+    cursor_y: i32,
+    logical_width: f64,
+    logical_height: f64,
+    offset: i32,
+) -> (i32, i32) {
+    clamp_popup_origin_with_offset(
+        app,
+        cursor_x,
+        cursor_y,
+        logical_width,
+        logical_height,
+        offset,
+    )
+}
+
+fn clamp_popup_origin_with_offset(
+    app: &AppHandle,
+    cursor_x: i32,
+    cursor_y: i32,
+    logical_width: f64,
+    logical_height: f64,
+    offset: i32,
+) -> (i32, i32) {
+    let (mut x, mut y) = (cursor_x + offset, cursor_y + offset);
 
     let monitors = app.available_monitors().unwrap_or_default();
     let area = monitors
@@ -741,6 +775,10 @@ fn clamp_popup_origin(
     x = x.max(left);
     y = y.max(top);
     (x, y)
+}
+
+pub fn cursor_pos_public() -> Option<(i32, i32)> {
+    cursor_pos()
 }
 
 #[cfg(windows)]

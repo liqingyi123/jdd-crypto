@@ -37,6 +37,22 @@ const {
   loadShortcut,
 } = useShortcutRecorder();
 
+const {
+  recording: compareRecording,
+  errorMessage: compareErrorMessage,
+  display: compareDisplay,
+  previewDisplay: comparePreviewDisplay,
+  buttonRef: compareButtonRef,
+  startRecording: startCompareRecording,
+  cancelRecording: cancelCompareRecording,
+  onRecordKey: onCompareRecordKey,
+  loadShortcut: loadCompareShortcut,
+} = useShortcutRecorder({
+  getCommand: "get_compare_mode_shortcut",
+  setCommand: "set_compare_mode_shortcut",
+  defaultShortcut: "Ctrl+Shift+D",
+});
+
 const themeOptions: Array<{ value: ThemePreference; label: string }> = [
   { value: "system", label: "跟随系统" },
   { value: "light", label: "浅色" },
@@ -45,6 +61,7 @@ const themeOptions: Array<{ value: ThemePreference; label: string }> = [
 
 const badgeSize = shallowRef(DEFAULT_BADGE_SIZE);
 const followPref = shallowRef(true);
+const comparePref = shallowRef(true);
 const autostartEnabled = shallowRef(false);
 const trailEnabled = shallowRef(DEFAULT_MOUSE_TRAIL_PREF.enabled);
 const trailEffect = shallowRef<MouseTrailEffect>(DEFAULT_MOUSE_TRAIL_PREF.effect);
@@ -100,6 +117,11 @@ onMounted(async () => {
     // browser preview
   }
   try {
+    comparePref.value = await invoke<boolean>("get_compare_mode_pref");
+  } catch {
+    // browser preview
+  }
+  try {
     autostartEnabled.value = await isAutostartEnabled();
   } catch {
     autostartEnabled.value = false;
@@ -111,6 +133,7 @@ onMounted(async () => {
     applyTrailPref(DEFAULT_MOUSE_TRAIL_PREF);
   }
   await loadShortcut();
+  await loadCompareShortcut();
   try {
     unlistenTrailPref = await listen<MouseTrailPref>("app://mouse-trail-pref", (event) => {
       applyTrailPref(event.payload);
@@ -146,6 +169,15 @@ async function onFollowPrefChange(value: string | number | boolean) {
     await cancelRecording();
   }
   await invoke("set_mouse_follow_pref", { enabled }).catch(() => undefined);
+}
+
+async function onComparePrefChange(value: string | number | boolean) {
+  const enabled = Boolean(value);
+  comparePref.value = enabled;
+  if (!enabled && compareRecording.value) {
+    await cancelCompareRecording();
+  }
+  await invoke("set_compare_mode_pref", { enabled }).catch(() => undefined);
 }
 
 async function onAutostartChange(value: string | number | boolean) {
@@ -336,6 +368,32 @@ function onThemeChange(value: string | number | boolean | undefined) {
         </div>
       </div>
       <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
+      <p>最多 4 个键，需包含修饰键。点击按钮后按下新组合，Esc 或点击其他区域取消。</p>
+    </section>
+    <section>
+      <div class="section-head">
+        <h2>文本对比模式</h2>
+        <label class="row">
+          <ElSwitch :model-value="comparePref" @change="onComparePrefChange" />
+        </label>
+      </div>
+      <p>
+        开启后可用快捷键进入对比模式：框选并解密两段文本，在中央气泡中左右对比并高亮后段差异。再次按下同一快捷键退出。
+      </p>
+      <div class="row">
+        <span>快捷键</span>
+        <div ref="compareButtonRef">
+          <ElButton
+            :type="compareRecording ? 'primary' : 'default'"
+            :disabled="!comparePref"
+            @click="startCompareRecording"
+            @keydown="onCompareRecordKey"
+          >
+            {{ compareRecording ? comparePreviewDisplay : compareDisplay }}
+          </ElButton>
+        </div>
+      </div>
+      <p v-if="compareErrorMessage" class="error">{{ compareErrorMessage }}</p>
       <p>最多 4 个键，需包含修饰键。点击按钮后按下新组合，Esc 或点击其他区域取消。</p>
     </section>
   </div>
