@@ -85,7 +85,10 @@ async function runBubble(payload: BubblePayload) {
   copyHint.value = "";
 
   try {
-    const { mode: resolvedMode, result } = preferDecrypt
+    const outcome: {
+      mode: "encrypt" | "decrypt";
+      result: ReturnType<typeof runAes>;
+    } = preferDecrypt
       ? runAesPreferDecrypt(payload.text)
       : {
           mode,
@@ -97,6 +100,7 @@ async function runBubble(payload: BubblePayload) {
             customIv: "",
           }),
         };
+    const { mode: resolvedMode, result } = outcome;
     if (token !== runToken) {
       return;
     }
