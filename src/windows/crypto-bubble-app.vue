@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onMounted, onUnmounted, shallowRef, useTemplateRef } from "vue";
 import { invoke } from "@tauri-apps/api/core";
-import { runAes } from "@/services/aes-ops";
+import { runAes, runAesPreferDecrypt } from "@/services/aes-ops";
 import { useSystemTheme } from "@/composables/use-system-theme";
 
 useSystemTheme();
@@ -73,9 +73,10 @@ async function runBubble(payload: BubblePayload) {
   if (!payload?.text) {
     return;
   }
+  const preferDecrypt = payload.mode === "auto";
   const mode = payload.mode === "encrypt" ? "encrypt" : "decrypt";
   const token = ++runToken;
-  lastMode.value = mode;
+  lastMode.value = preferDecrypt ? "decrypt" : mode;
   sourceText.value = payload.text;
   visible.value = true;
   loading.value = true;
@@ -84,18 +85,28 @@ async function runBubble(payload: BubblePayload) {
   copyHint.value = "";
 
   try {
-    const result = runAes({
-      type: mode,
-      text: payload.text,
-      aesCode: "auto",
-      customKey: "",
-      customIv: "",
-    });
+    const { mode: resolvedMode, result } = preferDecrypt
+      ? runAesPreferDecrypt(payload.text)
+      : {
+          mode,
+          result: runAes({
+            type: mode,
+            text: payload.text,
+            aesCode: "auto",
+            customKey: "",
+            customIv: "",
+          }),
+        };
     if (token !== runToken) {
       return;
     }
+    lastMode.value = resolvedMode;
     if (result.code !== "ok" || !result.content) {
-      errorText.value = mode === "decrypt" ? "自动解密失败" : "自动加密失败";
+      errorText.value = preferDecrypt
+        ? "自动加解密失败"
+        : resolvedMode === "decrypt"
+          ? "自动解密失败"
+          : "自动加密失败";
       return;
     }
     resultText.value = beautifyResult(result.content);
@@ -103,7 +114,11 @@ async function runBubble(payload: BubblePayload) {
     if (token !== runToken) {
       return;
     }
-    errorText.value = mode === "decrypt" ? "自动解密失败" : "自动加密失败";
+    errorText.value = preferDecrypt
+      ? "自动加解密失败"
+      : mode === "decrypt"
+        ? "自动解密失败"
+        : "自动加密失败";
   } finally {
     if (token === runToken) {
       loading.value = false;

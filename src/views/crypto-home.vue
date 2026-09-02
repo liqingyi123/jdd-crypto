@@ -4,7 +4,7 @@ import { storeToRefs } from "pinia";
 import { useAppStore } from "@/stores/app";
 import { useCryptoWorkspaceStore, type CryptoHistoryItem } from "@/stores/crypto-workspace";
 import { AES_ENUM } from "@/utils/aes-enum";
-import { runAes, type AesOpType } from "@/services/aes-ops";
+import { runAes, runAesPreferDecrypt, type AesOpType } from "@/services/aes-ops";
 import { prettierFormat } from "@/utils/prettier-format";
 import MonacoEditor from "@/components/monaco-editor.vue";
 
@@ -139,8 +139,41 @@ async function applyPending() {
     return;
   }
   inputText.value = payload.text;
-  const mode = payload.mode === "encrypt" ? "encrypt" : "decrypt";
   appStore.setPendingCrypto(null);
+
+  if (payload.mode === "auto") {
+    errorMessage.value = "";
+    const { mode, result } = runAesPreferDecrypt(payload.text);
+    if (result.code === "empty") {
+      errorMessage.value = "请输入待处理文本，并确认 AES key / iv 已填写";
+      outputText.value = "";
+      return;
+    }
+    if (result.code === "error") {
+      outputText.value = result.content;
+      errorMessage.value = "自动加解密失败";
+      return;
+    }
+    const display = await prettierFormat(result.content);
+    outputText.value = display;
+    const usedCode = result.usedCode ?? "auto";
+    const usedKey = result.usedKey ?? "";
+    const usedIv = result.usedIv ?? "";
+    if (usedCode === "custom") {
+      workspace.rememberCustom(usedKey, usedIv);
+    }
+    workspace.pushHistory({
+      type: mode,
+      text: payload.text,
+      aesCode: usedCode,
+      key: usedKey,
+      iv: usedIv,
+      result: display,
+    });
+    return;
+  }
+
+  const mode = payload.mode === "encrypt" ? "encrypt" : "decrypt";
   await run(mode);
 }
 

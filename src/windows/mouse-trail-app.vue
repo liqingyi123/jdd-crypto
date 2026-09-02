@@ -134,7 +134,9 @@ function applyPref(pref: MouseTrailPref) {
     colors.value.dots !== normalizedColors.dots ||
     colors.value.heart !== normalizedColors.heart;
 
-  if (effectChanged) {
+  // Cold start: local effect may already match pref (e.g. default ribbon)
+  // while trail engine is still null — must rebuild, not only on effect change.
+  if (!trail.value || effectChanged) {
     rebuildEngine(normalized, normalizedColors);
     return;
   }

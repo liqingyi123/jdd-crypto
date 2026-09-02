@@ -316,3 +316,29 @@ export function runAes(options: RunAesOptions): AesOpResult {
     usedIv: resolved.iv,
   };
 }
+
+/** Prefer auto-decrypt; fall back to auto-encrypt when decrypt fails. */
+export function runAesPreferDecrypt(text: string): {
+  mode: "encrypt" | "decrypt";
+  result: AesOpResult;
+} {
+  const decryptResult = runAes({
+    type: "decrypt",
+    text,
+    aesCode: "auto",
+    customKey: "",
+    customIv: "",
+  });
+  if (decryptResult.code === "ok" && decryptResult.content) {
+    return { mode: "decrypt", result: decryptResult };
+  }
+
+  const encryptResult = runAes({
+    type: "encrypt",
+    text,
+    aesCode: "auto",
+    customKey: "",
+    customIv: "",
+  });
+  return { mode: "encrypt", result: encryptResult };
+}

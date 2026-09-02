@@ -8,7 +8,6 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_global_shortcut::Shortcut;
 use tauri_plugin_store::StoreExt;
 
-use crate::clipboard::classify_clipboard;
 use crate::state::{AppState, DEFAULT_MOUSE_FOLLOW_SHORTCUT, MIN_BADGE_SIZE};
 use crate::windows::{self, CryptoHint};
 
@@ -350,16 +349,11 @@ fn open_main_with_capture(app: &AppHandle, text: String) {
         *last = text.clone();
     }
 
-    let kind = classify_clipboard(&text);
-    let mode = if kind == "maybe_cipher" {
-        "decrypt"
-    } else {
-        "encrypt"
-    };
+    // Prefer decrypt first; frontend falls back to encrypt on failure.
     let use_bubble = windows::is_short_bubble_text(&text);
     let hint = CryptoHint {
         text,
-        mode: mode.to_string(),
+        mode: "auto".to_string(),
     };
     if use_bubble {
         windows::schedule_show_crypto_bubble(app, hint);

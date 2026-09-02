@@ -1,8 +1,14 @@
 {
   "name": "jdd-crypto",
   "private": true,
-  "version": "0.5.4",
+  "version": "0.5.5",
   "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "volta": {
+    "node": "24.20.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
