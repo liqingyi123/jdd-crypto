@@ -1,4 +1,4 @@
-name: Tauri Build (macOS) 0.5.5
+name: Tauri Build (macOS)
 
 on:
   workflow_dispatch: # 支持手动点击触发打包（最适合调试）
@@ -25,11 +25,15 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          shared-key: macos-universal
+          cache-targets: true
 
       - name: Use crates.io on CI
         run: rm -f src-tauri/.cargo/config.toml
@@ -44,10 +48,10 @@ jobs:
           npm_config_registry: https://registry.npmjs.org
         run: npm ci
 
-      - name: Add macOS universal targets
-        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
-
       - name: Build Tauri (Universal DMG)
+        env:
+          CARGO_TERM_COLOR: always
+          CARGO_INCREMENTAL: "0"
         run: npm run tauri -- build --target universal-apple-darwin
 
       - name: Rename macOS DMG
