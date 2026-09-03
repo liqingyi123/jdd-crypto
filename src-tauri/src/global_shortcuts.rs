@@ -7,12 +7,13 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 use crate::state::AppState;
 
 const TRAIL_ARM_SHORTCUT: &str = "Ctrl+T";
-const TRAIL_EFFECT_SHORTCUTS: [&str; 5] = [
+const TRAIL_EFFECT_SHORTCUTS: [&str; 6] = [
     "Ctrl+1",
     "Ctrl+2",
     "Ctrl+3",
     "Ctrl+4",
     "Ctrl+5",
+    "Ctrl+6",
 ];
 
 pub fn register_all(app: &AppHandle) -> Result<(), String> {

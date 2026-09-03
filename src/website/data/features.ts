@@ -38,7 +38,7 @@ export const FEATURE_ITEMS: FeatureItem[] = [
     id: "trail",
     title: "鼠标拖尾特效",
     summary:
-      "躁动线条、绚丽流星、街头涂鸦、连线点阵、心动回忆等多种特效，部分支持自定义颜色；可用 Ctrl+T+数字快速切换。",
+      "躁动线条、星痕漫衍、街头涂鸦、浮络牵光、绮心逐迹、沧涟曳逝等多种特效，部分支持自定义颜色；可用 Ctrl+T+数字快速切换。",
   },
   {
     id: "theme",
@@ -59,8 +59,9 @@ export const FEATURE_ITEMS: FeatureItem[] = [
 
 export const TRAIL_EFFECT_OPTIONS = [
   { id: "ribbon" as const, label: "躁动线条" },
-  { id: "meteor" as const, label: "绚丽流星" },
+  { id: "meteor" as const, label: "星痕漫衍" },
   { id: "graffiti" as const, label: "街头涂鸦" },
-  { id: "dots" as const, label: "连线点阵" },
-  { id: "heart" as const, label: "心动回忆" },
+  { id: "dots" as const, label: "浮络牵光" },
+  { id: "heart" as const, label: "绮心逐迹" },
+  { id: "ripple" as const, label: "沧涟曳逝" },
 ];

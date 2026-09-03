@@ -8,7 +8,13 @@ export interface MouseTrailEngine {
   setColor?(color: string): void;
 }
 
-export type MouseTrailEffect = "ribbon" | "meteor" | "graffiti" | "dots" | "heart";
+export type MouseTrailEffect =
+  | "ribbon"
+  | "meteor"
+  | "graffiti"
+  | "dots"
+  | "heart"
+  | "ripple";
 
 export type ColorableTrailEffect = "meteor" | "dots" | "heart";
 
@@ -16,6 +22,8 @@ export interface MouseTrailColors {
   meteor: string;
   dots: string;
   heart: string;
+  /** Stored for preference compat; ripple uses fixed mid-gray highlight/shadow (not user-tintable). */
+  ripple: string;
 }
 
 export interface MouseTrailPref {
@@ -28,6 +36,7 @@ export const DEFAULT_MOUSE_TRAIL_COLORS: MouseTrailColors = {
   meteor: "#F8EC85",
   dots: "#00D1CE",
   heart: "#FF2EC8",
+  ripple: "#2A2A2E",
 };
 
 export const DEFAULT_MOUSE_TRAIL_PREF: MouseTrailPref = {
@@ -48,6 +57,9 @@ export function normalizeMouseTrailEffect(raw: string): MouseTrailEffect {
   }
   if (raw === "heart") {
     return "heart";
+  }
+  if (raw === "ripple") {
+    return "ripple";
   }
   return "ribbon";
 }
@@ -79,5 +91,6 @@ export function normalizeMouseTrailColors(
     meteor: normalizeTrailColor(raw?.meteor ?? d.meteor, d.meteor),
     dots: normalizeTrailColor(raw?.dots ?? d.dots, d.dots),
     heart: normalizeTrailColor(raw?.heart ?? d.heart, d.heart),
+    ripple: normalizeTrailColor(raw?.ripple ?? d.ripple, d.ripple),
   };
 }

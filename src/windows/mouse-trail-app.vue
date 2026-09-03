@@ -6,6 +6,7 @@ import { RibbonTrail } from "@/effects/ribbon-trail";
 import { GraffitiTrail } from "@/effects/graffiti-trail";
 import { DotsTrail } from "@/effects/dots-trail";
 import { HeartTrail } from "@/effects/heart-trail";
+import { RippleTrail } from "@/effects/ripple-trail";
 import {
   DEFAULT_MOUSE_TRAIL_COLORS,
   DEFAULT_MOUSE_TRAIL_PREF,
@@ -97,6 +98,9 @@ function createEngine(next: MouseTrailEffect, trailColors: MouseTrailColors): Mo
   if (next === "heart") {
     return new HeartTrail(hostRef.value, { color: trailColors.heart });
   }
+  if (next === "ripple") {
+    return new RippleTrail(hostRef.value);
+  }
   return new RibbonTrail(hostRef.value);
 }
 
@@ -132,7 +136,8 @@ function applyPref(pref: MouseTrailPref) {
   const colorsChanged =
     colors.value.meteor !== normalizedColors.meteor ||
     colors.value.dots !== normalizedColors.dots ||
-    colors.value.heart !== normalizedColors.heart;
+    colors.value.heart !== normalizedColors.heart ||
+    colors.value.ripple !== normalizedColors.ripple;
 
   // Cold start: local effect may already match pref (e.g. default ribbon)
   // while trail engine is still null — must rebuild, not only on effect change.

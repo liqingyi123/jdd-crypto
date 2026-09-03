@@ -1,6 +1,6 @@
 [package]
 name = "jdd-crypto"
-version = "0.5.5"
+version = "0.6.5"
 description = "Desktop encrypt/decrypt utility with badge, tray, and plugins"
 authors = ["you"]
 edition = "2021"

@@ -26,7 +26,7 @@ const isMacos = detectPlatform() === "macos";
           <p class="section-kicker">Live demo</p>
           <h2 class="section-title display-font">鼠标拖尾特效</h2>
           <p class="section-lead">
-            与桌面端同一套特效引擎，已在全站挂载。可在此切换特效，并为绚丽流星 / 连线点阵 / 心动回忆调整颜色。
+            与桌面端同一套特效引擎，已在全站挂载。可在此切换特效，并为星痕漫衍 / 浮络牵光 / 绮心逐迹调整颜色。
           </p>
         </div>
         <TrailDemo />

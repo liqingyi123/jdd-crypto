@@ -2,7 +2,6 @@
 import { computed, onMounted, onUnmounted, shallowRef } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { disable as disableAutostart, enable as enableAutostart, isEnabled as isAutostartEnabled } from "@tauri-apps/plugin-autostart";
 import { ElMessage } from "element-plus";
 import { storeToRefs } from "pinia";
 import { useThemeStore, type ThemePreference } from "@/stores/theme";
@@ -86,10 +85,11 @@ const badgeSizeOptions: Array<{ value: number; label: string }> = [
 
 const trailEffectOptions: Array<{ value: MouseTrailEffect; label: string; shortcutKey: string }> = [
   { value: "ribbon", label: "躁动线条", shortcutKey: "1" },
-  { value: "meteor", label: "绚丽流星", shortcutKey: "2" },
+  { value: "meteor", label: "星痕漫衍", shortcutKey: "2" },
   { value: "graffiti", label: "街头涂鸦", shortcutKey: "3" },
-  { value: "dots", label: "连线点阵", shortcutKey: "4" },
-  { value: "heart", label: "心动回忆", shortcutKey: "5" },
+  { value: "dots", label: "浮络牵光", shortcutKey: "4" },
+  { value: "heart", label: "绮心逐迹", shortcutKey: "5" },
+  { value: "ripple", label: "沧涟曳逝", shortcutKey: "6" },
 ];
 
 let unlistenTrailPref: UnlistenFn | null = null;
@@ -122,7 +122,7 @@ onMounted(async () => {
     // browser preview
   }
   try {
-    autostartEnabled.value = await isAutostartEnabled();
+    autostartEnabled.value = await invoke<boolean>("get_autostart_pref");
   } catch {
     autostartEnabled.value = false;
   }
@@ -185,11 +185,7 @@ async function onAutostartChange(value: string | number | boolean) {
   const previous = autostartEnabled.value;
   autostartEnabled.value = enabled;
   try {
-    if (enabled) {
-      await enableAutostart();
-    } else {
-      await disableAutostart();
-    }
+    await invoke<boolean>("set_autostart_pref", { enabled });
   } catch (error) {
     autostartEnabled.value = previous;
     ElMessage.error(error instanceof Error ? error.message : String(error));
@@ -214,7 +210,8 @@ async function onTrailEffectChange(value: string | number | boolean | undefined)
     value !== "meteor" &&
     value !== "graffiti" &&
     value !== "dots" &&
-    value !== "heart"
+    value !== "heart" &&
+    value !== "ripple"
   ) {
     return;
   }
@@ -317,7 +314,7 @@ function onThemeChange(value: string | number | boolean | undefined) {
       </div>
       <p>我的鼠标指针哪去啦？？！！<br />在所有显示器工作区跟随鼠标绘制炫酷好玩的拖尾特效以帮助更好的寻找鼠标位置。</p>
       <p class="trail-shortcut-hint">
-        快捷键：按住 Ctrl，依次按下 T 与数字键 1–5（Ctrl+T+数字）切换特效；松开 Ctrl 后需重新按下 T。
+        快捷键：按住 Ctrl，依次按下 T 与数字键 1–6（Ctrl+T+数字）切换特效；松开 Ctrl 后需重新按下 T。
       </p>
       <ElRadioGroup
         :model-value="trailEffect"

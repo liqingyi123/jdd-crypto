@@ -19,20 +19,29 @@ const DEFAULT_EFFECT: &str = "ribbon";
 const DEFAULT_METEOR_COLOR: &str = "#F8EC85";
 const DEFAULT_DOTS_COLOR: &str = "#00D1CE";
 const DEFAULT_HEART_COLOR: &str = "#FF2EC8";
+const DEFAULT_RIPPLE_COLOR: &str = "#2A2A2E";
 const DISPLAY_CHANGE_DEBOUNCE: Duration = Duration::from_millis(300);
 const TRAIL_ARM_SHORTCUT: &str = "Ctrl+T";
-const TRAIL_EFFECT_SHORTCUTS: [&str; 5] = [
+const TRAIL_EFFECT_SHORTCUTS: [&str; 6] = [
     "Ctrl+1",
     "Ctrl+2",
     "Ctrl+3",
     "Ctrl+4",
     "Ctrl+5",
+    "Ctrl+6",
 ];
-const TRAIL_EFFECTS: [&str; 5] = ["ribbon", "meteor", "graffiti", "dots", "heart"];
+const TRAIL_EFFECTS: [&str; 6] = [
+    "ribbon",
+    "meteor",
+    "graffiti",
+    "dots",
+    "heart",
+    "ripple",
+];
 
 /// Ctrl 仍按住时，已按下过 T，等待数字键完成 Ctrl+T+数字 组合。
 static TRAIL_CHORD_ARMED: AtomicBool = AtomicBool::new(false);
-static TRAIL_SHORTCUT_IDS: OnceLock<(u32, [u32; 5])> = OnceLock::new();
+static TRAIL_SHORTCUT_IDS: OnceLock<(u32, [u32; 6])> = OnceLock::new();
 
 static CURSOR_LOOP_STARTED: AtomicBool = AtomicBool::new(false);
 static TRAIL_ENABLED: AtomicBool = AtomicBool::new(false);
@@ -66,6 +75,8 @@ pub struct MouseTrailColors {
     pub dots: String,
     #[serde(default = "default_heart_color")]
     pub heart: String,
+    #[serde(default = "default_ripple_color")]
+    pub ripple: String,
 }
 
 impl Default for MouseTrailColors {
@@ -74,6 +85,7 @@ impl Default for MouseTrailColors {
             meteor: default_meteor_color(),
             dots: default_dots_color(),
             heart: default_heart_color(),
+            ripple: default_ripple_color(),
         }
     }
 }
@@ -88,6 +100,10 @@ fn default_dots_color() -> String {
 
 fn default_heart_color() -> String {
     DEFAULT_HEART_COLOR.to_string()
+}
+
+fn default_ripple_color() -> String {
+    DEFAULT_RIPPLE_COLOR.to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -157,6 +173,7 @@ fn normalize_effect(raw: &str) -> String {
         "graffiti" => "graffiti".to_string(),
         "dots" => "dots".to_string(),
         "heart" => "heart".to_string(),
+        "ripple" => "ripple".to_string(),
         _ => DEFAULT_EFFECT.to_string(),
     }
 }
@@ -177,6 +194,7 @@ fn normalize_colors(colors: &mut MouseTrailColors) {
     colors.meteor = normalize_color(&colors.meteor, DEFAULT_METEOR_COLOR);
     colors.dots = normalize_color(&colors.dots, DEFAULT_DOTS_COLOR);
     colors.heart = normalize_color(&colors.heart, DEFAULT_HEART_COLOR);
+    colors.ripple = normalize_color(&colors.ripple, DEFAULT_RIPPLE_COLOR);
 }
 
 fn normalize_pref(pref: &mut MouseTrailPref) {
@@ -235,7 +253,10 @@ pub fn set_effect_pref(app: AppHandle, effect: String) -> Result<MouseTrailPref,
 
 pub fn set_color_pref(app: AppHandle, effect: String, color: String) -> Result<MouseTrailPref, String> {
     let normalized_effect = normalize_effect(&effect);
-    if normalized_effect != "meteor" && normalized_effect != "dots" && normalized_effect != "heart" {
+    if normalized_effect != "meteor"
+        && normalized_effect != "dots"
+        && normalized_effect != "heart"
+    {
         return Err("该特效不支持自定义颜色".into());
     }
     let mut pref = load_pref(&app);
@@ -256,7 +277,10 @@ pub fn set_color_pref(app: AppHandle, effect: String, color: String) -> Result<M
 
 pub fn reset_color_pref(app: AppHandle, effect: String) -> Result<MouseTrailPref, String> {
     let normalized_effect = normalize_effect(&effect);
-    if normalized_effect != "meteor" && normalized_effect != "dots" && normalized_effect != "heart" {
+    if normalized_effect != "meteor"
+        && normalized_effect != "dots"
+        && normalized_effect != "heart"
+    {
         return Err("该特效不支持自定义颜色".into());
     }
     let mut pref = load_pref(&app);
@@ -284,12 +308,12 @@ pub fn init_from_store(app: &AppHandle) {
     set_enabled(app, pref.enabled);
 }
 
-fn trail_shortcut_ids() -> Result<(u32, [u32; 5]), String> {
+fn trail_shortcut_ids() -> Result<(u32, [u32; 6]), String> {
     if let Some(ids) = TRAIL_SHORTCUT_IDS.get() {
         return Ok(*ids);
     }
     let arm = Shortcut::from_str(TRAIL_ARM_SHORTCUT).map_err(|err| err.to_string())?;
-    let mut digits = [0_u32; 5];
+    let mut digits = [0_u32; 6];
     for (index, shortcut) in TRAIL_EFFECT_SHORTCUTS.iter().enumerate() {
         let parsed = Shortcut::from_str(shortcut).map_err(|err| err.to_string())?;
         digits[index] = parsed.id();
@@ -391,10 +415,11 @@ pub fn handle_trail_shortcut(
 
 fn effect_label(effect: &str) -> &'static str {
     match effect {
-        "meteor" => "绚丽流星",
+        "meteor" => "星痕漫衍",
         "graffiti" => "街头涂鸦",
-        "dots" => "连线点阵",
-        "heart" => "心动回忆",
+        "dots" => "浮络牵光",
+        "heart" => "绮心逐迹",
+        "ripple" => "沧涟曳逝",
         _ => "躁动线条",
     }
 }
@@ -606,7 +631,8 @@ fn cursor_loop(app: AppHandle) {
                     let _ = app.emit_filter("app://mouse-trail-cursor", payload, is_overlay_target);
                 }
             }
-            thread::sleep(Duration::from_millis(33));
+            // ~60fps for smoother trail continuity across engines.
+            thread::sleep(Duration::from_millis(16));
             continue;
         }
         last = None;

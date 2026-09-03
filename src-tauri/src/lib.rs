@@ -1,4 +1,5 @@
 mod app_update;
+mod autostart_pref;
 mod clipboard;
 mod commands;
 mod compare_mode;
@@ -99,6 +100,8 @@ pub fn run() {
             commands::set_mouse_trail_color,
             commands::reset_mouse_trail_colors,
             commands::reset_mouse_trail_pref,
+            commands::get_autostart_pref,
+            commands::set_autostart_pref,
             commands::check_app_update,
             commands::download_app_update,
             commands::install_app_update,
@@ -150,6 +153,7 @@ pub fn run() {
                 windows::bind_close_to_hide(&compare);
             }
             mouse_trail::init_from_store(app.handle());
+            autostart_pref::sync_from_store(app.handle());
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 if let Ok(result) = app_update::check_update(&handle, false) {

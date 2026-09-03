@@ -402,6 +402,16 @@ pub fn reset_mouse_trail_pref(app: AppHandle) -> Result<crate::mouse_trail::Mous
 }
 
 #[tauri::command]
+pub fn get_autostart_pref(app: AppHandle) -> bool {
+    crate::autostart_pref::load_pref(&app)
+}
+
+#[tauri::command]
+pub fn set_autostart_pref(app: AppHandle, enabled: bool) -> Result<bool, String> {
+    crate::autostart_pref::set_pref(&app, enabled)
+}
+
+#[tauri::command]
 pub fn check_app_update(
     app: AppHandle,
     manual: bool,
