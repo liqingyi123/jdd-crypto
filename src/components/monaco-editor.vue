@@ -6,6 +6,7 @@ import * as monaco from "monaco-editor/editor/editor.api";
 // Register JS grammar so result pane can highlight / fold object-like output.
 import "monaco-editor/languages/definitions/javascript/register";
 import { useThemeStore } from "@/stores/theme";
+import { registerHostsLanguage } from "@/utils/monaco-hosts-language";
 
 const model = defineModel<string>({ default: "" });
 
@@ -41,6 +42,9 @@ function monacoTheme(theme: string): string {
 onMounted(() => {
   if (!hostRef.value) {
     return;
+  }
+  if (props.language === "hosts") {
+    registerHostsLanguage(monaco);
   }
   const instance = monaco.editor.create(hostRef.value, {
     value: model.value,
@@ -98,6 +102,9 @@ watch(model, (value) => {
 watch(
   () => props.language,
   (language) => {
+    if (language === "hosts") {
+      registerHostsLanguage(monaco);
+    }
     const instance = editor.value;
     const modelRef = instance?.getModel();
     if (modelRef) {

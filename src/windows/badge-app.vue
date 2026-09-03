@@ -11,6 +11,7 @@ useSystemTheme();
 const pointerOrigin = ref<{ x: number; y: number } | null>(null);
 const didDrag = shallowRef(false);
 const badgeSize = shallowRef(DEFAULT_BADGE_SIZE);
+const appVersion = shallowRef("");
 let unlistenSize: (() => void) | undefined;
 
 const badgeStyle = computed(() => {
@@ -25,7 +26,26 @@ const badgeStyle = computed(() => {
   };
 });
 
+const badgeTip = computed(() => {
+  const title = appVersion.value
+    ? `多多解密 v${appVersion.value}`
+    : "多多解密";
+  return [
+    title,
+    "左键：打开主界面",
+    "中键：打开 Host 管理",
+    "右键：打开菜单",
+    "可拖动",
+  ].join("\n");
+});
+
 onMounted(async () => {
+  try {
+    const { getVersion } = await import("@tauri-apps/api/app");
+    appVersion.value = await getVersion();
+  } catch {
+    // browser preview
+  }
   try {
     badgeSize.value = await invoke<number>("get_badge_size");
   } catch {
@@ -55,6 +75,14 @@ async function openMain() {
 async function openMenu(event: MouseEvent) {
   event.preventDefault();
   await invoke("popup_app_menu").catch(() => undefined);
+}
+
+async function openHosts(event: MouseEvent) {
+  if (event.button !== 1) {
+    return;
+  }
+  event.preventDefault();
+  await invoke("open_hosts_window").catch(() => undefined);
 }
 
 function onPointerDown(event: PointerEvent) {
@@ -96,8 +124,9 @@ function onPointerUp() {
     <button
       class="orb"
       type="button"
-      title="多多解密：左键打开主界面，右键打开菜单，可拖动"
+      :title="badgeTip"
       @click="openMain"
+      @auxclick="openHosts"
       @contextmenu="openMenu"
       @pointerdown="onPointerDown"
       @pointermove="onPointerMove"

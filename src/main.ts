@@ -52,6 +52,9 @@ async function bootstrap() {
     await import("./styles/theme.css");
     document.documentElement.classList.remove("badge-window");
     await import("element-plus/theme-chalk/dark/css-vars.css");
+    // Programmatic APIs are not covered by unplugin-vue-components CSS injection.
+    await import("element-plus/es/components/message/style/css");
+    await import("element-plus/es/components/message-box/style/css");
   }
 
   const app = createApp(App, { windowLabel });

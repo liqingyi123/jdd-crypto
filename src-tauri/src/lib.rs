@@ -4,6 +4,7 @@ mod clipboard;
 mod commands;
 mod compare_mode;
 mod global_shortcuts;
+mod hosts_manager;
 mod mouse_follow;
 mod mouse_trail;
 mod plugin_host;
@@ -102,6 +103,19 @@ pub fn run() {
             commands::reset_mouse_trail_pref,
             commands::get_autostart_pref,
             commands::set_autostart_pref,
+            commands::hosts_list,
+            commands::hosts_upsert,
+            commands::hosts_delete,
+            commands::hosts_rename,
+            commands::hosts_set_nature,
+            commands::hosts_set_enabled,
+            commands::hosts_apply,
+            commands::hosts_read_system,
+            commands::hosts_has_write_access,
+            commands::hosts_request_permission,
+            commands::hosts_open_system,
+            commands::hosts_import_switchhosts,
+            commands::open_hosts_window,
             commands::check_app_update,
             commands::download_app_update,
             commands::install_app_update,

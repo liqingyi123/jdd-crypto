@@ -412,6 +412,96 @@ pub fn set_autostart_pref(app: AppHandle, enabled: bool) -> Result<bool, String>
 }
 
 #[tauri::command]
+pub fn hosts_list(app: AppHandle) -> Vec<crate::hosts_manager::HostsScheme> {
+    crate::hosts_manager::list_schemes(&app)
+}
+
+#[tauri::command]
+pub fn hosts_upsert(
+    app: AppHandle,
+    id: Option<String>,
+    title: String,
+    content: String,
+    enabled: Option<bool>,
+    nature: Option<String>,
+) -> Result<Vec<crate::hosts_manager::HostsScheme>, String> {
+    crate::hosts_manager::upsert_scheme(&app, id, title, content, enabled, nature)
+}
+
+#[tauri::command]
+pub fn hosts_delete(
+    app: AppHandle,
+    id: String,
+) -> Result<Vec<crate::hosts_manager::HostsScheme>, String> {
+    crate::hosts_manager::delete_scheme(&app, id)
+}
+
+#[tauri::command]
+pub fn hosts_rename(
+    app: AppHandle,
+    id: String,
+    title: String,
+) -> Result<Vec<crate::hosts_manager::HostsScheme>, String> {
+    crate::hosts_manager::rename_scheme(&app, id, title)
+}
+
+#[tauri::command]
+pub fn hosts_set_nature(
+    app: AppHandle,
+    id: String,
+    nature: String,
+) -> Result<Vec<crate::hosts_manager::HostsScheme>, String> {
+    crate::hosts_manager::set_nature(&app, id, nature)
+}
+
+#[tauri::command]
+pub fn hosts_set_enabled(
+    app: AppHandle,
+    id: String,
+    enabled: bool,
+) -> Result<Vec<crate::hosts_manager::HostsScheme>, String> {
+    crate::hosts_manager::set_enabled(&app, id, enabled)
+}
+
+#[tauri::command]
+pub fn hosts_apply(app: AppHandle) -> Result<(), String> {
+    crate::hosts_manager::apply_enabled(&app)
+}
+
+#[tauri::command]
+pub fn hosts_read_system() -> Result<String, String> {
+    crate::hosts_manager::read_system_hosts()
+}
+
+#[tauri::command]
+pub fn hosts_has_write_access() -> bool {
+    crate::hosts_manager::has_write_access()
+}
+
+#[tauri::command]
+pub fn hosts_request_permission(app: AppHandle) -> Result<(), String> {
+    crate::hosts_manager::request_permission(&app)
+}
+
+#[tauri::command]
+pub fn hosts_open_system(app: AppHandle) -> Result<(), String> {
+    crate::hosts_manager::open_system_hosts(&app)
+}
+
+#[tauri::command]
+pub fn hosts_import_switchhosts(
+    app: AppHandle,
+    raw: String,
+) -> Result<crate::hosts_manager::ImportResult, String> {
+    crate::hosts_manager::import_switchhosts(&app, raw)
+}
+
+#[tauri::command]
+pub fn open_hosts_window(app: AppHandle) {
+    windows::show_feature(&app, "hosts");
+}
+
+#[tauri::command]
 pub fn check_app_update(
     app: AppHandle,
     manual: bool,
