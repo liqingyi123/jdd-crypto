@@ -12,7 +12,7 @@ const isMacos = detectPlatform() === "macos";
       <p class="section-kicker">Features</p>
       <h1 class="section-title display-font">功能介绍</h1>
       <p class="section-lead">
-        围绕加解密与日常开发场景打磨：角标、剪贴板气泡、文本对比，以及 Host 多方案管理，均可按需开关与自定义快捷键。
+        围绕加解密与日常开发场景打磨：角标、剪贴板气泡、文本对比、Host 内网预置与快捷切换，以及可玩的拖尾特效，均可按需开关与自定义快捷键。
       </p>
       <div class="feature-grid">
         <article v-for="item in FEATURE_ITEMS" :key="item.id" class="feature-card">
@@ -26,7 +26,7 @@ const isMacos = detectPlatform() === "macos";
           <p class="section-kicker">Live demo</p>
           <h2 class="section-title display-font">鼠标拖尾特效</h2>
           <p class="section-lead">
-            与桌面端同一套特效引擎，已在全站挂载。可在此切换特效，并为星痕漫衍 / 浮络牵光 / 绮心逐迹调整颜色。
+            与桌面端同一套特效引擎，已在全站挂载。可在此切换特效（含沧涟曳逝水波纹），并为星痕漫衍 / 浮络牵光 / 绮心逐迹调整颜色。
           </p>
         </div>
         <TrailDemo />
