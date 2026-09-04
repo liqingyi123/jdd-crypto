@@ -35,6 +35,12 @@ export const FEATURE_ITEMS: FeatureItem[] = [
       "快捷键进入对比模式，跟随提示引导两次框选解密；成功后在中央左右对照展示，并高亮后段差异。快捷键可在设置中自定义。",
   },
   {
+    id: "hosts",
+    title: "Host 管理",
+    summary:
+      "多方案切换写入系统 hosts，支持保留 / 单开；可导入导出 SwitchHosts 备份，远程方案按 URL 定时刷新；全局快捷键在光标旁快速开关方案。",
+  },
+  {
     id: "trail",
     title: "鼠标拖尾特效",
     summary:

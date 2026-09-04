@@ -12,7 +12,7 @@ const isMacos = detectPlatform() === "macos";
       <p class="section-kicker">Features</p>
       <h1 class="section-title display-font">功能介绍</h1>
       <p class="section-lead">
-        围绕加解密日常场景打磨的桌面能力：从角标、剪贴板气泡到文本对比，均可按需开关与自定义快捷键。
+        围绕加解密与日常开发场景打磨：角标、剪贴板气泡、文本对比，以及 Host 多方案管理，均可按需开关与自定义快捷键。
       </p>
       <div class="feature-grid">
         <article v-for="item in FEATURE_ITEMS" :key="item.id" class="feature-card">

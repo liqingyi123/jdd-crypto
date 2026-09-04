@@ -22,14 +22,14 @@ const roadmap = [
       <p class="section-kicker">About</p>
       <h1 class="section-title display-font">关于多多解密</h1>
       <p class="section-lead">
-        奖多多内部专用跨平台桌面端加解密工具。当前支持 Windows 与 macOS（Universal），面向日常加解密与文本处理场景。
+        奖多多内部专用跨平台桌面端加解密工具。当前支持 Windows 与 macOS（Universal），面向日常加解密、文本处理与 Host 管理场景。
       </p>
 
       <div class="panels">
         <section class="panel">
           <h2>产品定位</h2>
           <p>
-            用悬浮角标与托盘降低启动成本，用剪贴板询问、短文本结果气泡与鼠标跟随减少复制粘贴往返；支持文本对比模式快速核对两段解密结果，以及可玩可替换的拖尾特效。
+            用悬浮角标与托盘降低启动成本，用剪贴板询问、短文本结果气泡与鼠标跟随减少复制粘贴往返；支持文本对比、Host 多方案切换，以及可玩可替换的拖尾特效。
           </p>
         </section>
         <section class="panel">
