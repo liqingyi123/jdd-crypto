@@ -5,3 +5,7 @@ declare module "*.vue" {
   const component: DefineComponent<{}, {}, any>;
   export default component;
 }
+
+declare module "element-plus/es/components/message/style/css";
+declare module "element-plus/es/components/message-box/style/css";
+
