@@ -792,6 +792,66 @@ pub fn cursor_pos_public() -> Option<(i32, i32)> {
     cursor_pos()
 }
 
+/// Point shell shortcuts at `desktop-icon.ico` so Windows does not keep showing a
+/// cached older icon embedded in the same exe path after upgrades.
+#[cfg(windows)]
+pub fn sync_shell_shortcut_icons() {
+    use std::os::windows::process::CommandExt;
+    use std::process::Command;
+
+    let Ok(exe) = std::env::current_exe() else {
+        return;
+    };
+    let Some(dir) = exe.parent() else {
+        return;
+    };
+    let ico = dir.join("desktop-icon.ico");
+    if !ico.is_file() {
+        return;
+    }
+
+    let exe_s = exe.to_string_lossy().replace('\'', "''");
+    let ico_s = ico.to_string_lossy().replace('\'', "''");
+    let script = format!(
+        r#"
+$ErrorActionPreference = 'SilentlyContinue'
+$sh = New-Object -ComObject WScript.Shell
+$want = '{exe_s}'
+$ico = '{ico_s},0'
+$targets = @(
+  [IO.Path]::Combine($env:USERPROFILE, 'Desktop', '多多解密.lnk'),
+  [IO.Path]::Combine($env:PUBLIC, 'Desktop', '多多解密.lnk'),
+  [IO.Path]::Combine($env:APPDATA, 'Microsoft\Windows\Start Menu\Programs', '多多解密.lnk')
+)
+foreach ($p in $targets) {{
+  if (-not (Test-Path -LiteralPath $p)) {{ continue }}
+  $lnk = $sh.CreateShortcut($p)
+  if ($lnk.TargetPath -ne $want) {{ continue }}
+  if ($lnk.IconLocation -eq $ico) {{ continue }}
+  $lnk.IconLocation = $ico
+  $lnk.Save()
+}}
+Add-Type -Namespace Jdd -Name ShellNotify -MemberDefinition '[DllImport("shell32.dll")] public static extern void SHChangeNotify(int e, uint f, System.IntPtr a, System.IntPtr b);' -ErrorAction SilentlyContinue
+[Jdd.ShellNotify]::SHChangeNotify(0x08000000, 0, [IntPtr]::Zero, [IntPtr]::Zero)
+"#
+    );
+    let _ = Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-WindowStyle",
+            "Hidden",
+            "-Command",
+            &script,
+        ])
+        .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
+        .status();
+}
+
+#[cfg(not(windows))]
+pub fn sync_shell_shortcut_icons() {}
+
 #[cfg(windows)]
 fn cursor_pos() -> Option<(i32, i32)> {
     use windows_sys::Win32::Foundation::POINT;

@@ -5,7 +5,8 @@
       "nsis": {
         "installerIcon": "icons/icon.ico",
         "languages": ["SimpChinese"],
-        "displayLanguageSelector": false
+        "displayLanguageSelector": false,
+        "installerHooks": "./windows/hooks.nsh"
       }
     }
   }

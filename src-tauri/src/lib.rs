@@ -181,6 +181,12 @@ pub fn run() {
             mouse_trail::init_from_store(app.handle());
             autostart_pref::sync_from_store(app.handle());
             crate::hosts_manager::start_refresh_loop(app.handle().clone());
+            #[cfg(windows)]
+            {
+                std::thread::spawn(|| {
+                    windows::sync_shell_shortcut_icons();
+                });
+            }
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 if let Ok(result) = app_update::check_update(&handle, false) {
