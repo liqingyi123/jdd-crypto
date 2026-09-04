@@ -1272,17 +1272,18 @@ fn merge_hosts_content(local: &str, server: &str) -> (String, u32) {
 
 fn merge_preset_scheme(existing: &mut HostsScheme, incoming: HostsScheme) -> u32 {
     let kept_nature = existing.nature.clone();
+    let kept_enabled = existing.enabled;
     if is_remote(&incoming) || is_remote(existing) {
         *existing = incoming;
         existing.nature = kept_nature;
+        existing.enabled = kept_enabled;
         existing.source = "imported".to_string();
         return 0;
     }
     let (merged, conflicts) = merge_hosts_content(&existing.content, &incoming.content);
-    let enabled = incoming.enabled;
     *existing = incoming;
     existing.content = merged;
-    existing.enabled = enabled;
+    existing.enabled = kept_enabled;
     existing.nature = kept_nature;
     existing.source = "imported".to_string();
     existing.readonly = false;
@@ -1298,6 +1299,11 @@ fn upsert_preset_scheme(schemes: &mut Vec<HostsScheme>, incoming: HostsScheme) -
         s.source == "imported" && s.title == incoming.title
     }) {
         return merge_preset_scheme(&mut schemes[idx], incoming);
+    }
+    // 单开方案默认关闭，仅由用户后续手动开启
+    let mut incoming = incoming;
+    if is_exclusive(&incoming) {
+        incoming.enabled = false;
     }
     schemes.push(incoming);
     0

@@ -21,7 +21,8 @@ async function bootstrap() {
     windowLabel === "clipboard-prompt" ||
     windowLabel === "crypto-bubble" ||
     windowLabel === "compare-tip" ||
-    windowLabel === "compare-bubble";
+    windowLabel === "compare-bubble" ||
+    windowLabel === "overlay-toast";
 
   if (isMouseTrail) {
     // Keep trail overlays free of theme chrome (transparent only).
@@ -33,7 +34,7 @@ async function bootstrap() {
     } catch {
       // browser preview
     }
-  } else if (windowLabel === "compare-tip") {
+  } else if (windowLabel === "compare-tip" || windowLabel === "overlay-toast") {
     await import("./styles/theme.css");
     document.documentElement.classList.add("badge-window");
     document.body.style.background = "transparent";

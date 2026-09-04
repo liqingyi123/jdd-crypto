@@ -543,6 +543,16 @@ pub fn hide_hosts_quick(app: AppHandle) {
 }
 
 #[tauri::command]
+pub fn show_overlay_toast(app: AppHandle, message: String) {
+    crate::overlay_toast::schedule_show(&app, message);
+}
+
+#[tauri::command]
+pub fn take_pending_overlay_toast() -> Option<String> {
+    crate::overlay_toast::take_pending()
+}
+
+#[tauri::command]
 pub fn get_hosts_quick_shortcut(state: State<AppState>) -> String {
     state
         .hosts_quick_shortcut

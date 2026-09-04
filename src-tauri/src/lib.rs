@@ -8,6 +8,7 @@ mod hosts_manager;
 mod hosts_quick;
 mod mouse_follow;
 mod mouse_trail;
+mod overlay_toast;
 mod plugin_host;
 mod state;
 mod tray;
@@ -123,6 +124,8 @@ pub fn run() {
             commands::hosts_reset_system,
             commands::open_hosts_window,
             commands::hide_hosts_quick,
+            commands::show_overlay_toast,
+            commands::take_pending_overlay_toast,
             commands::get_hosts_quick_shortcut,
             commands::set_hosts_quick_shortcut,
             commands::check_app_update,

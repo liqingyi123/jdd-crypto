@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, shallowRef } from "vue";
 import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { ElMessage } from "element-plus";
 import { useSystemTheme } from "@/composables/use-system-theme";
 
 useSystemTheme();
@@ -25,24 +24,43 @@ let unlistenOpen: UnlistenFn | undefined;
 let unlistenBlur: (() => void) | undefined;
 let blurArmed = false;
 let armTimer: ReturnType<typeof setTimeout> | undefined;
+let loadToken = 0;
 
 async function hideWindow() {
   await invoke("hide_hosts_quick").catch(() => undefined);
 }
 
+function showToast(message: string) {
+  void invoke("show_overlay_toast", { message }).catch(() => undefined);
+}
+
 async function loadSchemes() {
+  const token = ++loadToken;
   loading.value = true;
+  togglingId.value = null;
   try {
     const list = await invoke<HostsScheme[]>("hosts_list");
+    if (token !== loadToken) {
+      return;
+    }
     schemes.value = Array.isArray(list) ? list : [];
   } catch (err) {
-    ElMessage.error(String(err));
+    if (token !== loadToken) {
+      return;
+    }
+    showToast(`加载失败：${String(err)}`);
+    await hideWindow();
   } finally {
-    loading.value = false;
+    if (token === loadToken) {
+      loading.value = false;
+    }
   }
 }
 
 async function toggleEnabled(scheme: HostsScheme, enabled: boolean) {
+  if (togglingId.value) {
+    return;
+  }
   togglingId.value = scheme.id;
   try {
     const list = await invoke<HostsScheme[]>("hosts_set_enabled", {
@@ -50,12 +68,23 @@ async function toggleEnabled(scheme: HostsScheme, enabled: boolean) {
       enabled,
     });
     schemes.value = list;
-    ElMessage.success(
-      enabled ? `已启用「${scheme.title}」` : `已关闭「${scheme.title}」`,
-    );
+    const message = enabled
+      ? `Host 切换成功：已启用「${scheme.title}」`
+      : `Host 切换成功：已关闭「${scheme.title}」`;
+    void emit("app://hosts-switched", { message, ok: true, schemes: list });
+    // Clear busy before hide/toast so UI never stays locked if either hangs.
+    togglingId.value = null;
+    showToast(message);
     await hideWindow();
   } catch (err) {
-    ElMessage.error(`切换失败：${String(err)}`);
+    const message = `Host 切换失败：${String(err)}`;
+    void emit("app://hosts-switched", {
+      message,
+      ok: false,
+      schemes: schemes.value,
+    });
+    togglingId.value = null;
+    showToast(message);
     await loadSchemes();
   } finally {
     togglingId.value = null;
@@ -90,11 +119,13 @@ onMounted(async () => {
   window.addEventListener("keydown", onKeydown);
   const win = getCurrentWindow();
   unlistenBlur = await win.onFocusChanged(({ payload: focused }) => {
-    if (!focused && blurArmed) {
+    if (!focused && blurArmed && !togglingId.value) {
       void hideWindow();
     }
   });
   unlistenOpen = await listen("hosts://quick-open", () => {
+    loading.value = false;
+    togglingId.value = null;
     void loadSchemes();
     armBlurDismiss();
   });

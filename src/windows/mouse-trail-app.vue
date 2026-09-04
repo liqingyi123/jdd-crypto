@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { nextTick, onMounted, onUnmounted, ref, shallowRef } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import OverlayToast from "@/components/overlay-toast.vue";
+import { useOverlayToast } from "@/composables/use-overlay-toast";
 import { MeteorTrail } from "@/effects/meteor-trail";
 import { RibbonTrail } from "@/effects/ribbon-trail";
 import { GraffitiTrail } from "@/effects/graffiti-trail";
@@ -42,12 +44,11 @@ const bounds = shallowRef<MonitorBounds | null>(null);
 const trail = shallowRef<MouseTrailEngine | null>(null);
 const effect = shallowRef<MouseTrailEffect>(DEFAULT_MOUSE_TRAIL_PREF.effect);
 const colors = shallowRef<MouseTrailColors>({ ...DEFAULT_MOUSE_TRAIL_COLORS });
-const toastText = shallowRef("");
+const { toastText, showToast } = useOverlayToast();
 let unlistenCursor: (() => void) | undefined;
 let unlistenPref: (() => void) | undefined;
 let unlistenMonitors: (() => void) | undefined;
 let unlistenSwitched: (() => void) | undefined;
-let toastTimer: ReturnType<typeof setTimeout> | undefined;
 let wasInside = false;
 let windowLabel = "";
 
@@ -177,14 +178,7 @@ function showSwitchToast(payload: TrailSwitchedPayload) {
   if (!label) {
     return;
   }
-  toastText.value = `鼠标拖尾特效已切换至${label}`;
-  if (toastTimer) {
-    clearTimeout(toastTimer);
-  }
-  toastTimer = setTimeout(() => {
-    toastText.value = "";
-    toastTimer = undefined;
-  }, 1600);
+  showToast(`鼠标拖尾特效已切换至${label}`);
 }
 
 onMounted(async () => {
@@ -236,9 +230,6 @@ onUnmounted(() => {
   unlistenPref?.();
   unlistenMonitors?.();
   unlistenSwitched?.();
-  if (toastTimer) {
-    clearTimeout(toastTimer);
-  }
   trail.value?.destroy();
   trail.value = null;
 });
@@ -247,7 +238,7 @@ onUnmounted(() => {
 <template>
   <div class="overlay-root">
     <div ref="hostRef" class="overlay-host" />
-    <div v-if="toastText" class="trail-toast" aria-live="polite">{{ toastText }}</div>
+    <OverlayToast :text="toastText" />
   </div>
 </template>
 
@@ -262,24 +253,6 @@ onUnmounted(() => {
 .overlay-host {
   position: absolute;
   inset: 0;
-}
-
-.trail-toast {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 10;
-  pointer-events: none;
-  padding: 12px 20px;
-  border-radius: 12px;
-  background: rgba(20, 24, 32, 0.78);
-  color: #fff;
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
 }
 </style>
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { ElMessage, ElMessageBox } from "element-plus";
 import MonacoEditor from "@/components/monaco-editor.vue";
 
@@ -683,9 +684,22 @@ async function pullPresetConfig() {
     const conflictScheme = schemes.value.find((s) =>
       (s.content ?? "").includes("# >>> 本地 start"),
     );
+    // 拉取后强制同步右侧编辑器（同 id 也要刷新 draft，否则仍显示拉取前正文）
+    dirty.value = false;
     if (conflictScheme) {
       await selectScheme(conflictScheme);
-    } else if (!selectedId.value && schemes.value.length > 0) {
+    } else if (viewingSystem.value) {
+      // 系统 hosts 视图：下方 reloadSystemIfNeeded 会刷新
+    } else if (selectedId.value) {
+      const current = schemes.value.find((s) => s.id === selectedId.value);
+      if (current) {
+        await selectScheme(current);
+      } else if (schemes.value.length > 0) {
+        await selectScheme(schemes.value[0]);
+      } else {
+        await selectSystemHosts();
+      }
+    } else if (schemes.value.length > 0) {
       await selectScheme(schemes.value[0]);
     }
     if (conflicts > 0) {
@@ -761,9 +775,25 @@ async function resetSystemHosts() {
   }
 }
 
+let unlistenHostsSwitched: UnlistenFn | undefined;
+
 onMounted(() => {
   void refresh();
   void refreshHostsPermission();
+  void listen<{
+    schemes?: HostsScheme[];
+  }>("app://hosts-switched", (event) => {
+    if (Array.isArray(event.payload?.schemes)) {
+      schemes.value = normalizeSchemes(event.payload.schemes);
+      void reloadSystemIfNeeded();
+    }
+  }).then((unlisten) => {
+    unlistenHostsSwitched = unlisten;
+  });
+});
+
+onBeforeUnmount(() => {
+  unlistenHostsSwitched?.();
 });
 </script>
 
