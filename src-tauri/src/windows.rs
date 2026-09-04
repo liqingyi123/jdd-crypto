@@ -866,7 +866,29 @@ fn cursor_pos() -> Option<(i32, i32)> {
     Some((point.x, point.y))
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
+fn cursor_pos() -> Option<(i32, i32)> {
+    use core_graphics::display::CGDisplay;
+    use core_graphics::event::CGEvent;
+    use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
+
+    let source = CGEventSource::new(CGEventSourceStateID::CombinedSessionState).ok()?;
+    let event = CGEvent::new(source).ok()?;
+    let loc = event.location();
+    let main = CGDisplay::main();
+    let logical_h = main.bounds().size.height;
+    let scale = if logical_h > 0.0 {
+        main.pixels_high() as f64 / logical_h
+    } else {
+        1.0
+    };
+    Some((
+        (loc.x * scale).round() as i32,
+        (loc.y * scale).round() as i32,
+    ))
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
 fn cursor_pos() -> Option<(i32, i32)> {
     None
 }

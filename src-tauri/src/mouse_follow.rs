@@ -397,19 +397,31 @@ fn capture_selection_text(app: &AppHandle) -> Option<String> {
 fn capture_selection_text(app: &AppHandle) -> Option<String> {
     thread::sleep(Duration::from_millis(70));
     let before = app.clipboard().read_text().unwrap_or_default();
+    let sentinel = format!(
+        "__jdd_crypto_sel_{}__",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
+    );
+    if app.clipboard().write_text(&sentinel).is_err() {
+        let _ = app.clipboard().write_text(&before);
+        return None;
+    }
     send_copy_shortcut();
 
-    let deadline = Instant::now() + Duration::from_millis(450);
+    let deadline = Instant::now() + Duration::from_millis(600);
     while Instant::now() < deadline {
         thread::sleep(Duration::from_millis(30));
         let Ok(current) = app.clipboard().read_text() else {
             continue;
         };
-        if current.trim().is_empty() || current == before {
+        if current.trim().is_empty() || current == sentinel {
             continue;
         }
         return Some(current);
     }
+    let _ = app.clipboard().write_text(&before);
     None
 }
 
@@ -471,55 +483,8 @@ fn double_click_tolerance() -> (i32, i32) {
 }
 
 #[cfg(any(windows, target_os = "macos"))]
-fn cursor_physical_pos(app: &AppHandle) -> Option<(i32, i32)> {
-    let (x, y) = cursor_pos()?;
-    #[cfg(windows)]
-    {
-        let _ = app;
-        return Some((x, y));
-    }
-    #[cfg(target_os = "macos")]
-    {
-        let scale = app
-            .get_webview_window("badge")
-            .and_then(|win| win.scale_factor().ok())
-            .or_else(|| {
-                app.primary_monitor()
-                    .ok()
-                    .flatten()
-                    .map(|monitor| monitor.scale_factor())
-            })
-            .unwrap_or(1.0);
-        Some((
-            (f64::from(x) * scale).round() as i32,
-            (f64::from(y) * scale).round() as i32,
-        ))
-    }
-}
-
-#[cfg(windows)]
-fn cursor_pos() -> Option<(i32, i32)> {
-    use windows_sys::Win32::Foundation::POINT;
-    use windows_sys::Win32::UI::WindowsAndMessaging::GetCursorPos;
-
-    let mut point = POINT { x: 0, y: 0 };
-    // SAFETY: `point` is a valid stack POINT; GetCursorPos only writes into it.
-    let ok = unsafe { GetCursorPos(&mut point) };
-    if ok == 0 {
-        return None;
-    }
-    Some((point.x, point.y))
-}
-
-#[cfg(target_os = "macos")]
-fn cursor_pos() -> Option<(i32, i32)> {
-    use core_graphics::event::CGEvent;
-    use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
-
-    let source = CGEventSource::new(CGEventSourceStateID::CombinedSessionState).ok()?;
-    let event = CGEvent::new(source).ok()?;
-    let loc = event.location();
-    Some((loc.x.round() as i32, loc.y.round() as i32))
+fn cursor_physical_pos(_app: &AppHandle) -> Option<(i32, i32)> {
+    windows::cursor_pos_public()
 }
 
 #[cfg(windows)]
@@ -589,17 +554,26 @@ fn send_copy_shortcut() {
     use core_graphics::event::{CGEvent, CGEventFlags, CGEventTapLocation, CGKeyCode};
     use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 
+    // kVK_Command = 55, kVK_ANSI_C = 8
+    const KEY_COMMAND: CGKeyCode = 55;
     const KEY_C: CGKeyCode = 8;
     let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) else {
         return;
     };
     let flags = CGEventFlags::CGEventFlagCommand;
+
+    if let Ok(cmd_down) = CGEvent::new_keyboard_event(source.clone(), KEY_COMMAND, true) {
+        cmd_down.post(CGEventTapLocation::HID);
+    }
     if let Ok(down) = CGEvent::new_keyboard_event(source.clone(), KEY_C, true) {
         down.set_flags(flags);
         down.post(CGEventTapLocation::HID);
     }
-    if let Ok(up) = CGEvent::new_keyboard_event(source, KEY_C, false) {
+    if let Ok(up) = CGEvent::new_keyboard_event(source.clone(), KEY_C, false) {
         up.set_flags(flags);
         up.post(CGEventTapLocation::HID);
+    }
+    if let Ok(cmd_up) = CGEvent::new_keyboard_event(source, KEY_COMMAND, false) {
+        cmd_up.post(CGEventTapLocation::HID);
     }
 }

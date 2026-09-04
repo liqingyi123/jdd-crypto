@@ -644,7 +644,7 @@ fn cursor_loop(app: AppHandle) {
     let mut last: Option<(i32, i32)> = None;
     loop {
         if TRAIL_ENABLED.load(Ordering::Relaxed) {
-            if let Some((x, y)) = cursor_pos() {
+            if let Some((x, y)) = crate::windows::cursor_pos_public() {
                 if last != Some((x, y)) {
                     last = Some((x, y));
                     let payload = MouseTrailCursor { x, y };
@@ -658,24 +658,6 @@ fn cursor_loop(app: AppHandle) {
         last = None;
         thread::sleep(Duration::from_millis(100));
     }
-}
-
-#[cfg(windows)]
-fn cursor_pos() -> Option<(i32, i32)> {
-    use windows_sys::Win32::Foundation::POINT;
-    use windows_sys::Win32::UI::WindowsAndMessaging::GetCursorPos;
-
-    let mut point = POINT { x: 0, y: 0 };
-    let ok = unsafe { GetCursorPos(&mut point) };
-    if ok == 0 {
-        return None;
-    }
-    Some((point.x, point.y))
-}
-
-#[cfg(not(windows))]
-fn cursor_pos() -> Option<(i32, i32)> {
-    None
 }
 
 #[cfg(windows)]
