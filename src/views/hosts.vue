@@ -79,6 +79,7 @@ const REFRESH_OPTIONS: Array<{ label: string; value: number }> = [
 interface ImportResult {
   imported: number;
   skipped: number;
+  conflicts?: number;
   schemes: HostsScheme[];
 }
 
@@ -86,6 +87,7 @@ const loading = shallowRef(false);
 const saving = shallowRef(false);
 const importing = shallowRef(false);
 const exporting = shallowRef(false);
+const pulling = shallowRef(false);
 const resetting = shallowRef(false);
 const schemes = ref<HostsScheme[]>([]);
 const selectedId = shallowRef<string | null>(null);
@@ -672,6 +674,38 @@ async function onFileSelected(event: Event) {
   }
 }
 
+async function pullPresetConfig() {
+  pulling.value = true;
+  try {
+    const result = await invoke<ImportResult>("hosts_pull_preset");
+    schemes.value = normalizeSchemes(result.schemes);
+    const conflicts = Number(result.conflicts ?? 0);
+    const conflictScheme = schemes.value.find((s) =>
+      (s.content ?? "").includes("# >>> 本地 start"),
+    );
+    if (conflictScheme) {
+      await selectScheme(conflictScheme);
+    } else if (!selectedId.value && schemes.value.length > 0) {
+      await selectScheme(schemes.value[0]);
+    }
+    if (conflicts > 0) {
+      ElMessage.warning(
+        `拉取完成：更新 ${result.imported} 个，跳过 ${result.skipped} 个；有 ${conflicts} 处同域名冲突。请查看「# >>> 本地 / 服务器」块，自行决定保留后保存`,
+      );
+    } else {
+      ElMessage.success(
+        `拉取完成：更新 ${result.imported} 个，跳过 ${result.skipped} 个`,
+      );
+    }
+    await reloadSystemIfNeeded();
+  } catch (err) {
+    markPermissionFailure(err);
+    ElMessage.error(String(err));
+  } finally {
+    pulling.value = false;
+  }
+}
+
 function downloadJsonFile(content: string, filename: string) {
   const blob = new Blob([content], { type: "application/json;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -737,6 +771,7 @@ onMounted(() => {
   <div v-loading="loading" class="page">
     <div class="toolbar">
       <div class="toolbar-left">
+        <!-- 暂时关闭新建 / 导入 / 导出，改走内网固定预置拉取
         <ElButton type="primary" :loading="saving" @click="openCreateDialog">
           新建
         </ElButton>
@@ -745,6 +780,10 @@ onMounted(() => {
         </ElButton>
         <ElButton :loading="exporting" @click="exportSwitchhosts">
           导出
+        </ElButton>
+        -->
+        <ElButton type="primary" :loading="pulling" @click="pullPresetConfig">
+          拉取最新配置
         </ElButton>
         <ElButton
           type="warning"
@@ -904,7 +943,7 @@ onMounted(() => {
             </ElDropdown>
           </div>
         </div>
-        <p v-if="schemes.length === 0" class="empty">暂无方案，可新建或导入</p>
+        <p v-if="schemes.length === 0" class="empty">暂无方案，请拉取最新配置</p>
       </aside>
 
       <section class="editor">

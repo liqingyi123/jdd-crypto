@@ -350,16 +350,14 @@ fn open_main_with_capture(app: &AppHandle, text: String) {
     }
 
     // Prefer decrypt first; frontend falls back to encrypt on failure.
-    let use_bubble = windows::is_short_bubble_text(&text);
-    let hint = CryptoHint {
-        text,
-        mode: "auto".to_string(),
-    };
-    if use_bubble {
-        windows::schedule_show_crypto_bubble(app, hint);
-    } else {
-        windows::show_main(app, Some(hint));
-    }
+    // Always use result bubble (no 1100-char main-window split).
+    windows::schedule_show_crypto_bubble(
+        app,
+        CryptoHint {
+            text,
+            mode: "auto".to_string(),
+        },
+    );
     stop(app);
 }
 

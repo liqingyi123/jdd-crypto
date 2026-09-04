@@ -518,6 +518,11 @@ pub fn hosts_import_switchhosts(
 }
 
 #[tauri::command]
+pub fn hosts_pull_preset(app: AppHandle) -> Result<crate::hosts_manager::ImportResult, String> {
+    crate::hosts_manager::pull_preset_config(&app)
+}
+
+#[tauri::command]
 pub fn hosts_export_switchhosts(app: AppHandle) -> Result<String, String> {
     crate::hosts_manager::export_switchhosts(&app)
 }

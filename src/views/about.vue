@@ -7,13 +7,13 @@ const version = ref("0.1.0");
 const platform = ref("desktop");
 const { checking, checkUpdate } = useAppUpdate();
 
-const roadmap = [
-  "转 KV 功能支持密文、明文两种文本格式",
-  "网络代理功能，实时捕获任意应用的网络请求",
-  "插件管理功能支持编辑器主题、加解密预设",
-  "彩虹屁 + 节日祝福语功能",
-  "将结果自动复制到剪贴板"
-];
+// const roadmap = [
+//   "转 KV 功能支持密文、明文两种文本格式",
+//   "网络代理功能，实时捕获任意应用的网络请求",
+//   "插件管理功能支持编辑器主题、加解密预设",
+//   "彩虹屁 + 节日祝福语功能",
+//   "将结果自动复制到剪贴板"
+// ];
 const callmap = [
   { type: 'QQ', value: '1787750205' },
   { type: '微信', value: 'qinghe6971' }
@@ -73,7 +73,7 @@ function onCheckUpdate() {
         </li>
       </ol>
     </section>
-    <section class="roadmap">
+    <!-- <section class="roadmap">
       <h3>规划中</h3>
       <ol>
         <li v-for="(item, index) in roadmap" :key="item">
@@ -81,7 +81,7 @@ function onCheckUpdate() {
           <span class="text">{{ item }}</span>
         </li>
       </ol>
-    </section>
+    </section> -->
   </div>
 </template>
 

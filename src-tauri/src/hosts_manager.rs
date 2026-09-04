@@ -29,6 +29,11 @@ const SCHEMES_KEY: &str = "schemes";
 
 const MARKER_BEGIN: &str = "# >>> jdd-crypto-hosts-begin";
 const MARKER_END: &str = "# <<< jdd-crypto-hosts-end";
+const SWITCHHOSTS_START: &str = "# --- SWITCHHOSTS_CONTENT_START ---";
+const SWITCHHOSTS_END: &str = "# --- SWITCHHOSTS_CONTENT_END ---";
+
+const PRESET_CONFIG_URL: &str =
+    "http://172.20.2.169:7101/appStore/Software/PC/developer/jdd-crypto/swh_data.json";
 
 static ID_SEQ: AtomicU64 = AtomicU64::new(1);
 
@@ -245,6 +250,8 @@ pub fn start_refresh_loop(app: AppHandle) {
 pub struct ImportResult {
     pub imported: u32,
     pub skipped: u32,
+    #[serde(default)]
+    pub conflicts: u32,
     pub schemes: Vec<HostsScheme>,
 }
 
@@ -569,8 +576,39 @@ fn strip_managed_block(raw: &str) -> String {
     out
 }
 
+/// Remove SwitchHosts managed segments. START may appear mid-file; keep content before/after.
+fn strip_switchhosts_block(raw: &str) -> String {
+    let lines: Vec<&str> = raw.lines().collect();
+    let mut out = String::new();
+    let mut i = 0usize;
+    while i < lines.len() {
+        let trimmed = lines[i].trim();
+        if trimmed != SWITCHHOSTS_START {
+            out.push_str(lines[i]);
+            out.push('\n');
+            i += 1;
+            continue;
+        }
+        // Skip from START until END (inclusive), or MARKER_BEGIN (exclusive), or EOF.
+        i += 1;
+        while i < lines.len() {
+            let t = lines[i].trim();
+            if t == SWITCHHOSTS_END {
+                i += 1;
+                break;
+            }
+            if t == MARKER_BEGIN {
+                break;
+            }
+            i += 1;
+        }
+    }
+    out
+}
+
 fn compose_hosts_file(existing: &str, managed: &str) -> String {
-    let mut base = strip_managed_block(existing);
+    let mut base = strip_switchhosts_block(existing);
+    base = strip_managed_block(&base);
     while base.ends_with("\n\n\n") {
         base.pop();
     }
@@ -799,6 +837,7 @@ pub fn import_switchhosts(app: &AppHandle, raw: String) -> Result<ImportResult, 
     Ok(ImportResult {
         imported,
         skipped,
+        conflicts: 0,
         schemes,
     })
 }
@@ -823,7 +862,7 @@ pub fn reset_system_hosts(app: &AppHandle) -> Result<Vec<HostsScheme>, String> {
 fn current_system_hosts_base() -> String {
     let path = system_hosts_path();
     let raw = fs::read_to_string(&path).unwrap_or_default();
-    strip_managed_block(&raw)
+    strip_managed_block(&strip_switchhosts_block(&raw))
 }
 
 fn build_switchhosts_export(schemes: &[HostsScheme], system_content: &str) -> Result<String, String> {
@@ -1064,6 +1103,282 @@ fn upsert_imported_scheme(schemes: &mut Vec<HostsScheme>, incoming: HostsScheme)
     schemes.push(incoming);
 }
 
+fn is_merge_marker_line(trimmed: &str) -> bool {
+    let t = trimmed.trim();
+    t.starts_with("# >>>")
+        || t.starts_with(">>>")
+        || t.starts_with("# <<<<<<<")
+        || t.starts_with("# =======")
+        || t.starts_with("# >>>>>>>")
+        || t == "# 远程配置合入冲突，请自行决定保留"
+        || t == "# 服务器配置合入冲突，请自行决定保留"
+}
+
+fn significant_hosts_lines(content: &str) -> Vec<String> {
+    let mut lines = Vec::new();
+    for line in content.lines() {
+        let trimmed = line.trim_end();
+        if trimmed.trim().is_empty() {
+            continue;
+        }
+        if is_merge_marker_line(trimmed.trim()) {
+            continue;
+        }
+        lines.push(trimmed.to_string());
+    }
+    lines
+}
+
+/// Parse hostnames from a hosts line (supports leading `#` commented entries).
+fn domains_of_line(line: &str) -> Vec<String> {
+    let mut s = line.trim();
+    while s.starts_with('#') {
+        s = s[1..].trim_start();
+    }
+    if s.is_empty() {
+        return Vec::new();
+    }
+    let without_inline = s.split('#').next().unwrap_or(s).trim();
+    let parts: Vec<&str> = without_inline.split_whitespace().collect();
+    if parts.len() < 2 {
+        return Vec::new();
+    }
+    // First token must look like an IP (v4/v6-ish); otherwise treat as pure comment.
+    let ip = parts[0];
+    let looks_like_ip = ip.contains('.') || ip.contains(':');
+    if !looks_like_ip {
+        return Vec::new();
+    }
+    parts[1..]
+        .iter()
+        .filter(|h| !h.is_empty())
+        .map(|h| (*h).to_string())
+        .collect()
+}
+
+fn line_touches_conflict(line: &str, conflict_domains: &std::collections::HashSet<String>) -> bool {
+    domains_of_line(line)
+        .iter()
+        .any(|d| conflict_domains.contains(d))
+}
+
+fn index_lines_by_domain(lines: &[String]) -> std::collections::BTreeMap<String, Vec<String>> {
+    let mut map: std::collections::BTreeMap<String, Vec<String>> = std::collections::BTreeMap::new();
+    for line in lines {
+        for domain in domains_of_line(line) {
+            let entry = map.entry(domain).or_default();
+            if !entry.iter().any(|l| l == line) {
+                entry.push(line.clone());
+            }
+        }
+    }
+    map
+}
+
+/// Domain-aware merge: union when no shared-domain mismatch; conflict markers
+/// only for domains that appear on both sides with different lines.
+fn merge_hosts_content(local: &str, server: &str) -> (String, u32) {
+    let local_lines = significant_hosts_lines(local);
+    let server_lines = significant_hosts_lines(server);
+
+    if local_lines == server_lines {
+        let mut out = String::new();
+        for line in &local_lines {
+            out.push_str(line);
+            out.push('\n');
+        }
+        return (out, 0);
+    }
+
+    let local_by_domain = index_lines_by_domain(&local_lines);
+    let server_by_domain = index_lines_by_domain(&server_lines);
+
+    let mut conflict_domains: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut conflict_order: Vec<String> = Vec::new();
+    for (domain, local_domain_lines) in &local_by_domain {
+        let Some(server_domain_lines) = server_by_domain.get(domain) else {
+            continue;
+        };
+        if local_domain_lines != server_domain_lines {
+            if conflict_domains.insert(domain.clone()) {
+                conflict_order.push(domain.clone());
+            }
+        }
+    }
+
+    let mut out = String::new();
+    let mut emitted: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    for line in &local_lines {
+        if line_touches_conflict(line, &conflict_domains) {
+            continue;
+        }
+        if emitted.insert(line.clone()) {
+            out.push_str(line);
+            out.push('\n');
+        }
+    }
+
+    for line in &server_lines {
+        if line_touches_conflict(line, &conflict_domains) {
+            continue;
+        }
+        if emitted.insert(line.clone()) {
+            out.push_str(line);
+            out.push('\n');
+        }
+    }
+
+    if conflict_order.is_empty() {
+        return (out, 0);
+    }
+
+    let mut emitted_conflict_lines: std::collections::HashSet<String> =
+        std::collections::HashSet::new();
+    for domain in &conflict_order {
+        let local_side = local_by_domain.get(domain).cloned().unwrap_or_default();
+        let server_side = server_by_domain.get(domain).cloned().unwrap_or_default();
+
+        // Skip if all lines for this domain were already emitted in a prior hunk
+        // (multi-domain lines may share conflict domains).
+        let local_pending: Vec<String> = local_side
+            .into_iter()
+            .filter(|l| emitted_conflict_lines.insert(format!("L:{l}")))
+            .collect();
+        let server_pending: Vec<String> = server_side
+            .into_iter()
+            .filter(|l| emitted_conflict_lines.insert(format!("S:{l}")))
+            .collect();
+        if local_pending.is_empty() && server_pending.is_empty() {
+            continue;
+        }
+
+        out.push_str("# >>> 本地 start\n");
+        for line in &local_pending {
+            out.push_str(line);
+            out.push('\n');
+        }
+        out.push_str("# >>> 本地 end\n");
+        out.push_str("# >>> 服务器 start\n");
+        for line in &server_pending {
+            out.push_str(line);
+            out.push('\n');
+        }
+        out.push_str("# >>> 服务器 end\n");
+    }
+
+    (out, conflict_order.len() as u32)
+}
+
+fn merge_preset_scheme(existing: &mut HostsScheme, incoming: HostsScheme) -> u32 {
+    let kept_nature = existing.nature.clone();
+    if is_remote(&incoming) || is_remote(existing) {
+        *existing = incoming;
+        existing.nature = kept_nature;
+        existing.source = "imported".to_string();
+        return 0;
+    }
+    let (merged, conflicts) = merge_hosts_content(&existing.content, &incoming.content);
+    let enabled = incoming.enabled;
+    *existing = incoming;
+    existing.content = merged;
+    existing.enabled = enabled;
+    existing.nature = kept_nature;
+    existing.source = "imported".to_string();
+    existing.readonly = false;
+    existing.scheme_type = TYPE_LOCAL.to_string();
+    conflicts
+}
+
+fn upsert_preset_scheme(schemes: &mut Vec<HostsScheme>, incoming: HostsScheme) -> u32 {
+    if let Some(existing) = schemes.iter_mut().find(|s| s.id == incoming.id) {
+        return merge_preset_scheme(existing, incoming);
+    }
+    if let Some(idx) = schemes.iter().position(|s| {
+        s.source == "imported" && s.title == incoming.title
+    }) {
+        return merge_preset_scheme(&mut schemes[idx], incoming);
+    }
+    schemes.push(incoming);
+    0
+}
+
+fn parse_switchhosts_raw(raw: &str) -> Result<(Vec<HostsScheme>, u32), String> {
+    let value: Value = serde_json::from_str(raw).map_err(|e| format!("JSON 解析失败: {e}"))?;
+    let data = value
+        .get("data")
+        .ok_or_else(|| "备份格式不正确：缺少 data 字段".to_string())?;
+    if !data.is_object() {
+        return Err(
+            "备份格式不正确：data 应为对象（SwitchHosts PotDb：list.tree + collection.hosts）"
+                .to_string(),
+        );
+    }
+    let tree = data
+        .pointer("/list/tree")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| "备份格式不正确：缺少 data.list.tree 数组".to_string())?;
+    let content_by_id = build_hosts_content_map(data);
+    let mut imported = 0u32;
+    let mut skipped = 0u32;
+    let mut schemes = Vec::new();
+    for node in tree {
+        collect_import_nodes(node, &content_by_id, &mut schemes, &mut imported, &mut skipped);
+    }
+    let _ = imported;
+    Ok((schemes, skipped))
+}
+
+/// Fetch intranet preset SwitchHosts JSON and merge into local store.
+pub fn pull_preset_config(app: &AppHandle) -> Result<ImportResult, String> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("创建 HTTP 客户端失败: {e}"))?;
+    let response = client
+        .get(PRESET_CONFIG_URL)
+        .send()
+        .map_err(|e| format!("拉取预置配置失败: {e}"))?;
+    if !response.status().is_success() {
+        return Err(format!("拉取预置配置返回 HTTP {}", response.status()));
+    }
+    let raw = response
+        .text()
+        .map_err(|e| format!("读取预置配置失败: {e}"))?;
+
+    let (incoming, skipped) = parse_switchhosts_raw(&raw)?;
+    let mut schemes = load_schemes(app);
+    let mut imported = 0u32;
+    let mut conflicts = 0u32;
+    for item in incoming {
+        conflicts += upsert_preset_scheme(&mut schemes, item);
+        imported += 1;
+    }
+
+    let mut exclusive_on = false;
+    for s in schemes.iter_mut() {
+        if !is_exclusive(s) || !s.enabled {
+            continue;
+        }
+        if exclusive_on {
+            s.enabled = false;
+        } else {
+            exclusive_on = true;
+        }
+    }
+
+    save_schemes(app, &schemes)?;
+    if schemes.iter().any(|s| s.enabled) {
+        apply_enabled(app)?;
+    }
+    Ok(ImportResult {
+        imported,
+        skipped,
+        conflicts,
+        schemes,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1090,6 +1405,79 @@ mod tests {
         let cleared = compose_hosts_file(&with_block, "");
         assert!(!cleared.contains(MARKER_BEGIN));
         assert!(cleared.contains("127.0.0.1 localhost"));
+    }
+
+    #[test]
+    fn compose_strips_switchhosts_mid_file() {
+        let existing = format!(
+            "127.0.0.1 localhost\n\n{SWITCHHOSTS_START}\n1.1.1.1 old.swh\n# keep-after\n9.9.9.9 after.swh\n\n{MARKER_BEGIN}\nmine\n{MARKER_END}\n"
+        );
+        // Without END, strip stops at MARKER_BEGIN so mid content after START until marker is removed;
+        // but "keep-after" between START and MARKER is also removed (SwitchHosts owned until marker).
+        let next = compose_hosts_file(&existing, "2.2.2.2 jdd.test");
+        assert!(!next.contains(SWITCHHOSTS_START));
+        assert!(!next.contains("1.1.1.1 old.swh"));
+        assert!(next.contains("127.0.0.1 localhost"));
+        assert!(next.contains("2.2.2.2 jdd.test"));
+        assert!(next.contains(MARKER_BEGIN));
+    }
+
+    #[test]
+    fn compose_strips_switchhosts_with_end_keeps_trailing() {
+        let existing = format!(
+            "127.0.0.1 localhost\n{SWITCHHOSTS_START}\n1.1.1.1 old.swh\n{SWITCHHOSTS_END}\n# trailing\n8.8.8.8 keep.me\n"
+        );
+        let next = compose_hosts_file(&existing, "2.2.2.2 jdd.test");
+        assert!(!next.contains(SWITCHHOSTS_START));
+        assert!(!next.contains("1.1.1.1 old.swh"));
+        assert!(next.contains("8.8.8.8 keep.me"));
+        assert!(next.contains("127.0.0.1 localhost"));
+    }
+
+    #[test]
+    fn merge_hosts_union_when_no_shared_domain_conflict() {
+        let local = "117.78.3.98 domain-h.jiangduoduo.com\n117.78.3.98 domain-h.jiangduoduo.com1\n";
+        let server = "117.78.3.98 domain-h.jiangduoduo.com\n# 10.208.143.106 api.yiqicp.com\n# 10.208.143.230 api.zhcnews.com\n";
+        let (merged, conflicts) = merge_hosts_content(local, server);
+        assert_eq!(conflicts, 0);
+        let expected = "\
+117.78.3.98 domain-h.jiangduoduo.com
+117.78.3.98 domain-h.jiangduoduo.com1
+# 10.208.143.106 api.yiqicp.com
+# 10.208.143.230 api.zhcnews.com
+";
+        assert_eq!(merged, expected);
+    }
+
+    #[test]
+    fn merge_hosts_union_disjoint_domains() {
+        let local = "1.1.1.1 only-local.com\n";
+        let server = "2.2.2.2 only-server.com\n";
+        let (merged, conflicts) = merge_hosts_content(local, server);
+        assert_eq!(conflicts, 0);
+        assert_eq!(
+            merged,
+            "1.1.1.1 only-local.com\n2.2.2.2 only-server.com\n"
+        );
+    }
+
+    #[test]
+    fn merge_hosts_conflict_blocks_on_domain_ip_mismatch() {
+        let local = "1.1.1.1 foo.com\n3.3.3.3 bar.com\n";
+        let server = "2.2.2.2 foo.com\n4.4.4.4 baz.com\n";
+        let (merged, conflicts) = merge_hosts_content(local, server);
+        assert_eq!(conflicts, 1);
+        let expected = "\
+3.3.3.3 bar.com
+4.4.4.4 baz.com
+# >>> 本地 start
+1.1.1.1 foo.com
+# >>> 本地 end
+# >>> 服务器 start
+2.2.2.2 foo.com
+# >>> 服务器 end
+";
+        assert_eq!(merged, expected);
     }
 
     #[test]

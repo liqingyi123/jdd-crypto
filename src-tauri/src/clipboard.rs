@@ -7,7 +7,7 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_store::StoreExt;
 
 use crate::state::{AppState, ClipboardCandidate};
-use crate::windows;
+use crate::windows::{self, CryptoHint};
 
 const SETTINGS_STORE: &str = "settings.json";
 const WATCH_KEY: &str = "clipboardWatchEnabled";
@@ -82,13 +82,20 @@ pub fn start_clipboard_watcher(app: AppHandle) {
 
         let kind = classify_clipboard(&text);
         let payload = ClipboardCandidate {
-            text,
+            text: text.clone(),
             kind: kind.to_string(),
         };
         if let Ok(mut candidate) = state.last_candidate.lock() {
             *candidate = Some(payload.clone());
         }
         let _ = app.emit("clipboard://candidate", &payload);
-        windows::schedule_show_clipboard_prompt(&app);
+        // Silent decrypt-JSON path: frontend bubble decides whether to show.
+        windows::schedule_show_crypto_bubble(
+            &app,
+            CryptoHint {
+                text,
+                mode: "silent_json".to_string(),
+            },
+        );
     });
 }

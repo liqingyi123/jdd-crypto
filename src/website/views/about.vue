@@ -6,13 +6,13 @@ const contacts = [
   { type: "微信", value: "qinghe6971" },
 ];
 
-const roadmap = [
-  "转 KV 功能支持密文、明文两种文本格式",
-  "网络代理功能，实时捕获任意应用的网络请求",
-  "插件管理功能支持编辑器主题、加解密预设",
-  "彩虹屁 + 节日祝福语功能",
-  "将结果自动复制到剪贴板",
-];
+// const roadmap = [
+//   "转 KV 功能支持密文、明文两种文本格式",
+//   "网络代理功能，实时捕获任意应用的网络请求",
+//   "插件管理功能支持编辑器主题、加解密预设",
+//   "彩虹屁 + 节日祝福语功能",
+//   "将结果自动复制到剪贴板",
+// ];
 </script>
 
 <template>
@@ -29,7 +29,7 @@ const roadmap = [
         <section class="panel">
           <h2>产品定位</h2>
           <p>
-            用悬浮角标与托盘降低启动成本，用剪贴板询问、短文本结果气泡与鼠标跟随减少复制粘贴往返；支持文本对比、Host 多方案切换，以及可玩可替换的拖尾特效。
+            用悬浮角标与托盘降低启动成本，用剪贴板静默解密、结果气泡与鼠标跟随减少复制粘贴往返；支持文本对比、Host 多方案切换，以及可玩可替换的拖尾特效。
           </p>
         </section>
         <section class="panel">
@@ -41,12 +41,12 @@ const roadmap = [
             </li>
           </ul>
         </section>
-        <section class="panel panel-wide">
+        <!-- <section class="panel panel-wide">
           <h2>规划中</h2>
           <ol>
             <li v-for="(item, index) in roadmap" :key="index">{{ item }}</li>
           </ol>
-        </section>
+        </section> -->
       </div>
     </div>
   </div>

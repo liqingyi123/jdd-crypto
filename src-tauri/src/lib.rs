@@ -118,6 +118,7 @@ pub fn run() {
             commands::hosts_request_permission,
             commands::hosts_open_system,
             commands::hosts_import_switchhosts,
+            commands::hosts_pull_preset,
             commands::hosts_export_switchhosts,
             commands::hosts_reset_system,
             commands::open_hosts_window,

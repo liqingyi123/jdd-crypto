@@ -319,7 +319,7 @@ function onThemeChange(value: string | number | boolean | undefined) {
         </label>
       </div>
       <p>
-        自动识别剪贴板并提示加解密，关闭后不再轮询剪贴板，避免打扰与隐私风险。</p>
+        自动识别剪贴板并静默尝试解密（仅 JSON 结果弹气泡），关闭后不再轮询剪贴板，避免打扰与隐私风险。</p>
     </section>
     <section>
       <div class="section-head">

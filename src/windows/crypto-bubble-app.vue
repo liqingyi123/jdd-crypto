@@ -41,6 +41,20 @@ function beautifyResult(raw: string): string {
   }
 }
 
+/** True when decrypted payload is a JSON object or array. */
+function isJsonPayload(raw: string): boolean {
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
+    return false;
+  }
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    return parsed !== null && typeof parsed === "object";
+  } catch {
+    return false;
+  }
+}
+
 async function scrollBodyToBottom() {
   await nextTick();
   const el = bodyEl.value;
@@ -73,18 +87,43 @@ async function runBubble(payload: BubblePayload) {
   if (!payload?.text) {
     return;
   }
+  const silentJson = payload.mode === "silent_json";
   const preferDecrypt = payload.mode === "auto";
   const mode = payload.mode === "encrypt" ? "encrypt" : "decrypt";
   const token = ++runToken;
-  lastMode.value = preferDecrypt ? "decrypt" : mode;
+  lastMode.value = preferDecrypt || silentJson ? "decrypt" : mode;
   sourceText.value = payload.text;
-  visible.value = true;
-  loading.value = true;
+  // Silent path stays invisible until decrypt+JSON succeed.
+  visible.value = !silentJson;
+  loading.value = !silentJson;
   resultText.value = "";
   errorText.value = "";
   copyHint.value = "";
 
   try {
+    if (silentJson) {
+      const result = runAes({
+        type: "decrypt",
+        text: payload.text,
+        aesCode: "auto",
+        customKey: "",
+        customIv: "",
+      });
+      if (token !== runToken) {
+        return;
+      }
+      if (result.code !== "ok" || !result.content || !isJsonPayload(result.content)) {
+        await invoke("hide_crypto_bubble").catch(() => undefined);
+        return;
+      }
+      lastMode.value = "decrypt";
+      resultText.value = beautifyResult(result.content);
+      visible.value = true;
+      loading.value = false;
+      await scrollBodyToBottom();
+      return;
+    }
+
     const outcome: {
       mode: "encrypt" | "decrypt";
       result: ReturnType<typeof runAes>;
@@ -118,13 +157,17 @@ async function runBubble(payload: BubblePayload) {
     if (token !== runToken) {
       return;
     }
+    if (silentJson) {
+      await invoke("hide_crypto_bubble").catch(() => undefined);
+      return;
+    }
     errorText.value = preferDecrypt
       ? "自动加解密失败"
       : mode === "decrypt"
         ? "自动解密失败"
         : "自动加密失败";
   } finally {
-    if (token === runToken) {
+    if (token === runToken && !silentJson) {
       loading.value = false;
       if (resultText.value) {
         await scrollBodyToBottom();
