@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import MonacoEditor from "@/components/monaco-editor.vue";
 
 type HostNature = "keep" | "exclusive";
+type HostSchemeType = "local" | "remote";
 
 const SYSTEM_ID = "__system__";
 
@@ -16,7 +17,64 @@ interface HostsScheme {
   source: string;
   nature: HostNature;
   readonly: boolean;
+  /** App IPC: schemeType; SwitchHosts import source field: type */
+  type?: HostSchemeType;
+  schemeType?: HostSchemeType;
+  url: string;
+  refresh_interval?: number;
+  refreshInterval?: number;
+  last_refresh?: string;
+  lastRefresh?: string;
+  last_refresh_ms?: number;
+  lastRefreshMs?: number;
 }
+
+function normalizeScheme(raw: HostsScheme): HostsScheme {
+  const url = (raw.url ?? "").trim();
+  const rawType = String(raw.schemeType ?? raw.type ?? "").toLowerCase();
+  const type: HostSchemeType =
+    rawType === "remote" || url.length > 0 ? "remote" : "local";
+  const refresh_interval = Number(
+    raw.refreshInterval ?? raw.refresh_interval ?? 0,
+  );
+  const last_refresh = String(raw.lastRefresh ?? raw.last_refresh ?? "");
+  const last_refresh_ms = Number(
+    raw.lastRefreshMs ?? raw.last_refresh_ms ?? 0,
+  );
+  return {
+    ...raw,
+    type,
+    schemeType: type,
+    url,
+    refresh_interval: Number.isFinite(refresh_interval) ? refresh_interval : 0,
+    refreshInterval: Number.isFinite(refresh_interval) ? refresh_interval : 0,
+    last_refresh,
+    lastRefresh: last_refresh,
+    last_refresh_ms: Number.isFinite(last_refresh_ms) ? last_refresh_ms : 0,
+    lastRefreshMs: Number.isFinite(last_refresh_ms) ? last_refresh_ms : 0,
+    readonly: type === "remote" ? true : !!raw.readonly,
+  };
+}
+
+function normalizeSchemes(list: HostsScheme[] | null | undefined): HostsScheme[] {
+  if (!Array.isArray(list)) {
+    return [];
+  }
+  return list.map((item) => normalizeScheme(item));
+}
+
+const REFRESH_OPTIONS: Array<{ label: string; value: number }> = [
+  { label: "永不", value: 0 },
+  { label: "5分钟", value: 300 },
+  { label: "10分钟", value: 600 },
+  { label: "30分钟", value: 1800 },
+  { label: "1小时", value: 3600 },
+  { label: "2小时", value: 7200 },
+  { label: "4小时", value: 14400 },
+  { label: "6小时", value: 21600 },
+  { label: "12小时", value: 43200 },
+  { label: "24小时", value: 86400 },
+];
 
 interface ImportResult {
   imported: number;
@@ -27,6 +85,8 @@ interface ImportResult {
 const loading = shallowRef(false);
 const saving = shallowRef(false);
 const importing = shallowRef(false);
+const exporting = shallowRef(false);
+const resetting = shallowRef(false);
 const schemes = ref<HostsScheme[]>([]);
 const selectedId = shallowRef<string | null>(null);
 const draftTitle = shallowRef("");
@@ -38,6 +98,9 @@ const renamingId = shallowRef<string | null>(null);
 const renameDraft = shallowRef("");
 const createDialogVisible = shallowRef(false);
 const createNature = shallowRef<HostNature>("exclusive");
+const createType = shallowRef<HostSchemeType>("local");
+const createUrl = shallowRef("");
+const createInterval = shallowRef(0);
 const deleteDialogVisible = shallowRef(false);
 const deleteTarget = shallowRef<HostsScheme | null>(null);
 const deleting = shallowRef(false);
@@ -46,6 +109,10 @@ const hostsWritable = shallowRef(false);
 const sessionPermissionOk = shallowRef(false);
 const permissionBreathing = shallowRef(false);
 const requestingPermission = shallowRef(false);
+const refreshingRemote = shallowRef(false);
+const draftUrl = shallowRef("");
+const draftInterval = shallowRef(0);
+const draftType = shallowRef<HostSchemeType>("local");
 const renameInputRef = ref<{ focus?: () => void; input?: HTMLInputElement } | null>(
   null,
 );
@@ -58,9 +125,21 @@ const selected = computed(
 
 const viewingSystem = computed(() => selectedId.value === SYSTEM_ID);
 
-const editorReadOnly = computed(
-  () => viewingSystem.value || selected.value?.readonly === true,
+const isRemoteSelected = computed(
+  () =>
+    !viewingSystem.value &&
+    selected.value !== null &&
+    isRemoteScheme(selected.value),
 );
+
+const contentReadOnly = computed(
+  () =>
+    viewingSystem.value ||
+    draftType.value === "remote" ||
+    selected.value?.readonly === true,
+);
+
+const metaEditable = computed(() => !viewingSystem.value && selected.value !== null);
 
 const hasEditorTarget = computed(
   () => viewingSystem.value || selected.value !== null,
@@ -123,6 +202,27 @@ function sourceLabel(source: string): string {
   return source === "imported" ? "导入" : "本地";
 }
 
+function isRemoteScheme(scheme: HostsScheme): boolean {
+  const normalized = normalizeScheme(scheme);
+  return normalized.type === "remote";
+}
+
+function schemeTypeOf(scheme: HostsScheme): HostSchemeType {
+  return isRemoteScheme(scheme) ? "remote" : "local";
+}
+
+function schemeRefreshInterval(scheme: HostsScheme): number {
+  return normalizeScheme(scheme).refresh_interval ?? 0;
+}
+
+function schemeUrl(scheme: HostsScheme): string {
+  return normalizeScheme(scheme).url ?? "";
+}
+
+function schemeLastRefresh(scheme: HostsScheme): string {
+  return normalizeScheme(scheme).last_refresh ?? "";
+}
+
 function cancelRename() {
   renamingId.value = null;
   renameDraft.value = "";
@@ -180,6 +280,9 @@ async function selectScheme(scheme: HostsScheme) {
   syncing.value = true;
   draftTitle.value = scheme.title;
   draftContent.value = scheme.content;
+  draftType.value = schemeTypeOf(scheme);
+  draftUrl.value = schemeUrl(scheme);
+  draftInterval.value = schemeRefreshInterval(scheme);
   dirty.value = false;
   await nextTick();
   syncing.value = false;
@@ -230,7 +333,7 @@ async function openSystemHostsFile() {
 }
 
 function markDirty() {
-  if (syncing.value || editorReadOnly.value) {
+  if (syncing.value || viewingSystem.value) {
     return;
   }
   dirty.value = true;
@@ -240,7 +343,7 @@ async function refresh() {
   loading.value = true;
   try {
     const list = await invoke<HostsScheme[]>("hosts_list");
-    schemes.value = Array.isArray(list) ? list : [];
+    schemes.value = normalizeSchemes(list);
     if (viewingSystem.value) {
       await reloadSystemIfNeeded();
     } else if (
@@ -276,26 +379,38 @@ function openCreateDialog() {
     cancelRename();
   }
   createNature.value = "exclusive";
+  createType.value = "local";
+  createUrl.value = "";
+  createInterval.value = 0;
   createDialogVisible.value = true;
 }
 
 async function confirmCreate() {
+  if (createType.value === "remote" && !createUrl.value.trim()) {
+    ElMessage.warning("远程方案必须填写 URL");
+    return;
+  }
   saving.value = true;
   try {
     const list = await invoke<HostsScheme[]>("hosts_upsert", {
       id: null,
-      title: "新方案",
+      title: createType.value === "remote" ? "新远程方案" : "新方案",
       content: "",
       enabled: false,
       nature: createNature.value,
+      schemeType: createType.value,
+      url: createType.value === "remote" ? createUrl.value.trim() : "",
+      refreshInterval: createType.value === "remote" ? createInterval.value : 0,
     });
-    schemes.value = list;
+    schemes.value = normalizeSchemes(list);
     createDialogVisible.value = false;
-    const created = list[list.length - 1];
+    const created = schemes.value[schemes.value.length - 1];
     if (created) {
       await selectScheme(created);
     }
-    ElMessage.success("已新建方案");
+    ElMessage.success(
+      createType.value === "remote" ? "已新建并刷新远程方案" : "已新建方案",
+    );
   } catch (err) {
     ElMessage.error(String(err));
   } finally {
@@ -304,12 +419,16 @@ async function confirmCreate() {
 }
 
 async function saveScheme() {
-  if (!selectedId.value || editorReadOnly.value) {
+  if (!selectedId.value || viewingSystem.value) {
     return;
   }
   const title = draftTitle.value.trim();
   if (!title) {
     ElMessage.warning("标题不能为空");
+    return;
+  }
+  if (draftType.value === "remote" && !draftUrl.value.trim()) {
+    ElMessage.warning("远程方案必须填写 URL");
     return;
   }
   saving.value = true;
@@ -320,11 +439,18 @@ async function saveScheme() {
       content: draftContent.value,
       enabled: null,
       nature: null,
+      schemeType: draftType.value,
+      url: draftType.value === "remote" ? draftUrl.value.trim() : "",
+      refreshInterval: draftType.value === "remote" ? draftInterval.value : 0,
     });
-    schemes.value = list;
+    schemes.value = normalizeSchemes(list);
     dirty.value = false;
+    const current = schemes.value.find((s) => s.id === selectedId.value);
+    if (current) {
+      await selectScheme(current);
+    }
     ElMessage.success("已保存");
-    if (selected.value?.enabled) {
+    if (current?.enabled) {
       sessionPermissionOk.value = true;
       permissionBreathing.value = false;
       await refreshHostsPermission();
@@ -338,6 +464,29 @@ async function saveScheme() {
   }
 }
 
+async function refreshRemoteNow() {
+  if (!selectedId.value || !isRemoteSelected.value) {
+    return;
+  }
+  refreshingRemote.value = true;
+  try {
+    const list = await invoke<HostsScheme[]>("hosts_refresh", {
+      id: selectedId.value,
+    });
+    schemes.value = normalizeSchemes(list);
+    const current = schemes.value.find((s) => s.id === selectedId.value);
+    if (current) {
+      await selectScheme(current);
+    }
+    ElMessage.success("远程 Host 已刷新");
+    await reloadSystemIfNeeded();
+  } catch (err) {
+    ElMessage.error(`刷新失败：${String(err)}`);
+  } finally {
+    refreshingRemote.value = false;
+  }
+}
+
 async function discardEdits() {
   if (!selected.value) {
     return;
@@ -345,6 +494,9 @@ async function discardEdits() {
   syncing.value = true;
   draftTitle.value = selected.value.title;
   draftContent.value = selected.value.content;
+  draftType.value = schemeTypeOf(selected.value);
+  draftUrl.value = schemeUrl(selected.value);
+  draftInterval.value = schemeRefreshInterval(selected.value);
   dirty.value = false;
   await nextTick();
   syncing.value = false;
@@ -356,7 +508,7 @@ async function toggleEnabled(scheme: HostsScheme, enabled: boolean) {
       id: scheme.id,
       enabled,
     });
-    schemes.value = list;
+    schemes.value = normalizeSchemes(list);
     sessionPermissionOk.value = true;
     permissionBreathing.value = false;
     ElMessage.success(
@@ -393,7 +545,7 @@ async function confirmRename(scheme: HostsScheme) {
       id: scheme.id,
       title,
     });
-    schemes.value = list;
+    schemes.value = normalizeSchemes(list);
     if (selectedId.value === scheme.id) {
       draftTitle.value = title;
     }
@@ -413,7 +565,7 @@ async function changeNature(scheme: HostsScheme, nature: HostNature) {
       id: scheme.id,
       nature,
     });
-    schemes.value = list;
+    schemes.value = normalizeSchemes(list);
     ElMessage.success(`已切换为${natureLabel(nature)}`);
     if (scheme.enabled) {
       sessionPermissionOk.value = true;
@@ -441,7 +593,7 @@ async function confirmDeleteScheme() {
   deleting.value = true;
   try {
     const list = await invoke<HostsScheme[]>("hosts_delete", { id: scheme.id });
-    schemes.value = list;
+    schemes.value = normalizeSchemes(list);
     deleteDialogVisible.value = false;
     deleteTarget.value = null;
     if (renamingId.value === scheme.id) {
@@ -506,9 +658,9 @@ async function onFileSelected(event: Event) {
     const result = await invoke<ImportResult>("hosts_import_switchhosts", {
       raw,
     });
-    schemes.value = result.schemes;
-    if (!selectedId.value && result.schemes.length > 0) {
-      await selectScheme(result.schemes[result.schemes.length - 1]);
+    schemes.value = normalizeSchemes(result.schemes);
+    if (!selectedId.value && schemes.value.length > 0) {
+      await selectScheme(schemes.value[schemes.value.length - 1]);
     }
     ElMessage.success(
       `导入完成：成功 ${result.imported} 个，跳过 ${result.skipped} 个`,
@@ -517,6 +669,61 @@ async function onFileSelected(event: Event) {
     ElMessage.error(String(err));
   } finally {
     importing.value = false;
+  }
+}
+
+function downloadJsonFile(content: string, filename: string) {
+  const blob = new Blob([content], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+async function exportSwitchhosts() {
+  exporting.value = true;
+  try {
+    const raw = await invoke<string>("hosts_export_switchhosts");
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadJsonFile(raw, `switchhosts-backup-${stamp}.json`);
+    ElMessage.success("导出完成");
+  } catch (err) {
+    ElMessage.error(String(err));
+  } finally {
+    exporting.value = false;
+  }
+}
+
+async function resetSystemHosts() {
+  try {
+    await ElMessageBox.confirm(
+      "将关闭全部方案开关，并清除本应用写入系统 hosts 的托管内容。是否继续？",
+      "重置 Host",
+      {
+        type: "warning",
+        confirmButtonText: "重置",
+        cancelButtonText: "取消",
+      },
+    );
+  } catch {
+    return;
+  }
+  resetting.value = true;
+  try {
+    const list = await invoke<HostsScheme[]>("hosts_reset_system");
+    schemes.value = normalizeSchemes(list);
+    sessionPermissionOk.value = true;
+    permissionBreathing.value = false;
+    await refreshHostsPermission();
+    await reloadSystemIfNeeded();
+    ElMessage.success("已重置系统 Host");
+  } catch (err) {
+    markPermissionFailure(err);
+    ElMessage.error(String(err));
+  } finally {
+    resetting.value = false;
   }
 }
 
@@ -535,6 +742,17 @@ onMounted(() => {
         </ElButton>
         <ElButton :loading="importing" @click="triggerImport">
           导入
+        </ElButton>
+        <ElButton :loading="exporting" @click="exportSwitchhosts">
+          导出
+        </ElButton>
+        <ElButton
+          type="warning"
+          plain
+          :loading="resetting"
+          @click="resetSystemHosts"
+        >
+          重置
         </ElButton>
         <ElButton
           v-if="showPermissionButton"
@@ -621,6 +839,14 @@ onMounted(() => {
                 {{ sourceLabel(scheme.source) }}
               </ElTag>
               <ElTag
+                v-if="isRemoteScheme(scheme)"
+                size="small"
+                effect="plain"
+                type="danger"
+              >
+                远程
+              </ElTag>
+              <ElTag
                 size="small"
                 effect="plain"
                 :type="scheme.nature === 'exclusive' ? 'warning' : 'success'"
@@ -688,10 +914,10 @@ onMounted(() => {
               v-model="draftTitle"
               class="title-input"
               placeholder="方案标题"
-              :disabled="editorReadOnly"
+              :disabled="viewingSystem"
               @input="markDirty"
             />
-            <template v-if="!editorReadOnly">
+            <template v-if="metaEditable">
               <ElButton :disabled="!dirty" @click="discardEdits">
                 放弃更改
               </ElButton>
@@ -706,11 +932,54 @@ onMounted(() => {
             </template>
             <ElTag v-else type="info" size="small" effect="plain">只读</ElTag>
           </div>
+          <div v-if="metaEditable" class="remote-bar">
+            <ElSelect
+              v-model="draftType"
+              class="type-select"
+              @change="markDirty"
+            >
+              <ElOption label="本地" value="local" />
+              <ElOption label="远程" value="remote" />
+            </ElSelect>
+            <template v-if="draftType === 'remote'">
+              <ElInput
+                v-model="draftUrl"
+                class="url-input"
+                placeholder="远程 URL"
+                @input="markDirty"
+              />
+              <ElSelect
+                v-model="draftInterval"
+                class="interval-select"
+                @change="markDirty"
+              >
+                <ElOption
+                  v-for="opt in REFRESH_OPTIONS"
+                  :key="opt.value"
+                  :label="opt.label"
+                  :value="opt.value"
+                />
+              </ElSelect>
+              <ElButton
+                :loading="refreshingRemote"
+                :disabled="dirty || !draftUrl.trim()"
+                @click="refreshRemoteNow"
+              >
+                立即刷新
+              </ElButton>
+            </template>
+          </div>
+          <p
+            v-if="isRemoteSelected && selected && schemeLastRefresh(selected)"
+            class="last-refresh"
+          >
+            上次刷新：{{ schemeLastRefresh(selected) }}
+          </p>
           <div class="editor-body">
             <MonacoEditor
               v-model="draftContent"
               language="hosts"
-              :read-only="editorReadOnly"
+              :read-only="contentReadOnly"
               placeholder="hosts 内容，例如：127.0.0.1 example.com"
               @update:model-value="markDirty"
             />
@@ -723,10 +992,31 @@ onMounted(() => {
     <ElDialog
       v-model="createDialogVisible"
       title="新建 Host 方案"
-      width="360px"
+      width="420px"
       append-to-body
     >
       <div class="create-nature">
+        <div class="create-label">类型</div>
+        <ElRadioGroup v-model="createType">
+          <ElRadio value="local">本地</ElRadio>
+          <ElRadio value="remote">远程</ElRadio>
+        </ElRadioGroup>
+        <template v-if="createType === 'remote'">
+          <div class="create-label">远程 URL</div>
+          <ElInput v-model="createUrl" placeholder="https://example.com/hosts" />
+          <div class="create-label">定时刷新</div>
+          <ElSelect v-model="createInterval" style="width: 100%">
+            <ElOption
+              v-for="opt in REFRESH_OPTIONS"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+            />
+          </ElSelect>
+          <p class="create-hint">
+            即使选择「永不」，首次创建时也会自动拉取一次远程内容。
+          </p>
+        </template>
         <div class="create-label">性质</div>
         <ElRadioGroup v-model="createNature">
           <ElRadio value="exclusive">单开</ElRadio>
@@ -868,13 +1158,23 @@ onMounted(() => {
 }
 
 .item-meta {
-  margin-top: 6px;
+  margin-top: 4px;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
   font-size: 12px;
   color: var(--el-text-color-secondary);
+}
+
+.item-meta :deep(.el-tag) {
+  flex-shrink: 0;
+  height: 18px;
+  padding: 0 4px;
+  font-size: 11px;
+  line-height: 16px;
 }
 
 .meta-text {
@@ -926,6 +1226,34 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.remote-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.type-select {
+  width: 100px;
+  flex-shrink: 0;
+}
+
+.url-input {
+  flex: 1;
+  min-width: 160px;
+}
+
+.interval-select {
+  width: 120px;
+  flex-shrink: 0;
+}
+
+.last-refresh {
+  margin: 0;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .title-input {

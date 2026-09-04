@@ -71,15 +71,17 @@ fn feature_spec(label: &str) -> Option<FeatureSpec> {
     }
 }
 
-fn focus_window(win: &WebviewWindow) {
+fn focus_window(app: &AppHandle, win: &WebviewWindow) {
     let _ = win.unminimize();
     let _ = win.show();
     let _ = win.set_focus();
+    // Re-raise trail after focus so overlays stay above feature/main windows.
+    crate::mouse_trail::raise_overlays(app);
 }
 
 pub fn show_main(app: &AppHandle, hint: Option<CryptoHint>) {
     if let Some(win) = app.get_webview_window("main") {
-        focus_window(&win);
+        focus_window(app, &win);
         if let Some(hint) = hint {
             let _ = win.emit("app://crypto-payload", &hint);
             let handle = app.clone();
@@ -98,7 +100,7 @@ pub fn show_feature(app: &AppHandle, label: &str) {
     // Feature windows are created lazily (not declared in tauri.conf.json) so
     // cold start only pays for badge + main. Re-open reuses the existing webview.
     if let Some(win) = app.get_webview_window(label) {
-        focus_window(&win);
+        focus_window(app, &win);
         return;
     }
 
@@ -118,6 +120,7 @@ pub fn show_feature(app: &AppHandle, label: &str) {
 
     if let Ok(win) = result {
         bind_close_to_hide(&win);
+        crate::mouse_trail::raise_overlays(app);
     }
 }
 

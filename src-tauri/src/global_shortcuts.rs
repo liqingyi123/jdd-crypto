@@ -49,6 +49,16 @@ pub fn register_all(app: &AppHandle) -> Result<(), String> {
         global.register(parsed).map_err(|err| err.to_string())?;
     }
 
+    let hosts_quick = state
+        .hosts_quick_shortcut
+        .lock()
+        .map(|guard| guard.clone())
+        .unwrap_or_else(|_| crate::state::DEFAULT_HOSTS_QUICK_SHORTCUT.to_string());
+    let hosts_quick = Shortcut::from_str(&hosts_quick).map_err(|err| err.to_string())?;
+    global
+        .register(hosts_quick)
+        .map_err(|err| err.to_string())?;
+
     Ok(())
 }
 

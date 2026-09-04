@@ -52,6 +52,21 @@ const {
   defaultShortcut: "Ctrl+Shift+D",
 });
 
+const {
+  recording: hostsQuickRecording,
+  errorMessage: hostsQuickErrorMessage,
+  display: hostsQuickDisplay,
+  previewDisplay: hostsQuickPreviewDisplay,
+  buttonRef: hostsQuickButtonRef,
+  startRecording: startHostsQuickRecording,
+  onRecordKey: onHostsQuickRecordKey,
+  loadShortcut: loadHostsQuickShortcut,
+} = useShortcutRecorder({
+  getCommand: "get_hosts_quick_shortcut",
+  setCommand: "set_hosts_quick_shortcut",
+  defaultShortcut: "Ctrl+Alt+S",
+});
+
 const themeOptions: Array<{ value: ThemePreference; label: string }> = [
   { value: "system", label: "跟随系统" },
   { value: "light", label: "浅色" },
@@ -134,6 +149,7 @@ onMounted(async () => {
   }
   await loadShortcut();
   await loadCompareShortcut();
+  await loadHostsQuickShortcut();
   try {
     unlistenTrailPref = await listen<MouseTrailPref>("app://mouse-trail-pref", (event) => {
       applyTrailPref(event.payload);
@@ -391,6 +407,34 @@ function onThemeChange(value: string | number | boolean | undefined) {
         </div>
       </div>
       <p v-if="compareErrorMessage" class="error">{{ compareErrorMessage }}</p>
+      <p>最多 4 个键，需包含修饰键。点击按钮后按下新组合，Esc 或点击其他区域取消。</p>
+    </section>
+    <section>
+      <div class="section-head">
+        <h2>Host 快速切换</h2>
+      </div>
+      <p>
+        按下快捷键后在鼠标旁打开 Host 方案列表，切换开关后窗口自动关闭。
+      </p>
+      <div class="row">
+        <span>快捷键</span>
+        <div ref="hostsQuickButtonRef">
+          <ElButton
+            :type="hostsQuickRecording ? 'primary' : 'default'"
+            @click="startHostsQuickRecording"
+            @keydown="onHostsQuickRecordKey"
+          >
+            {{
+              hostsQuickRecording
+                ? hostsQuickPreviewDisplay
+                : hostsQuickDisplay
+            }}
+          </ElButton>
+        </div>
+      </div>
+      <p v-if="hostsQuickErrorMessage" class="error">
+        {{ hostsQuickErrorMessage }}
+      </p>
       <p>最多 4 个键，需包含修饰键。点击按钮后按下新组合，Esc 或点击其他区域取消。</p>
     </section>
   </div>

@@ -521,7 +521,9 @@ fn schedule_sync_overlays(app: &AppHandle, visible: bool) {
         let _ = handle.run_on_main_thread(move || {
             sync_overlays(&handle_for_main, visible);
             if visible {
+                // Focus interactive windows first, then re-raise trail above them.
                 restore_interactive_focus(&handle_for_main);
+                raise_overlays(&handle_for_main);
             }
         });
     });
@@ -534,6 +536,24 @@ fn restore_interactive_focus(app: &AppHandle) {
     }
     if let Some(win) = app.get_webview_window("main") {
         let _ = win.set_focus();
+    }
+}
+
+/// Keep trail overlays above other app windows without stealing focus.
+pub fn raise_overlays(app: &AppHandle) {
+    if !TRAIL_ENABLED.load(Ordering::Relaxed) {
+        return;
+    }
+    // Badge first, then trail last so trail stays topmost among our windows.
+    if let Some(badge) = app.get_webview_window("badge") {
+        let _ = badge.set_always_on_top(true);
+    }
+    for (label, win) in app.webview_windows() {
+        if !label.starts_with("mouse-trail-") {
+            continue;
+        }
+        let _ = win.set_ignore_cursor_events(true);
+        let _ = win.set_always_on_top(true);
     }
 }
 
@@ -555,6 +575,7 @@ pub fn sync_overlays(app: &AppHandle, visible: bool) {
             let _ = win.set_size(layout.logical_size);
             if visible {
                 let _ = win.set_ignore_cursor_events(true);
+                let _ = win.set_always_on_top(true);
                 let _ = win.show();
             } else {
                 let _ = win.hide();
@@ -587,14 +608,13 @@ pub fn sync_overlays(app: &AppHandle, visible: bool) {
 
         if let Ok(win) = result {
             let _ = win.set_ignore_cursor_events(true);
+            let _ = win.set_always_on_top(true);
             let _ = win.show();
         }
     }
 
     if visible {
-        if let Some(badge) = app.get_webview_window("badge") {
-            let _ = badge.set_always_on_top(true);
-        }
+        raise_overlays(app);
     }
 }
 

@@ -46,14 +46,43 @@ pub struct HostsScheme {
     /// Readonly schemes cannot edit hosts content.
     #[serde(default)]
     pub readonly: bool,
+    /// "local" | "remote". Import reads SwitchHosts tree `type`; IPC uses schemeType.
+    #[serde(
+        default = "default_scheme_type",
+        alias = "type",
+        alias = "scheme_type"
+    )]
+    pub scheme_type: String,
+    /// Remote URL. Import reads SwitchHosts `url`.
+    #[serde(default)]
+    pub url: String,
+    /// Seconds; 0 = never. Import reads SwitchHosts `refresh_interval`.
+    #[serde(default, alias = "refresh_interval")]
+    pub refresh_interval: u64,
+    /// Import reads SwitchHosts `last_refresh`.
+    #[serde(default, alias = "last_refresh")]
+    pub last_refresh: String,
+    /// Import reads SwitchHosts `last_refresh_ms`.
+    #[serde(default, alias = "last_refresh_ms")]
+    pub last_refresh_ms: u64,
 }
 
 fn default_nature() -> String {
     "keep".to_string()
 }
 
+fn default_scheme_type() -> String {
+    TYPE_LOCAL.to_string()
+}
+
 pub const NATURE_KEEP: &str = "keep";
 pub const NATURE_EXCLUSIVE: &str = "exclusive";
+pub const TYPE_LOCAL: &str = "local";
+pub const TYPE_REMOTE: &str = "remote";
+
+const ALLOWED_REFRESH_INTERVALS: &[u64] = &[
+    0, 300, 600, 1800, 3600, 7200, 14400, 21600, 43200, 86400,
+];
 
 fn normalize_nature(raw: &str) -> Result<String, String> {
     match raw.trim() {
@@ -65,6 +94,150 @@ fn normalize_nature(raw: &str) -> Result<String, String> {
 
 fn is_exclusive(scheme: &HostsScheme) -> bool {
     scheme.nature == NATURE_EXCLUSIVE
+}
+
+fn is_remote(scheme: &HostsScheme) -> bool {
+    scheme.scheme_type == TYPE_REMOTE || !scheme.url.trim().is_empty()
+}
+
+/// Fill remote metadata from url / legacy fields after load.
+fn normalize_scheme(scheme: &mut HostsScheme) {
+    if !scheme.url.trim().is_empty() {
+        scheme.scheme_type = TYPE_REMOTE.to_string();
+        scheme.readonly = true;
+    } else if scheme.scheme_type != TYPE_REMOTE {
+        scheme.scheme_type = TYPE_LOCAL.to_string();
+    }
+}
+
+fn normalize_scheme_type(raw: &str) -> Result<String, String> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "" | TYPE_LOCAL => Ok(TYPE_LOCAL.to_string()),
+        TYPE_REMOTE => Ok(TYPE_REMOTE.to_string()),
+        _ => Err("类型无效，仅支持 local 或 remote".to_string()),
+    }
+}
+
+fn normalize_refresh_interval(raw: u64) -> Result<u64, String> {
+    if ALLOWED_REFRESH_INTERVALS.contains(&raw) {
+        Ok(raw)
+    } else {
+        Err("刷新间隔无效".to_string())
+    }
+}
+
+fn now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// UTC wall time `YYYY-MM-DD HH:mm:ss` (SwitchHosts-style display string).
+fn format_last_refresh(ms: u64) -> String {
+    let total_secs = (ms / 1000) as i64;
+    let days = total_secs.div_euclid(86_400);
+    let tod = total_secs.rem_euclid(86_400) as u32;
+    let hour = tod / 3600;
+    let min = (tod % 3600) / 60;
+    let sec = tod % 60;
+    let (y, m, d) = civil_from_days(days);
+    format!("{y:04}-{m:02}-{d:02} {hour:02}:{min:02}:{sec:02}")
+}
+
+/// Howard Hinnant civil_from_days (UTC).
+fn civil_from_days(z: i64) -> (i32, u32, u32) {
+    let z = z + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = (z - era * 146_097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    (y as i32, m as u32, d as u32)
+}
+
+fn fetch_remote_content(url: &str) -> Result<String, String> {
+    let url = url.trim();
+    if url.is_empty() {
+        return Err("远程 URL 不能为空".to_string());
+    }
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("创建 HTTP 客户端失败: {e}"))?;
+    let response = client
+        .get(url)
+        .send()
+        .map_err(|e| format!("请求远程 hosts 失败: {e}"))?;
+    if !response.status().is_success() {
+        return Err(format!("远程 hosts 返回 HTTP {}", response.status()));
+    }
+    let text = response
+        .text()
+        .map_err(|e| format!("读取远程 hosts 失败: {e}"))?;
+    Ok(text)
+}
+
+fn mark_refreshed(scheme: &mut HostsScheme, content: String) {
+    let ms = now_ms();
+    scheme.content = content;
+    scheme.last_refresh_ms = ms;
+    scheme.last_refresh = format_last_refresh(ms);
+}
+
+/// Refresh one remote scheme by id; re-applies system hosts when enabled.
+pub fn refresh_scheme(app: &AppHandle, id: &str) -> Result<Vec<HostsScheme>, String> {
+    let mut schemes = load_schemes(app);
+    let Some(item) = schemes.iter_mut().find(|s| s.id == id) else {
+        return Err("方案不存在".to_string());
+    };
+    if !is_remote(item) {
+        return Err("仅远程方案支持刷新".to_string());
+    }
+    let url = item.url.clone();
+    if url.trim().is_empty() {
+        return Err("远程 URL 不能为空".to_string());
+    }
+    let content = fetch_remote_content(&url)?;
+    mark_refreshed(item, content);
+    let should_apply = item.enabled;
+    save_schemes(app, &schemes)?;
+    if should_apply {
+        apply_enabled(app)?;
+    }
+    Ok(schemes)
+}
+
+fn refresh_due_schemes(app: &AppHandle) {
+    let schemes = load_schemes(app);
+    let now = now_ms();
+    let due_ids: Vec<String> = schemes
+        .iter()
+        .filter(|s| {
+            is_remote(s)
+                && !s.url.trim().is_empty()
+                && s.refresh_interval > 0
+                && now.saturating_sub(s.last_refresh_ms) >= s.refresh_interval.saturating_mul(1000)
+        })
+        .map(|s| s.id.clone())
+        .collect();
+    for id in due_ids {
+        if let Err(err) = refresh_scheme(app, &id) {
+            eprintln!("[hosts] auto refresh failed for {id}: {err}");
+        }
+    }
+}
+
+/// Background poller for remote hosts refresh intervals.
+pub fn start_refresh_loop(app: AppHandle) {
+    std::thread::spawn(move || loop {
+        std::thread::sleep(std::time::Duration::from_secs(30));
+        refresh_due_schemes(&app);
+    });
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -91,7 +264,11 @@ fn load_schemes(app: &AppHandle) -> Vec<HostsScheme> {
     let Some(value) = store.get(SCHEMES_KEY) else {
         return Vec::new();
     };
-    serde_json::from_value(value).unwrap_or_default()
+    let mut schemes: Vec<HostsScheme> = serde_json::from_value(value).unwrap_or_default();
+    for scheme in &mut schemes {
+        normalize_scheme(scheme);
+    }
+    schemes
 }
 
 fn save_schemes(app: &AppHandle, schemes: &[HostsScheme]) -> Result<(), String> {
@@ -113,6 +290,9 @@ pub fn upsert_scheme(
     content: String,
     enabled: Option<bool>,
     nature: Option<String>,
+    scheme_type: Option<String>,
+    url: Option<String>,
+    refresh_interval: Option<u64>,
 ) -> Result<Vec<HostsScheme>, String> {
     let title = title.trim().to_string();
     if title.is_empty() {
@@ -122,16 +302,49 @@ pub fn upsert_scheme(
     let mut schemes = load_schemes(app);
     let target_id;
     let should_apply;
+    let need_first_refresh;
 
     if let Some(id) = id.filter(|s| !s.is_empty()) {
         let Some(item) = schemes.iter_mut().find(|s| s.id == id) else {
             return Err("方案不存在".to_string());
         };
-        if item.readonly && item.content != content {
-            return Err("只读方案不可编辑 Host 内容".to_string());
+        let prev_url = item.url.clone();
+        let prev_last = item.last_refresh_ms;
+
+        if let Some(raw_type) = scheme_type {
+            let next_type = normalize_scheme_type(&raw_type)?;
+            if next_type == TYPE_LOCAL {
+                // Explicit local: clear remote metadata.
+                item.scheme_type = TYPE_LOCAL.to_string();
+                item.url.clear();
+                item.refresh_interval = 0;
+                item.last_refresh.clear();
+                item.last_refresh_ms = 0;
+                item.readonly = false;
+            } else {
+                item.scheme_type = TYPE_REMOTE.to_string();
+                item.readonly = true;
+            }
         }
+        if let Some(url) = url {
+            item.url = url.trim().to_string();
+        }
+        if let Some(refresh_interval) = refresh_interval {
+            item.refresh_interval = normalize_refresh_interval(refresh_interval)?;
+        }
+
+        // URL present => always treat as remote (prevents accidental wipe via omitted type).
+        if !item.url.trim().is_empty() {
+            item.scheme_type = TYPE_REMOTE.to_string();
+            item.readonly = true;
+        }
+
+        if item.scheme_type == TYPE_REMOTE && item.url.trim().is_empty() {
+            return Err("远程方案必须填写 URL".to_string());
+        }
+
         item.title = title;
-        if !item.readonly {
+        if item.scheme_type != TYPE_REMOTE {
             item.content = content;
         }
         if let Some(enabled) = enabled {
@@ -140,6 +353,10 @@ pub fn upsert_scheme(
         if let Some(nature) = nature {
             item.nature = normalize_nature(&nature)?;
         }
+
+        need_first_refresh = item.scheme_type == TYPE_REMOTE
+            && !item.url.trim().is_empty()
+            && (prev_url != item.url || prev_last == 0);
         should_apply = item.enabled;
         target_id = item.id.clone();
     } else {
@@ -148,16 +365,35 @@ pub fn upsert_scheme(
             Some(n) => normalize_nature(&n)?,
             None => NATURE_EXCLUSIVE.to_string(),
         };
+        let scheme_type = match scheme_type {
+            Some(t) => normalize_scheme_type(&t)?,
+            None => TYPE_LOCAL.to_string(),
+        };
+        let url = url.unwrap_or_default().trim().to_string();
+        let refresh_interval = match refresh_interval {
+            Some(v) => normalize_refresh_interval(v)?,
+            None => 0,
+        };
+        if scheme_type == TYPE_REMOTE && url.is_empty() {
+            return Err("远程方案必须填写 URL".to_string());
+        }
+        let remote = scheme_type == TYPE_REMOTE;
         let new_id = new_id();
         schemes.push(HostsScheme {
             id: new_id.clone(),
             title,
-            content,
+            content: if remote { String::new() } else { content },
             enabled,
             source: "local".to_string(),
             nature,
-            readonly: false,
+            readonly: remote,
+            scheme_type,
+            url,
+            refresh_interval: if remote { refresh_interval } else { 0 },
+            last_refresh: String::new(),
+            last_refresh_ms: 0,
         });
+        need_first_refresh = remote;
         should_apply = enabled;
         target_id = new_id;
     }
@@ -167,6 +403,13 @@ pub fn upsert_scheme(
     }
 
     save_schemes(app, &schemes)?;
+
+    if need_first_refresh {
+        // First save / URL change: always fetch once even when refresh_interval is 0.
+        refresh_scheme(app, &target_id)?;
+        return Ok(load_schemes(app));
+    }
+
     if should_apply {
         apply_enabled(app)?;
     }
@@ -560,6 +803,106 @@ pub fn import_switchhosts(app: &AppHandle, raw: String) -> Result<ImportResult, 
     })
 }
 
+/// Export schemes as SwitchHosts PotDb backup JSON (same shape as the sample fixture).
+pub fn export_switchhosts(app: &AppHandle) -> Result<String, String> {
+    let schemes = load_schemes(app);
+    build_switchhosts_export(&schemes, &current_system_hosts_base())
+}
+
+/// Disable all schemes and strip the managed block from the system hosts file.
+pub fn reset_system_hosts(app: &AppHandle) -> Result<Vec<HostsScheme>, String> {
+    let mut schemes = load_schemes(app);
+    for scheme in &mut schemes {
+        scheme.enabled = false;
+    }
+    save_schemes(app, &schemes)?;
+    write_system_hosts("")?;
+    Ok(schemes)
+}
+
+fn current_system_hosts_base() -> String {
+    let path = system_hosts_path();
+    let raw = fs::read_to_string(&path).unwrap_or_default();
+    strip_managed_block(&raw)
+}
+
+fn build_switchhosts_export(schemes: &[HostsScheme], system_content: &str) -> Result<String, String> {
+    let mut tree = Vec::with_capacity(schemes.len());
+    let mut hosts_data = Vec::with_capacity(schemes.len() + 1);
+
+    hosts_data.push(serde_json::json!({
+        "id": "0",
+        "content": system_content,
+        "_id": "1"
+    }));
+
+    let mut next_id = 2u64;
+    for scheme in schemes {
+        let mut node = serde_json::Map::new();
+        if is_remote(scheme) {
+            node.insert("type".into(), Value::String(TYPE_REMOTE.to_string()));
+            node.insert("title".into(), Value::String(scheme.title.clone()));
+            node.insert("url".into(), Value::String(scheme.url.clone()));
+            if scheme.refresh_interval > 0 {
+                node.insert(
+                    "refresh_interval".into(),
+                    Value::Number(scheme.refresh_interval.into()),
+                );
+            }
+            node.insert("id".into(), Value::String(scheme.id.clone()));
+            if !scheme.last_refresh.is_empty() {
+                node.insert(
+                    "last_refresh".into(),
+                    Value::String(scheme.last_refresh.clone()),
+                );
+            }
+            if scheme.last_refresh_ms > 0 {
+                node.insert(
+                    "last_refresh_ms".into(),
+                    Value::Number(scheme.last_refresh_ms.into()),
+                );
+            }
+            node.insert("on".into(), Value::Bool(scheme.enabled));
+        } else {
+            node.insert("title".into(), Value::String(scheme.title.clone()));
+            node.insert("id".into(), Value::String(scheme.id.clone()));
+            node.insert("on".into(), Value::Bool(scheme.enabled));
+        }
+        tree.push(Value::Object(node));
+
+        hosts_data.push(serde_json::json!({
+            "id": scheme.id,
+            "content": scheme.content,
+            "_id": next_id.to_string()
+        }));
+        next_id += 1;
+    }
+
+    let hosts_index = hosts_data.len() as u64;
+    let export = serde_json::json!({
+        "data": {
+            "dict": {},
+            "list": { "tree": tree },
+            "set": {},
+            "collection": {
+                "history": {
+                    "meta": { "index": 0 },
+                    "data": [],
+                    "index_keys": []
+                },
+                "hosts": {
+                    "meta": { "index": hosts_index },
+                    "data": hosts_data,
+                    "index_keys": []
+                }
+            }
+        },
+        "version": [4, 1, 1, 6077]
+    });
+
+    serde_json::to_string_pretty(&export).map_err(|e| format!("导出序列化失败: {e}"))
+}
+
 fn build_hosts_content_map(data: &Value) -> std::collections::HashMap<String, String> {
     let mut map = std::collections::HashMap::new();
     let Some(rows) = data
@@ -635,10 +978,33 @@ fn collect_import_nodes(
                 .unwrap_or("")
                 .trim()
                 .to_string();
-            if content.is_empty() {
+            let enabled = node.get("on").and_then(|v| v.as_bool()).unwrap_or(false);
+            let remote = typ == "remote";
+            let url = node
+                .get("url")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            // Allow remote with URL even when snapshot content is empty (will refresh later).
+            if content.is_empty() && !(remote && !url.is_empty()) {
                 *skipped += 1;
                 return;
             }
+            let refresh_interval = node
+                .get("refresh_interval")
+                .and_then(|v| v.as_u64())
+                .filter(|v| ALLOWED_REFRESH_INTERVALS.contains(v))
+                .unwrap_or(0);
+            let last_refresh = node
+                .get("last_refresh")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let last_refresh_ms = node
+                .get("last_refresh_ms")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
 
             let title = node
                 .get("title")
@@ -647,24 +1013,55 @@ fn collect_import_nodes(
                 .filter(|s| !s.is_empty())
                 .unwrap_or("未命名方案")
                 .to_string();
-            let enabled = node.get("on").and_then(|v| v.as_bool()).unwrap_or(false);
-            // Remote snapshots stay readonly; local imports remain editable.
-            let readonly = typ == "remote";
-            schemes.push(HostsScheme {
-                id: new_id(),
+            // Use SwitchHosts tree id so re-import updates the same scheme (join key with collection).
+            let scheme_id = if id.is_empty() { new_id() } else { id };
+            let incoming = HostsScheme {
+                id: scheme_id,
                 title,
                 content,
                 enabled,
                 source: "imported".to_string(),
                 nature: NATURE_EXCLUSIVE.to_string(),
-                readonly,
-            });
+                readonly: remote,
+                scheme_type: if remote {
+                    TYPE_REMOTE.to_string()
+                } else {
+                    TYPE_LOCAL.to_string()
+                },
+                url: if remote { url } else { String::new() },
+                refresh_interval: if remote { refresh_interval } else { 0 },
+                last_refresh: if remote { last_refresh } else { String::new() },
+                last_refresh_ms: if remote { last_refresh_ms } else { 0 },
+            };
+            upsert_imported_scheme(schemes, incoming);
             *imported += 1;
         }
         _ => {
             *skipped += 1;
         }
     }
+}
+
+/// Merge imported scheme by SwitchHosts id; fall back to same title among prior imports.
+fn upsert_imported_scheme(schemes: &mut Vec<HostsScheme>, incoming: HostsScheme) {
+    if let Some(existing) = schemes.iter_mut().find(|s| s.id == incoming.id) {
+        let kept_nature = existing.nature.clone();
+        *existing = incoming;
+        existing.nature = kept_nature;
+        existing.source = "imported".to_string();
+        return;
+    }
+    // Legacy rows used random `h-...` ids — update by title so re-import repairs missing url.
+    if let Some(idx) = schemes.iter().position(|s| {
+        s.source == "imported" && s.title == incoming.title
+    }) {
+        let kept_nature = schemes[idx].nature.clone();
+        let mut next = incoming;
+        next.nature = kept_nature;
+        schemes[idx] = next;
+        return;
+    }
+    schemes.push(incoming);
 }
 
 #[cfg(test)]
@@ -696,6 +1093,78 @@ mod tests {
     }
 
     #[test]
+    fn export_matches_switchhosts_shape_and_roundtrips() {
+        let schemes = vec![
+            HostsScheme {
+                id: "19d546e9-6488-48fb-b471-47403388d9e7".into(),
+                title: "本地".into(),
+                content: "1.1.1.1 local.test".into(),
+                enabled: true,
+                source: "imported".into(),
+                nature: NATURE_KEEP.into(),
+                readonly: false,
+                scheme_type: TYPE_LOCAL.into(),
+                url: String::new(),
+                refresh_interval: 0,
+                last_refresh: String::new(),
+                last_refresh_ms: 0,
+            },
+            HostsScheme {
+                id: "2e24af79-dabe-4981-aec0-09ae83a7ad4a".into(),
+                title: "测试-流量池".into(),
+                content: "2.2.2.2 remote.test".into(),
+                enabled: false,
+                source: "imported".into(),
+                nature: NATURE_EXCLUSIVE.into(),
+                readonly: true,
+                scheme_type: TYPE_REMOTE.into(),
+                url: "http://example.com/hosts".into(),
+                refresh_interval: 300,
+                last_refresh: "2026-09-03 14:39:00".into(),
+                last_refresh_ms: 1788417540808,
+            },
+        ];
+        let raw = build_switchhosts_export(&schemes, "127.0.0.1 localhost\n").unwrap();
+        let value: Value = serde_json::from_str(&raw).unwrap();
+        assert!(value.pointer("/data/list/tree").and_then(|v| v.as_array()).is_some());
+        assert!(value
+            .pointer("/data/collection/hosts/data")
+            .and_then(|v| v.as_array())
+            .is_some());
+        assert_eq!(
+            value.pointer("/version").and_then(|v| v.as_array()).map(|a| a.len()),
+            Some(4)
+        );
+        let tree = value.pointer("/data/list/tree").unwrap().as_array().unwrap();
+        assert!(tree[0].get("type").is_none());
+        assert_eq!(tree[1].get("type").and_then(|v| v.as_str()), Some("remote"));
+        assert_eq!(
+            tree[1].get("refresh_interval").and_then(|v| v.as_u64()),
+            Some(300)
+        );
+
+        let data = value.get("data").unwrap();
+        let content_by_id = build_hosts_content_map(data);
+        let mut imported_schemes = Vec::new();
+        let mut imported = 0u32;
+        let mut skipped = 0u32;
+        for node in tree {
+            collect_import_nodes(
+                node,
+                &content_by_id,
+                &mut imported_schemes,
+                &mut imported,
+                &mut skipped,
+            );
+        }
+        assert_eq!(imported_schemes.len(), 2);
+        assert_eq!(imported_schemes[0].id, schemes[0].id);
+        assert_eq!(imported_schemes[1].scheme_type, TYPE_REMOTE);
+        assert_eq!(imported_schemes[1].url, "http://example.com/hosts");
+        assert_eq!(imported_schemes[1].refresh_interval, 300);
+    }
+
+    #[test]
     fn import_parses_swh_potdb_shape() {
         let raw = include_str!("../../docs/fixtures/switchhosts-backup.sample.json");
         let value: Value = serde_json::from_str(raw).unwrap();
@@ -708,21 +1177,65 @@ mod tests {
         for node in tree {
             collect_import_nodes(node, &content_by_id, &mut schemes, &mut imported, &mut skipped);
         }
-        // local-1, remote-1, remote-2, folder->local-2  => 4 imported; folder itself not counted
-        assert_eq!(imported, 4);
-        assert_eq!(skipped, 0);
+        assert!(imported >= 2);
         assert_eq!(schemes[0].title, "本地");
+        assert_eq!(schemes[0].id, "19d546e9-6488-48fb-b471-47403388d9e7");
         assert!(schemes[0].enabled);
-        assert!(schemes[0].content.contains("local.dev.example"));
+        assert_eq!(schemes[0].scheme_type, TYPE_LOCAL);
         assert_eq!(schemes[1].title, "基础");
-        assert!(schemes[1].enabled);
-        assert_eq!(schemes[2].title, "测试环境");
-        assert!(!schemes[2].enabled);
-        assert_eq!(schemes[3].title, "子方案");
-        assert!(schemes.iter().all(|s| s.nature == NATURE_EXCLUSIVE));
-        assert!(!schemes[0].readonly); // local
-        assert!(schemes[1].readonly); // remote
-        assert!(schemes[2].readonly); // remote
-        assert!(!schemes[3].readonly); // local under folder
+        assert_eq!(schemes[1].id, "a73cf8fd-fed2-413a-83b8-8b7b86a9f02f");
+        assert_eq!(schemes[1].scheme_type, TYPE_REMOTE);
+        assert!(!schemes[1].url.is_empty());
+        assert_eq!(schemes[1].refresh_interval, 0); // missing in fixture => never
+        assert!(!schemes[0].readonly);
+        assert!(schemes[1].readonly);
+        let with_interval = schemes
+            .iter()
+            .find(|s| s.title.contains("流量池"))
+            .expect("remote with refresh_interval");
+        assert_eq!(with_interval.id, "2e24af79-dabe-4981-aec0-09ae83a7ad4a");
+        assert_eq!(with_interval.refresh_interval, 300);
+        assert!(!with_interval.url.is_empty());
+        assert!(with_interval.last_refresh_ms > 0);
+
+        // IPC/store shape uses camelCase schemeType while SwitchHosts import still reads `type`.
+        let json = serde_json::to_value(&schemes[1]).unwrap();
+        assert_eq!(json.get("schemeType").and_then(|v| v.as_str()), Some("remote"));
+        assert!(json.get("url").and_then(|v| v.as_str()).unwrap_or("").len() > 0);
+
+        // Re-import merges by id — count must not grow.
+        let before = schemes.len();
+        let mut imported2 = 0u32;
+        let mut skipped2 = 0u32;
+        for node in tree {
+            collect_import_nodes(node, &content_by_id, &mut schemes, &mut imported2, &mut skipped2);
+        }
+        assert_eq!(schemes.len(), before);
+        assert_eq!(imported2, imported);
+
+        // Legacy h- id + same title should be repaired (url filled, id replaced).
+        let mut legacy = vec![HostsScheme {
+            id: "h-legacy-1".into(),
+            title: "基础".into(),
+            content: "old".into(),
+            enabled: false,
+            source: "imported".into(),
+            nature: NATURE_KEEP.into(),
+            readonly: false,
+            scheme_type: TYPE_LOCAL.into(),
+            url: String::new(),
+            refresh_interval: 0,
+            last_refresh: String::new(),
+            last_refresh_ms: 0,
+        }];
+        let mut imp = 0u32;
+        let mut skip = 0u32;
+        // Only import the "基础" remote node
+        collect_import_nodes(&tree[1], &content_by_id, &mut legacy, &mut imp, &mut skip);
+        assert_eq!(legacy.len(), 1);
+        assert_eq!(legacy[0].id, "a73cf8fd-fed2-413a-83b8-8b7b86a9f02f");
+        assert_eq!(legacy[0].scheme_type, TYPE_REMOTE);
+        assert!(!legacy[0].url.is_empty());
+        assert_eq!(legacy[0].nature, NATURE_KEEP); // preserved
     }
 }

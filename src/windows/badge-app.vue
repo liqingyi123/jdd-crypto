@@ -166,7 +166,6 @@ function onPointerUp() {
   height: 100%;
   border-radius: var(--badge-radius, 12px);
   object-fit: cover;
-  image-rendering: pixelated;
   pointer-events: none;
   filter: drop-shadow(0 0 4px rgba(255, 120, 110, 0.35))
     drop-shadow(0 0 10px rgba(220, 70, 60, 0.1));

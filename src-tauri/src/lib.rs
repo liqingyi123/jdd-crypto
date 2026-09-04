@@ -5,6 +5,7 @@ mod commands;
 mod compare_mode;
 mod global_shortcuts;
 mod hosts_manager;
+mod hosts_quick;
 mod mouse_follow;
 mod mouse_trail;
 mod plugin_host;
@@ -50,6 +51,7 @@ pub fn run() {
                     if state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
                         mouse_follow::handle_follow_shortcut(app, shortcut);
                         compare_mode::handle_shortcut(app, shortcut);
+                        hosts_quick::handle_shortcut(app, shortcut);
                     }
                 })
                 .build(),
@@ -105,6 +107,7 @@ pub fn run() {
             commands::set_autostart_pref,
             commands::hosts_list,
             commands::hosts_upsert,
+            commands::hosts_refresh,
             commands::hosts_delete,
             commands::hosts_rename,
             commands::hosts_set_nature,
@@ -115,7 +118,12 @@ pub fn run() {
             commands::hosts_request_permission,
             commands::hosts_open_system,
             commands::hosts_import_switchhosts,
+            commands::hosts_export_switchhosts,
+            commands::hosts_reset_system,
             commands::open_hosts_window,
+            commands::hide_hosts_quick,
+            commands::get_hosts_quick_shortcut,
+            commands::set_hosts_quick_shortcut,
             commands::check_app_update,
             commands::download_app_update,
             commands::install_app_update,
@@ -157,6 +165,10 @@ pub fn run() {
             if let Ok(mut current) = app.state::<AppState>().compare_mode_shortcut.lock() {
                 *current = compare_shortcut;
             }
+            let hosts_quick_shortcut = hosts_quick::load_shortcut(app.handle());
+            if let Ok(mut current) = app.state::<AppState>().hosts_quick_shortcut.lock() {
+                *current = hosts_quick_shortcut;
+            }
             mouse_follow::start_follow_loop(app.handle().clone());
             let _ = global_shortcuts::register_all(app.handle());
             if let Some(tip) = app.get_webview_window("compare-tip") {
@@ -168,6 +180,7 @@ pub fn run() {
             }
             mouse_trail::init_from_store(app.handle());
             autostart_pref::sync_from_store(app.handle());
+            crate::hosts_manager::start_refresh_loop(app.handle().clone());
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 if let Ok(result) = app_update::check_update(&handle, false) {

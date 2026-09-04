@@ -11,6 +11,7 @@ pub const MIN_BADGE_SIZE: u32 = 38;
 pub const DEFAULT_BADGE_SIZE: u32 = 68;
 pub const DEFAULT_MOUSE_FOLLOW_SHORTCUT: &str = "Ctrl+Shift+G";
 pub const DEFAULT_COMPARE_MODE_SHORTCUT: &str = "Ctrl+Shift+D";
+pub const DEFAULT_HOSTS_QUICK_SHORTCUT: &str = "Ctrl+Alt+S";
 
 #[derive(Clone, Serialize)]
 pub struct ClipboardCandidate {
@@ -32,6 +33,7 @@ pub struct AppState {
     pub compare_pref_enabled: AtomicBool,
     pub compare_active: AtomicBool,
     pub compare_mode_shortcut: Mutex<String>,
+    pub hosts_quick_shortcut: Mutex<String>,
     pub pending_update: Mutex<Option<UpdateCheckResult>>,
 }
 
@@ -51,6 +53,7 @@ impl Default for AppState {
             compare_pref_enabled: AtomicBool::new(true),
             compare_active: AtomicBool::new(false),
             compare_mode_shortcut: Mutex::new(DEFAULT_COMPARE_MODE_SHORTCUT.to_string()),
+            hosts_quick_shortcut: Mutex::new(DEFAULT_HOSTS_QUICK_SHORTCUT.to_string()),
             pending_update: Mutex::new(None),
         }
     }

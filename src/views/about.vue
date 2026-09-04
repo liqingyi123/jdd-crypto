@@ -99,7 +99,6 @@ function onCheckUpdate() {
   height: 56px;
   border-radius: 10px;
   object-fit: cover;
-  image-rendering: pixelated;
   margin-bottom: 12px;
 }
 

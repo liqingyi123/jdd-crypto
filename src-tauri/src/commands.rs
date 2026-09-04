@@ -424,8 +424,29 @@ pub fn hosts_upsert(
     content: String,
     enabled: Option<bool>,
     nature: Option<String>,
+    scheme_type: Option<String>,
+    url: Option<String>,
+    refresh_interval: Option<u64>,
 ) -> Result<Vec<crate::hosts_manager::HostsScheme>, String> {
-    crate::hosts_manager::upsert_scheme(&app, id, title, content, enabled, nature)
+    crate::hosts_manager::upsert_scheme(
+        &app,
+        id,
+        title,
+        content,
+        enabled,
+        nature,
+        scheme_type,
+        url,
+        refresh_interval,
+    )
+}
+
+#[tauri::command]
+pub fn hosts_refresh(
+    app: AppHandle,
+    id: String,
+) -> Result<Vec<crate::hosts_manager::HostsScheme>, String> {
+    crate::hosts_manager::refresh_scheme(&app, &id)
 }
 
 #[tauri::command]
@@ -497,8 +518,47 @@ pub fn hosts_import_switchhosts(
 }
 
 #[tauri::command]
+pub fn hosts_export_switchhosts(app: AppHandle) -> Result<String, String> {
+    crate::hosts_manager::export_switchhosts(&app)
+}
+
+#[tauri::command]
+pub fn hosts_reset_system(app: AppHandle) -> Result<Vec<crate::hosts_manager::HostsScheme>, String> {
+    crate::hosts_manager::reset_system_hosts(&app)
+}
+
+#[tauri::command]
 pub fn open_hosts_window(app: AppHandle) {
     windows::show_feature(&app, "hosts");
+}
+
+#[tauri::command]
+pub fn hide_hosts_quick(app: AppHandle) {
+    crate::hosts_quick::hide(&app);
+}
+
+#[tauri::command]
+pub fn get_hosts_quick_shortcut(state: State<AppState>) -> String {
+    state
+        .hosts_quick_shortcut
+        .lock()
+        .map(|guard| guard.clone())
+        .unwrap_or_else(|_| crate::state::DEFAULT_HOSTS_QUICK_SHORTCUT.to_string())
+}
+
+#[tauri::command]
+pub fn set_hosts_quick_shortcut(
+    app: AppHandle,
+    state: State<AppState>,
+    shortcut: String,
+) -> Result<String, String> {
+    let normalized = crate::mouse_follow::validate_shortcut(&shortcut)?;
+    if let Ok(mut current) = state.hosts_quick_shortcut.lock() {
+        *current = normalized.clone();
+    }
+    crate::hosts_quick::save_shortcut(&app, &normalized);
+    crate::global_shortcuts::register_all(&app)?;
+    Ok(normalized)
 }
 
 #[tauri::command]
