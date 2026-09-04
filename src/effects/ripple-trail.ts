@@ -5,30 +5,35 @@
  * Niklas Knaack WaterRippleEffect (MIT). Calm pixels stay fully transparent —
  * only mouse-driven ripples are drawn (no full-screen veil).
  *
- * Ripple color uses mid-cool gray with signed highlight/shadow so rings stay
- * readable on both light and dark desktops. Not user-customizable.
+ * Ripple color uses soft mid-cool gray with mild highlight/shadow so rings stay
+ * readable on dark desktops without staining white ones. Not user-customizable.
  */
 import type { MouseTrailEngine } from "./mouse-trail-types";
 
 /** Mid caustic base (refracted for texture). */
-const BASE_RGB: [number, number, number] = [138, 140, 146];
-/** Crest — neutral gray, visible on dark UI without glare. */
-const HIGHLIGHT_RGB: [number, number, number] = [210, 212, 216];
-/** Trough — gray-black, visible on light UI without heavy stain. */
-const SHADOW_RGB: [number, number, number] = [42, 44, 48];
+const BASE_RGB: [number, number, number] = [168, 172, 178];
+/** Crest — soft light gray (readable on dark UI, gentle on light). */
+const HIGHLIGHT_RGB: [number, number, number] = [208, 212, 218];
+/** Trough — mid cool gray (avoid near-black stains on white desktops). */
+const SHADOW_RGB: [number, number, number] = [128, 132, 138];
 
 const SIM_SCALE = 0.45;
 const MAX_SIM_WIDTH = 960;
-const RIPPLE_RADIUS = 2;
-/** Tighter spacing along the path for a more continuous trail. */
-const DISTURB_THRESHOLD_SQ = 12;
+/** Soft circular kernel radius (sim pixels). */
+const RIPPLE_RADIUS = 6;
+/** Path sample spacing — denser than radius so stamps fuse into a continuous band. */
+const DISTURB_STEP = 2.5;
+/** Peak impulse at kernel center; soft falloff keeps dense samples from overdriving. */
 const DISTURB_IMPULSE = 280;
 /** Below this |height|, pixel stays invisible. */
-const ENERGY_FLOOR = 12;
+const ENERGY_FLOOR = 8;
 const ENERGY_SCALE = 200;
-const MAX_RIPPLE_ALPHA = 0.34;
-/** Higher shift → faster fade (shorter linger). */
-const DECAY_SHIFT = 4.9;
+/** Soft overall opacity — lower avoids harsh ink-like stains on white. */
+const MAX_RIPPLE_ALPHA = 0.22;
+/** Troughs draw lighter than crests so white backgrounds stay clean. */
+const TROUGH_ALPHA_SCALE = 0.62;
+/** Lower shift → stronger damping (fewer oscillation cycles). */
+const DECAY_SHIFT = 4;
 
 function hashNoise(x: number, y: number): number {
   const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
@@ -102,16 +107,28 @@ export class RippleTrail implements MouseTrailEngine {
   setMouse(x: number, y: number): void {
     const sx = x * this.scaleX;
     const sy = y * this.scaleY;
-    if (this.lastMx >= 0) {
-      const dx = sx - this.lastMx;
-      const dy = sy - this.lastMy;
-      if (dx * dx + dy * dy < DISTURB_THRESHOLD_SQ) {
-        return;
-      }
+    if (this.lastMx < 0) {
+      this.lastMx = sx;
+      this.lastMy = sy;
+      this.disturb(sx, sy);
+      return;
+    }
+
+    const dx = sx - this.lastMx;
+    const dy = sy - this.lastMy;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 0.5) {
+      return;
+    }
+
+    const steps = Math.max(1, Math.ceil(dist / DISTURB_STEP));
+    const inv = 1 / steps;
+    for (let s = 1; s <= steps; s += 1) {
+      const t = s * inv;
+      this.disturb(this.lastMx + dx * t, this.lastMy + dy * t);
     }
     this.lastMx = sx;
     this.lastMy = sy;
-    this.disturb(sx, sy);
   }
 
   leaveScreen(): void {
@@ -209,17 +226,24 @@ export class RippleTrail implements MouseTrailEngine {
     if (w <= 0 || h <= 0) {
       return;
     }
-    const ix = x | 0;
-    const iy = y | 0;
     const r = RIPPLE_RADIUS;
+    const rSq = r * r;
     const base = this.oldPage;
     const wave = this.wave;
-    for (let j = iy - r; j < iy + r; j += 1) {
-      for (let i = ix - r; i < ix + r; i += 1) {
-        if (i < 0 || i >= w || j < 0 || j >= h) {
+    const x0 = Math.max(0, Math.floor(x - r));
+    const x1 = Math.min(w - 1, Math.ceil(x + r));
+    const y0 = Math.max(0, Math.floor(y - r));
+    const y1 = Math.min(h - 1, Math.ceil(y + r));
+    for (let j = y0; j <= y1; j += 1) {
+      const dy = j + 0.5 - y;
+      for (let i = x0; i <= x1; i += 1) {
+        const dx = i + 0.5 - x;
+        const dSq = dx * dx + dy * dy;
+        if (dSq >= rSq) {
           continue;
         }
-        wave[base + j * w + i] += DISTURB_IMPULSE;
+        const falloff = 1 - dSq / rSq;
+        wave[base + j * w + i] += (DISTURB_IMPULSE * falloff * falloff) | 0;
       }
     }
   }
@@ -289,9 +313,11 @@ export class RippleTrail implements MouseTrailEngine {
 
         const srcI = (sampleX + sampleY * w) * 4;
         const energy = Math.min(1, absH / ENERGY_SCALE);
+        // Quadratic falloff softens outer rings; troughs use lighter alpha on white UIs.
+        const soft = energy * energy;
         const phase = height > 0 ? 1 : -1;
         const tone = (phase + 1) * 0.5;
-        const baseMix = 0.48;
+        const baseMix = 0.62;
         const r =
           src[srcI] * baseMix +
           HIGHLIGHT_RGB[0] * tone * (1 - baseMix) +
@@ -305,10 +331,14 @@ export class RippleTrail implements MouseTrailEngine {
           HIGHLIGHT_RGB[2] * tone * (1 - baseMix) +
           SHADOW_RGB[2] * (1 - tone) * (1 - baseMix);
 
+        const alphaScale = height < 0 ? TROUGH_ALPHA_SCALE : 1;
         dst[dstI] = Math.min(255, Math.round(r));
         dst[dstI + 1] = Math.min(255, Math.round(g));
         dst[dstI + 2] = Math.min(255, Math.round(b));
-        dst[dstI + 3] = Math.min(255, Math.round(energy * MAX_RIPPLE_ALPHA * 255));
+        dst[dstI + 3] = Math.min(
+          255,
+          Math.round(soft * MAX_RIPPLE_ALPHA * alphaScale * 255),
+        );
 
         cursor += 1;
         pixel += 1;
