@@ -795,6 +795,9 @@ onMounted(() => {
 onBeforeUnmount(() => {
   unlistenHostsSwitched?.();
 });
+
+/** Toolbar 新建/导入/导出暂关；保留入口便于恢复。 */
+defineExpose({ openCreateDialog, triggerImport, exportSwitchhosts });
 </script>
 
 <template>
