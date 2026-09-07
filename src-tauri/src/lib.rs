@@ -75,7 +75,6 @@ pub fn run() {
             commands::set_theme_pref,
             commands::set_clipboard_watch,
             commands::get_clipboard_watch,
-            commands::crypto_transform,
             commands::get_mouse_follow_shortcut,
             commands::set_mouse_follow_shortcut,
             commands::get_mouse_follow_pref,

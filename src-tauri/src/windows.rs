@@ -130,15 +130,12 @@ const DEFAULT_THEME_PREF: &str = "system";
 const BADGE_EDGE_MARGIN: f64 = 50.0;
 
 pub const CLIPBOARD_PROMPT_LABEL: &str = "clipboard-prompt";
-/// Logical size of the near-cursor clipboard prompt card window.
-const CLIPBOARD_PROMPT_WIDTH: f64 = 244.0;
-const CLIPBOARD_PROMPT_HEIGHT: f64 = 116.0;
 pub const CRYPTO_BUBBLE_LABEL: &str = "crypto-bubble";
 const CRYPTO_BUBBLE_WIDTH: f64 = 480.0;
 const CRYPTO_BUBBLE_HEIGHT: f64 = 360.0;
 const SHORT_TEXT_BUBBLE_LIMIT: usize = 1100;
 #[cfg(windows)]
-const CLIPBOARD_PROMPT_CURSOR_OFFSET: i32 = 16;
+const POPUP_CURSOR_OFFSET: i32 = 16;
 
 static SUPPRESS_BADGE_POS_SAVE: AtomicBool = AtomicBool::new(false);
 static BADGE_MOVE_SEQ: AtomicU64 = AtomicU64::new(0);
@@ -436,115 +433,10 @@ pub fn apply_badge_window_size(app: &AppHandle, size: u32, expanded: bool) {
     }
 }
 
-/// Show (or create) the clipboard prompt near the cursor. Must run on the main thread.
-pub fn show_clipboard_prompt(app: &AppHandle) {
-    use crate::state::AppState;
-
-    // Only hide the bubble window; do not clear pending mid-flight with a concurrent show.
-    hide_crypto_bubble_window(app);
-
-    let (cursor_x, cursor_y) = cursor_pos().unwrap_or((0, 0));
-    let target = clamp_popup_origin(
-        app,
-        cursor_x,
-        cursor_y,
-        CLIPBOARD_PROMPT_WIDTH,
-        CLIPBOARD_PROMPT_HEIGHT,
-    );
-
-    let ensure_emit = |win: &WebviewWindow| {
-        if let Ok(guard) = app.state::<AppState>().last_candidate.lock() {
-            if let Some(payload) = guard.as_ref() {
-                let _ = win.emit("clipboard://candidate", payload);
-            }
-        }
-    };
-
-    if let Some(win) = app.get_webview_window(CLIPBOARD_PROMPT_LABEL) {
-        let _ = win.set_size(tauri::LogicalSize::new(
-            CLIPBOARD_PROMPT_WIDTH,
-            CLIPBOARD_PROMPT_HEIGHT,
-        ));
-        let _ = win.set_position(PhysicalPosition::new(target.0, target.1));
-        let _ = win.set_always_on_top(true);
-        // Do not focus — keep the user's original input focused.
-        let _ = win.show();
-        ensure_emit(&win);
-        let handle = app.clone();
-        thread::spawn(move || {
-            thread::sleep(Duration::from_millis(200));
-            if let Some(win) = handle.get_webview_window(CLIPBOARD_PROMPT_LABEL) {
-                if let Ok(guard) = handle.state::<AppState>().last_candidate.lock() {
-                    if let Some(payload) = guard.as_ref() {
-                        let _ = win.emit("clipboard://candidate", payload);
-                    }
-                }
-            }
-        });
-        return;
-    }
-
-    let result = WebviewWindowBuilder::new(
-        app,
-        CLIPBOARD_PROMPT_LABEL,
-        WebviewUrl::App("index.html".into()),
-    )
-    .title("剪贴板询问")
-    .decorations(false)
-    .transparent(true)
-    .shadow(false)
-    .background_color(Color(0, 0, 0, 0))
-    .always_on_top(true)
-    .skip_taskbar(true)
-    .resizable(false)
-    .maximizable(false)
-    .minimizable(false)
-    .focused(false)
-    .visible(true)
-    .inner_size(CLIPBOARD_PROMPT_WIDTH, CLIPBOARD_PROMPT_HEIGHT)
-    .build();
-
-    if let Ok(win) = result {
-        let _ = win.set_position(PhysicalPosition::new(target.0, target.1));
-        let _ = win.set_always_on_top(true);
-        if let Some(badge) = app.get_webview_window("badge") {
-            let _ = badge.set_always_on_top(true);
-        }
-        let _ = win.set_always_on_top(true);
-        ensure_emit(&win);
-        let handle = app.clone();
-        thread::spawn(move || {
-            thread::sleep(Duration::from_millis(250));
-            if let Some(win) = handle.get_webview_window(CLIPBOARD_PROMPT_LABEL) {
-                if let Ok(guard) = handle.state::<AppState>().last_candidate.lock() {
-                    if let Some(payload) = guard.as_ref() {
-                        let _ = win.emit("clipboard://candidate", payload);
-                    }
-                }
-            }
-        });
-    }
-}
-
 pub fn hide_clipboard_prompt(app: &AppHandle) {
     if let Some(win) = app.get_webview_window(CLIPBOARD_PROMPT_LABEL) {
         let _ = win.hide();
     }
-}
-
-pub fn schedule_show_clipboard_prompt(app: &AppHandle) {
-    let handle = app.clone();
-    let _ = handle.clone().run_on_main_thread(move || {
-        show_clipboard_prompt(&handle);
-    });
-}
-
-#[allow(dead_code)]
-pub fn schedule_hide_clipboard_prompt(app: &AppHandle) {
-    let handle = app.clone();
-    let _ = handle.clone().run_on_main_thread(move || {
-        hide_clipboard_prompt(&handle);
-    });
 }
 
 pub fn is_short_bubble_text(text: &str) -> bool {
@@ -687,7 +579,7 @@ fn clamp_popup_origin(
     logical_height: f64,
 ) -> (i32, i32) {
     #[cfg(windows)]
-    let offset = CLIPBOARD_PROMPT_CURSOR_OFFSET;
+    let offset = POPUP_CURSOR_OFFSET;
     #[cfg(not(windows))]
     let offset = 16;
     clamp_popup_origin_with_offset(

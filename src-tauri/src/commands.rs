@@ -1,4 +1,3 @@
-use serde::{Deserialize, Serialize};
 use std::sync::atomic::Ordering;
 use tauri::{AppHandle, Manager, State, WebviewWindow};
 use tauri_plugin_clipboard_manager::ClipboardExt;
@@ -6,22 +5,6 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 use crate::state::AppState;
 use crate::windows::{self, CryptoHint};
 use crate::tray;
-
-#[derive(Deserialize)]
-pub struct CryptoRequest {
-    pub mode: String,
-    pub algorithm: String,
-    pub key_id: Option<String>,
-    pub iv_id: Option<String>,
-    pub plaintext: Option<String>,
-    pub ciphertext: Option<String>,
-}
-
-#[derive(Serialize)]
-pub struct CryptoResponse {
-    pub ok: bool,
-    pub result: String,
-}
 
 #[tauri::command]
 pub fn navigate_main(
@@ -185,13 +168,6 @@ pub fn set_clipboard_watch(app: AppHandle, state: State<AppState>, enabled: bool
 #[tauri::command]
 pub fn get_clipboard_watch(state: State<AppState>) -> bool {
     state.clipboard_watch_enabled.load(Ordering::Relaxed)
-}
-
-#[tauri::command]
-pub fn crypto_transform(request: CryptoRequest) -> Result<CryptoResponse, String> {
-    let _ = request;
-    // AES 主路径在前端 crypto-js；此命令保留兼容，暂未实现。
-    Err("crypto_transform 未实现：请使用前端 AES 工作台".to_string())
 }
 
 #[tauri::command]
