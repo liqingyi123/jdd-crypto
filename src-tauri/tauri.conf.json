@@ -103,7 +103,6 @@
     "active": true,
     "targets": "all",
     "resources": {
-      "plugins": "plugins",
       "icons/icon.ico": "desktop-icon.ico"
     },
     "icon": [

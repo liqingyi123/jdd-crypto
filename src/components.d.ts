@@ -30,7 +30,6 @@ declare module 'vue' {
     ElTag: typeof import('element-plus/es')['ElTag']
     MonacoEditor: typeof import('./components/monaco-editor.vue')['default']
     OverlayToast: typeof import('./components/overlay-toast.vue')['default']
-    PluginTypeCard: typeof import('./components/plugin-type-card.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
   }

@@ -82,6 +82,7 @@ const autostartEnabled = shallowRef(false);
 const trailEnabled = shallowRef(DEFAULT_MOUSE_TRAIL_PREF.enabled);
 const trailEffect = shallowRef<MouseTrailEffect>(DEFAULT_MOUSE_TRAIL_PREF.effect);
 const trailColors = shallowRef<MouseTrailColors>({ ...DEFAULT_MOUSE_TRAIL_COLORS });
+const committedTrailColors = shallowRef<MouseTrailColors>({ ...DEFAULT_MOUSE_TRAIL_COLORS });
 const trailColorsResetting = shallowRef(false);
 
 const activeColorEffect = computed((): ColorableTrailEffect | null => {
@@ -110,10 +111,73 @@ const trailEffectOptions: Array<{ value: MouseTrailEffect; label: string; shortc
 ];
 
 let unlistenTrailPref: UnlistenFn | null = null;
+let trailColorPersistTimer: ReturnType<typeof setTimeout> | null = null;
+let trailColorPersistToken = 0;
+
 function applyTrailPref(pref: MouseTrailPref) {
   trailEnabled.value = pref.enabled;
   trailEffect.value = normalizeMouseTrailEffect(pref.effect);
-  trailColors.value = normalizeMouseTrailColors(pref.colors);
+  const colors = normalizeMouseTrailColors(pref.colors);
+  trailColors.value = colors;
+  committedTrailColors.value = { ...colors };
+}
+
+function clearTrailColorPersistTimer() {
+  if (trailColorPersistTimer !== null) {
+    clearTimeout(trailColorPersistTimer);
+    trailColorPersistTimer = null;
+  }
+}
+
+function optimisticTrailColor(effect: ColorableTrailEffect, color: string) {
+  trailColors.value = {
+    ...trailColors.value,
+    [effect]: color,
+  };
+}
+
+async function persistTrailColor(color: string) {
+  const effect = activeColorEffect.value;
+  if (!effect) {
+    return;
+  }
+  const rollback = committedTrailColors.value[effect];
+  optimisticTrailColor(effect, color);
+  const token = ++trailColorPersistToken;
+  try {
+    const pref = await invoke<MouseTrailPref>("set_mouse_trail_color", { effect, color });
+    if (token !== trailColorPersistToken) {
+      return;
+    }
+    applyTrailPref(pref);
+  } catch (error) {
+    if (token !== trailColorPersistToken) {
+      return;
+    }
+    optimisticTrailColor(effect, rollback);
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
+}
+
+function onTrailColorActiveChange(color: string | null) {
+  const effect = activeColorEffect.value;
+  if (!color || !effect) {
+    return;
+  }
+  optimisticTrailColor(effect, color);
+  clearTrailColorPersistTimer();
+  trailColorPersistTimer = setTimeout(() => {
+    trailColorPersistTimer = null;
+    void persistTrailColor(color);
+  }, 100);
+}
+
+function onTrailColorChange(color: string | null) {
+  if (!color) {
+    return;
+  }
+  clearTrailColorPersistTimer();
+  void persistTrailColor(color);
 }
 
 onMounted(async () => {
@@ -167,6 +231,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  clearTrailColorPersistTimer();
   void unlistenTrailPref?.();
 });
 
@@ -286,24 +351,13 @@ async function onTrailEffectChange(value: string | number | boolean | undefined)
   }
 }
 
-async function onTrailColorChange(color: string | null) {
-  const effect = activeColorEffect.value;
-  if (!color || !effect) {
-    return;
-  }
-  try {
-    const pref = await invoke<MouseTrailPref>("set_mouse_trail_color", { effect, color });
-    applyTrailPref(pref);
-  } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : String(error));
-  }
-}
-
 async function onTrailColorReset() {
   const effect = activeColorEffect.value;
   if (!effect) {
     return;
   }
+  clearTrailColorPersistTimer();
+  trailColorPersistToken += 1;
   trailColorsResetting.value = true;
   try {
     const pref = await invoke<MouseTrailPref>("reset_mouse_trail_colors", { effect });
@@ -404,6 +458,9 @@ async function onThemeChange(value: string | number | boolean | undefined) {
         <div class="row trail-color-row">
           <ElColorPicker
             :model-value="trailColors[activeColorEffect]"
+            :clearable="false"
+            popper-class="trail-color-picker"
+            @active-change="onTrailColorActiveChange"
             @change="onTrailColorChange"
           />
           <ElButton :loading="trailColorsResetting" @click="onTrailColorReset">
@@ -569,5 +626,13 @@ p {
 
 .error {
   color: var(--danger, #c0392b);
+}
+</style>
+
+<!-- ColorPicker 面板 teleport 到 body；EP 2.x 确认按钮类名为 el-color-footer__btn -->
+<style>
+.trail-color-picker .el-color-footer__btn,
+.trail-color-picker .el-color-footer__link-btn {
+  display: none !important;
 }
 </style>

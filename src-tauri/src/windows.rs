@@ -35,22 +35,6 @@ fn feature_spec(label: &str) -> Option<FeatureSpec> {
             min_width: 560.0,
             min_height: 420.0,
         }),
-        "feedback" => Some(FeatureSpec {
-            label: "feedback",
-            title: "意见反馈",
-            width: 720.0,
-            height: 560.0,
-            min_width: 560.0,
-            min_height: 420.0,
-        }),
-        "plugins" => Some(FeatureSpec {
-            label: "plugins",
-            title: "插件管理",
-            width: 720.0,
-            height: 560.0,
-            min_width: 560.0,
-            min_height: 420.0,
-        }),
         "hosts" => Some(FeatureSpec {
             label: "hosts",
             title: "Host管理",

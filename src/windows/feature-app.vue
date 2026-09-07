@@ -2,8 +2,6 @@
 import { computed, type Component } from "vue";
 import { useSystemTheme } from "@/composables/use-system-theme";
 import Settings from "@/views/settings.vue";
-import Feedback from "@/views/feedback.vue";
-import Plugins from "@/views/plugins.vue";
 import About from "@/views/about.vue";
 import Hosts from "@/views/hosts.vue";
 import zhCn from "element-plus/es/locale/lang/zh-cn";
@@ -16,8 +14,6 @@ const props = defineProps<{
 
 const pages: Record<string, { title: string; component: Component }> = {
   settings: { title: "功能设置", component: Settings },
-  feedback: { title: "意见反馈", component: Feedback },
-  plugins: { title: "插件管理", component: Plugins },
   about: { title: "关于", component: About },
   hosts: { title: "Host管理", component: Hosts },
 };

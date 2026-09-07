@@ -1,6 +1,6 @@
 # 多多解密
 
-基于 **Tauri 2 + Vue 3 + TypeScript** 的桌面加解密工具。主路径 AES（CBC / PKCS7）在前端通过 crypto-js 完成；插件运行时装载仍为后续迭代（插件页标明「开发中」）。
+基于 **Tauri 2 + Vue 3 + TypeScript** 的桌面加解密工具。主路径 AES（CBC / PKCS7）在前端通过 crypto-js 完成。
 
 目标平台：Windows / macOS / Linux。
 
@@ -8,13 +8,12 @@
 
 - 悬浮角标：可拖动；左键打开主界面；右键弹出菜单
 - 系统托盘：左键打开主界面；右键菜单与角标一致
-- 独立功能窗口：打开主界面只显示加解密；功能设置、意见反馈、插件管理、关于、Hosts 各自单独成窗（无侧栏切换）
+- 独立功能窗口：打开主界面只显示加解密；功能设置、关于、Hosts 各自单独成窗（无侧栏切换）
 - AES 工作台：内置业务预设 / 自定义 Key·IV，支持加密、解密、转 KV，操作历史本地保存
 - 剪贴板监听：识别文本变化后提示是否立即加密/解密（可在设置中关闭）
 - 鼠标跟随（`Ctrl+Shift+G`）：角标跟随光标，点击/拖选/双击选中文本后自动复制并打开加解密（macOS 需辅助功能权限，见下）
 - 对照模式、Hosts 方案管理 / 快捷切换、鼠标轨迹特效
 - 主题：跟随系统深浅色，也可强制浅色/深色
-- 插件：扫描 `plugin.json` 清单；编辑器主题 / 加解密预设槽位 UI 已就绪，运行时装载仍为 Phase 0
 
 ## 开发启动
 
@@ -40,8 +39,6 @@ npm run dev
 # 角标：  http://localhost:1420/?window=badge
 # 关于：  http://localhost:1420/?window=about
 # 设置：  http://localhost:1420/?window=settings
-# 反馈：  http://localhost:1420/?window=feedback
-# 插件：  http://localhost:1420/?window=plugins
 ```
 
 官网（独立于桌面端构建）：
@@ -139,50 +136,23 @@ macOS 与 Windows **共用**内网目录与同一份更新日志：
 2.说明二
 ```
 
-**不必改**：各 `src-tauri/plugins/*/plugin.json` 的 `version`（插件独立版本，与应用发版无关）。
-
 ## 目录约定
 
 ```text
 src/                         Vue 前端
   windows/                   badge / main / feature 窗口根组件
   views/                     各独立窗口页面
-  stores/                    Pinia（theme / clipboard / plugins / app）
-  composables/               主题、剪贴板提示、窗口拖动
-  plugins-runtime/           JS 插件加载器与沙箱扩展点
+  stores/                    Pinia（theme / clipboard / app）
+  composables/               主题、剪贴板提示等
   services/aes-ops.ts        前端 AES 编排（主路径）
   website/                   官网（独立 Vite 构建）
 src-tauri/                   Rust 核心
   src/windows.rs             窗口显示、按需创建功能窗、角标尺寸
   src/tray.rs                托盘与统一菜单
   src/clipboard.rs           剪贴板轮询与候选事件
-  src/plugin_host.rs         插件目录扫描
   src/commands.rs            前端可调用命令
-  plugins/<id>/plugin.json   开发期示例插件
 ```
-
-### 插件包
-
-每个插件一个目录：
-
-```text
-plugins/<id>/
-  plugin.json
-  index.js
-```
-
-`plugin.json` 关键字段：`id`、`name`、`version`、`entry`、`permissions`、`contributes`。
-
-搜索路径：
-
-1. 应用资源目录 `plugins/`
-2. 用户数据目录 `plugins/`
-3. 开发期 `src-tauri/plugins/`
-
-安全底线：只加载 JS/WASM + 宿主 API，不加载任意 `.dll/.so`。
 
 ## 后续迭代
 
 1. 角标位置持久化、主窗口深链与提示 UI 打磨
-2. 反馈通道接入（当前为占位页）
-3. iframe 沙箱真正执行插件；落地 monaco 主题 / crypto-presets 贡献点

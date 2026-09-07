@@ -9,7 +9,6 @@ mod hosts_quick;
 mod mouse_follow;
 mod mouse_trail;
 mod overlay_toast;
-mod plugin_host;
 mod state;
 mod tray;
 mod windows;
@@ -76,7 +75,6 @@ pub fn run() {
             commands::set_theme_pref,
             commands::set_clipboard_watch,
             commands::get_clipboard_watch,
-            commands::list_plugins,
             commands::crypto_transform,
             commands::get_mouse_follow_shortcut,
             commands::set_mouse_follow_shortcut,
@@ -93,10 +91,6 @@ pub fn run() {
             commands::get_compare_bubble_payload,
             commands::begin_shortcut_capture,
             commands::end_shortcut_capture,
-            commands::get_plugin_slots,
-            commands::set_plugin_slot_enabled,
-            commands::import_plugin,
-            commands::reset_plugin_slot,
             commands::get_mouse_trail_monitor_bounds,
             commands::get_mouse_trail_pref,
             commands::set_mouse_trail_enabled,

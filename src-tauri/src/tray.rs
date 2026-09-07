@@ -9,8 +9,6 @@ pub fn build_app_menu<R: Runtime, M: Manager<R>>(app: &M) -> tauri::Result<Menu<
     let show_main = MenuItem::with_id(app, "show_main", "打开主界面", true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "功能设置", true, None::<&str>)?;
     let hosts = MenuItem::with_id(app, "hosts", "Host管理", true, None::<&str>)?;
-    let feedback = MenuItem::with_id(app, "feedback", "意见反馈", true, None::<&str>)?;
-    let plugins = MenuItem::with_id(app, "plugins", "插件管理", true, None::<&str>)?;
     let about = MenuItem::with_id(app, "about", "关于", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
     let sep = PredefinedMenuItem::separator(app)?;
@@ -21,8 +19,6 @@ pub fn build_app_menu<R: Runtime, M: Manager<R>>(app: &M) -> tauri::Result<Menu<
             &show_main,
             &settings,
             &hosts,
-            &feedback,
-            &plugins,
             &about,
             &sep,
             &quit,
@@ -35,8 +31,6 @@ pub fn handle_menu_id(app: &AppHandle, id: &str) {
         "show_main" => windows::show_main(app, None),
         "settings" => windows::show_feature(app, "settings"),
         "hosts" => windows::show_feature(app, "hosts"),
-        "feedback" => windows::show_feature(app, "feedback"),
-        "plugins" => windows::show_feature(app, "plugins"),
         "about" => windows::show_feature(app, "about"),
         "quit" => app.exit(0),
         _ => {}

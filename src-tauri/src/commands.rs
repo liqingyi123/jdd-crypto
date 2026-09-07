@@ -5,7 +5,7 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 
 use crate::state::AppState;
 use crate::windows::{self, CryptoHint};
-use crate::{plugin_host, tray};
+use crate::tray;
 
 #[derive(Deserialize)]
 pub struct CryptoRequest {
@@ -188,11 +188,6 @@ pub fn get_clipboard_watch(state: State<AppState>) -> bool {
 }
 
 #[tauri::command]
-pub fn list_plugins(app: AppHandle) -> Vec<plugin_host::PluginManifest> {
-    plugin_host::scan_plugins(&app)
-}
-
-#[tauri::command]
 pub fn crypto_transform(request: CryptoRequest) -> Result<CryptoResponse, String> {
     let _ = request;
     // AES 主路径在前端 crypto-js；此命令保留兼容，暂未实现。
@@ -321,38 +316,6 @@ pub fn begin_shortcut_capture(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn end_shortcut_capture(app: AppHandle) -> Result<(), String> {
     crate::mouse_follow::register_current(&app)
-}
-
-#[tauri::command]
-pub fn get_plugin_slots(app: AppHandle) -> plugin_host::PluginSlotsState {
-    plugin_host::get_plugin_slots(app)
-}
-
-#[tauri::command]
-pub fn set_plugin_slot_enabled(
-    app: AppHandle,
-    kind: String,
-    enabled: bool,
-) -> Result<plugin_host::PluginSlotsState, String> {
-    plugin_host::set_plugin_slot_enabled(app, kind, enabled)
-}
-
-#[tauri::command]
-pub fn import_plugin(
-    app: AppHandle,
-    kind: String,
-    file_name: String,
-    bytes: Vec<u8>,
-) -> Result<plugin_host::PluginSlotsState, String> {
-    plugin_host::import_plugin(app, kind, file_name, bytes)
-}
-
-#[tauri::command]
-pub fn reset_plugin_slot(
-    app: AppHandle,
-    kind: String,
-) -> Result<plugin_host::PluginSlotsState, String> {
-    plugin_host::reset_plugin_slot(app, kind)
 }
 
 #[tauri::command]
