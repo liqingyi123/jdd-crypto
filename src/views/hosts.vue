@@ -4,65 +4,15 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { ElMessage, ElMessageBox } from "element-plus";
 import MonacoEditor from "@/components/monaco-editor.vue";
-
-type HostNature = "keep" | "exclusive";
-type HostSchemeType = "local" | "remote";
+import {
+  normalizeScheme,
+  normalizeSchemes,
+  type HostNature,
+  type HostSchemeType,
+  type HostsScheme,
+} from "@/utils/hosts-scheme";
 
 const SYSTEM_ID = "__system__";
-
-interface HostsScheme {
-  id: string;
-  title: string;
-  content: string;
-  enabled: boolean;
-  source: string;
-  nature: HostNature;
-  readonly: boolean;
-  /** App IPC: schemeType; SwitchHosts import source field: type */
-  type?: HostSchemeType;
-  schemeType?: HostSchemeType;
-  url: string;
-  refresh_interval?: number;
-  refreshInterval?: number;
-  last_refresh?: string;
-  lastRefresh?: string;
-  last_refresh_ms?: number;
-  lastRefreshMs?: number;
-}
-
-function normalizeScheme(raw: HostsScheme): HostsScheme {
-  const url = (raw.url ?? "").trim();
-  const rawType = String(raw.schemeType ?? raw.type ?? "").toLowerCase();
-  const type: HostSchemeType =
-    rawType === "remote" || url.length > 0 ? "remote" : "local";
-  const refresh_interval = Number(
-    raw.refreshInterval ?? raw.refresh_interval ?? 0,
-  );
-  const last_refresh = String(raw.lastRefresh ?? raw.last_refresh ?? "");
-  const last_refresh_ms = Number(
-    raw.lastRefreshMs ?? raw.last_refresh_ms ?? 0,
-  );
-  return {
-    ...raw,
-    type,
-    schemeType: type,
-    url,
-    refresh_interval: Number.isFinite(refresh_interval) ? refresh_interval : 0,
-    refreshInterval: Number.isFinite(refresh_interval) ? refresh_interval : 0,
-    last_refresh,
-    lastRefresh: last_refresh,
-    last_refresh_ms: Number.isFinite(last_refresh_ms) ? last_refresh_ms : 0,
-    lastRefreshMs: Number.isFinite(last_refresh_ms) ? last_refresh_ms : 0,
-    readonly: type === "remote" ? true : !!raw.readonly,
-  };
-}
-
-function normalizeSchemes(list: HostsScheme[] | null | undefined): HostsScheme[] {
-  if (!Array.isArray(list)) {
-    return [];
-  }
-  return list.map((item) => normalizeScheme(item));
-}
 
 const REFRESH_OPTIONS: Array<{ label: string; value: number }> = [
   { label: "永不", value: 0 },
@@ -471,6 +421,10 @@ async function refreshRemoteNow() {
   if (!selectedId.value || !isRemoteSelected.value) {
     return;
   }
+  if (dirty.value) {
+    ElMessage.warning("请先保存或放弃当前编辑");
+    return;
+  }
   refreshingRemote.value = true;
   try {
     const list = await invoke<HostsScheme[]>("hosts_refresh", {
@@ -783,10 +737,32 @@ onMounted(() => {
   void listen<{
     schemes?: HostsScheme[];
   }>("app://hosts-switched", (event) => {
-    if (Array.isArray(event.payload?.schemes)) {
-      schemes.value = normalizeSchemes(event.payload.schemes);
-      void reloadSystemIfNeeded();
+    if (!Array.isArray(event.payload?.schemes)) {
+      return;
     }
+    const next = normalizeSchemes(event.payload.schemes);
+    if (dirty.value && selectedId.value && selectedId.value !== SYSTEM_ID) {
+      // Keep in-progress edits: preserve selected scheme editable fields from local list.
+      const prevSelected = schemes.value.find((s) => s.id === selectedId.value);
+      schemes.value = next.map((scheme) => {
+        if (!prevSelected || scheme.id !== selectedId.value) {
+          return scheme;
+        }
+        return {
+          ...scheme,
+          title: prevSelected.title,
+          content: prevSelected.content,
+          url: prevSelected.url,
+          type: prevSelected.type,
+          schemeType: prevSelected.schemeType,
+          refresh_interval: prevSelected.refresh_interval,
+          refreshInterval: prevSelected.refreshInterval,
+        };
+      });
+    } else {
+      schemes.value = next;
+    }
+    void reloadSystemIfNeeded();
   }).then((unlisten) => {
     unlistenHostsSwitched = unlisten;
   });

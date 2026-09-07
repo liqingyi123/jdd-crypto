@@ -17,6 +17,7 @@ const inputText = ref("");
 const outputText = ref("");
 const errorMessage = ref("");
 const historyVisible = ref(false);
+const busy = ref(false);
 
 const isCustom = computed(() => aesCode.value === "custom");
 
@@ -71,51 +72,59 @@ function clearInput() {
 }
 
 async function run(type: AesOpType) {
+  if (busy.value) {
+    return;
+  }
+  busy.value = true;
   errorMessage.value = "";
-  const result = runAes({
-    type,
-    text: inputText.value,
-    aesCode: aesCode.value,
-    customKey: customKey.value,
-    customIv: customIv.value,
-  });
+  try {
+    const result = runAes({
+      type,
+      text: inputText.value,
+      aesCode: aesCode.value,
+      customKey: customKey.value,
+      customIv: customIv.value,
+    });
 
-  if (result.code === "empty") {
-    errorMessage.value = "请输入待处理文本，并确认 AES key / iv 已填写";
-    outputText.value = "";
-    return;
+    if (result.code === "empty") {
+      errorMessage.value = "请输入待处理文本，并确认 AES key / iv 已填写";
+      outputText.value = "";
+      return;
+    }
+
+    if (result.code === "error") {
+      outputText.value = result.content;
+      errorMessage.value = result.content;
+      return;
+    }
+
+    const display = await prettierFormat(result.content);
+    outputText.value = display;
+
+    const usedCode = result.usedCode ?? aesCode.value;
+    const usedKey = result.usedKey ?? "";
+    const usedIv = result.usedIv ?? "";
+
+    if (aesCode.value === "custom" || usedCode === "custom") {
+      workspace.rememberCustom(usedKey, usedIv);
+    }
+
+    workspace.pushHistory({
+      type,
+      text: inputText.value,
+      aesCode: usedCode,
+      key: usedKey,
+      iv: usedIv,
+      result: display,
+    });
+  } finally {
+    busy.value = false;
   }
-
-  if (result.code === "error") {
-    outputText.value = result.content;
-    errorMessage.value = result.content;
-    return;
-  }
-
-  const display = await prettierFormat(result.content);
-  outputText.value = display;
-
-  const usedCode = result.usedCode ?? aesCode.value;
-  const usedKey = result.usedKey ?? "";
-  const usedIv = result.usedIv ?? "";
-
-  if (aesCode.value === "custom" || usedCode === "custom") {
-    workspace.rememberCustom(usedKey, usedIv);
-  }
-
-  workspace.pushHistory({
-    type,
-    text: inputText.value,
-    aesCode: usedCode,
-    key: usedKey,
-    iv: usedIv,
-    result: display,
-  });
 }
 
 async function applyHistory(id: string) {
   const item = history.value.find((entry) => entry.id === id);
-  if (!item) {
+  if (!item || busy.value) {
     return;
   }
   historyVisible.value = false;
@@ -135,14 +144,21 @@ async function applyHistory(id: string) {
 
 async function applyPending() {
   const payload = pendingCrypto.value;
-  if (!payload) {
+  if (!payload || busy.value) {
     return;
   }
   inputText.value = payload.text;
   appStore.setPendingCrypto(null);
 
-  if (payload.mode === "auto") {
-    errorMessage.value = "";
+  if (payload.mode !== "auto") {
+    const mode = payload.mode === "encrypt" ? "encrypt" : "decrypt";
+    await run(mode);
+    return;
+  }
+
+  busy.value = true;
+  errorMessage.value = "";
+  try {
     const { mode, result } = runAesPreferDecrypt(payload.text);
     if (result.code === "empty") {
       errorMessage.value = "请输入待处理文本，并确认 AES key / iv 已填写";
@@ -170,11 +186,9 @@ async function applyPending() {
       iv: usedIv,
       result: display,
     });
-    return;
+  } finally {
+    busy.value = false;
   }
-
-  const mode = payload.mode === "encrypt" ? "encrypt" : "decrypt";
-  await run(mode);
 }
 
 onMounted(() => {
@@ -230,9 +244,15 @@ watch(pendingCrypto, () => {
     </div>
 
     <div class="actions">
-      <ElButton type="success" @click="run('encrypt')">加密</ElButton>
-      <ElButton type="primary" @click="run('decrypt')">解密</ElButton>
-      <ElButton type="warning" @click="run('tokv')">转 KV</ElButton>
+      <ElButton type="success" :disabled="busy" :loading="busy" @click="run('encrypt')">
+        加密
+      </ElButton>
+      <ElButton type="primary" :disabled="busy" :loading="busy" @click="run('decrypt')">
+        解密
+      </ElButton>
+      <ElButton type="warning" :disabled="busy" :loading="busy" @click="run('tokv')">
+        转 KV
+      </ElButton>
     </div>
 
     <div class="editors">

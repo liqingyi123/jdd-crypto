@@ -5,7 +5,14 @@ export type ClipboardKind = "maybe_cipher" | "maybe_plain" | "unknown";
 
 export interface ClipboardCandidate {
   text: string;
-  kind: ClipboardKind | string;
+  kind: ClipboardKind;
+}
+
+function normalizeKind(kind: string): ClipboardKind {
+  if (kind === "maybe_cipher" || kind === "maybe_plain" || kind === "unknown") {
+    return kind;
+  }
+  return "unknown";
 }
 
 export const useClipboardStore = defineStore("clipboard", () => {
@@ -17,7 +24,14 @@ export const useClipboardStore = defineStore("clipboard", () => {
   }
 
   function setCandidate(next: ClipboardCandidate | null) {
-    candidate.value = next;
+    if (!next) {
+      candidate.value = null;
+      return;
+    }
+    candidate.value = {
+      text: next.text,
+      kind: normalizeKind(String(next.kind)),
+    };
   }
 
   function clearCandidate() {

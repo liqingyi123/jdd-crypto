@@ -4,7 +4,7 @@ import type { PluginSlot } from "@/constants/plugin-slots";
 defineProps<{
   title: string;
   description: string;
-  slot: PluginSlot;
+  pluginSlot: PluginSlot;
   comingSoon: boolean;
   importing: boolean;
   resetting: boolean;
@@ -22,23 +22,28 @@ function displayName(slot: PluginSlot): string {
 </script>
 
 <template>
-  <section>
+  <section :class="{ disabled: comingSoon }">
     <div class="section-head">
       <h2>{{ title }}</h2>
       <ElSwitch
-        :model-value="slot.enabled"
+        :model-value="pluginSlot.enabled"
+        :disabled="comingSoon"
         @change="(value) => emit('toggle', Boolean(value))"
       />
     </div>
     <p>{{ description }}</p>
     <div class="row">
-      <span class="current">当前：{{ displayName(slot) }}</span>
+      <span class="current">当前：{{ displayName(pluginSlot) }}</span>
       <div class="actions">
-        <ElButton :loading="importing" @click="emit('import')">导入插件</ElButton>
-        <ElButton :loading="resetting" @click="emit('reset')">恢复默认</ElButton>
+        <ElButton :disabled="comingSoon" :loading="importing" @click="emit('import')">
+          导入插件
+        </ElButton>
+        <ElButton :disabled="comingSoon" :loading="resetting" @click="emit('reset')">
+          恢复默认
+        </ElButton>
       </div>
     </div>
-    <p v-if="comingSoon" class="hint">开发中，敬请期待</p>
+    <p v-if="comingSoon" class="hint">开发中，敬请期待（暂不可用）</p>
   </section>
 </template>
 
@@ -48,6 +53,10 @@ section {
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--bg-elevated);
+}
+
+section.disabled {
+  opacity: 0.72;
 }
 
 .section-head {

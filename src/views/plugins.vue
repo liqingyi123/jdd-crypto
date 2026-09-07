@@ -72,7 +72,7 @@ async function onFileSelected(kind: PluginKind, event: Event) {
       :key="kind"
       :title="PLUGIN_KIND_META[kind].title"
       :description="PLUGIN_KIND_META[kind].description"
-      :slot="slotOf(kind)"
+      :plugin-slot="slotOf(kind)"
       :coming-soon="PLUGIN_KIND_META[kind].comingSoon"
       :importing="importingKind === kind"
       :resetting="resettingKind === kind"

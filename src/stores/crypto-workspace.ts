@@ -152,14 +152,6 @@ export const useCryptoWorkspaceStore = defineStore("crypto-workspace", () => {
     history.value = [];
   }
 
-  function removeHistory(id: string) {
-    const next = history.value.filter((entry) => entry.id !== id);
-    if (next.length === history.value.length) {
-      return;
-    }
-    history.value = next;
-  }
-
   function removeHistoryAt(index: number) {
     if (index < 0 || index >= history.value.length) {
       return;
@@ -178,7 +170,6 @@ export const useCryptoWorkspaceStore = defineStore("crypto-workspace", () => {
     rememberCustom,
     pushHistory,
     clearHistory,
-    removeHistory,
     removeHistoryAt,
   };
 });

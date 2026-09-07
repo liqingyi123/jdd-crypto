@@ -65,12 +65,10 @@ pub fn apply_pref(app: &AppHandle, enabled: bool) {
         .mouse_follow_pref_enabled
         .store(enabled, Ordering::Relaxed);
     save_pref(app, enabled);
-    if enabled {
-        let _ = register_current(app);
-        return;
-    }
-    let _ = unregister_all(app);
-    if state.mouse_follow_enabled.load(Ordering::Relaxed) {
+    // Rebuild all shortcuts so compare / hosts-quick / trail stay registered
+    // when follow preference is turned off (register_all skips follow when disabled).
+    let _ = register_current(app);
+    if !enabled && state.mouse_follow_enabled.load(Ordering::Relaxed) {
         stop(app);
     }
 }
@@ -373,6 +371,7 @@ fn clipboard_sequence() -> u32 {
 fn capture_selection_text(app: &AppHandle) -> Option<String> {
     // Slightly longer wait so double-click word selection can settle.
     thread::sleep(Duration::from_millis(70));
+    let before = app.clipboard().read_text().unwrap_or_default();
     let seq_before = clipboard_sequence();
     send_copy_shortcut();
 
@@ -388,6 +387,8 @@ fn capture_selection_text(app: &AppHandle) -> Option<String> {
         if current.trim().is_empty() {
             continue;
         }
+        // Restore prior clipboard so synthetic Ctrl+C does not overwrite user data.
+        let _ = app.clipboard().write_text(&before);
         return Some(current);
     }
     None

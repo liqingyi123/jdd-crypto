@@ -1,5 +1,6 @@
 import { onMounted, onUnmounted } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { ElMessage } from "element-plus";
 import { useClipboardStore, type ClipboardCandidate } from "@/stores/clipboard";
 
 export function useClipboardPrompt(options?: {
@@ -14,8 +15,15 @@ export function useClipboardPrompt(options?: {
 
   onMounted(async () => {
     try {
-      const enabled = await invoke<boolean>("get_clipboard_watch").catch(() => true);
-      clipboardStore.setWatchEnabled(enabled);
+      try {
+        const enabled = await invoke<boolean>("get_clipboard_watch");
+        clipboardStore.setWatchEnabled(enabled);
+      } catch (error) {
+        // Keep existing store value; avoid forcing watch on after a failed read.
+        ElMessage.error(
+          error instanceof Error ? error.message : `读取剪贴板监听失败：${String(error)}`,
+        );
+      }
       const { listen } = await import("@tauri-apps/api/event");
       unlisten = await listen<ClipboardCandidate>("clipboard://candidate", (event) => {
         if (!clipboardStore.watchEnabled) {
@@ -29,11 +37,15 @@ export function useClipboardPrompt(options?: {
         }
       });
       if (options?.fetchOnMount) {
-        const existing = await invoke<ClipboardCandidate | null>(
-          "get_clipboard_candidate",
-        ).catch(() => null);
-        if (existing && clipboardStore.watchEnabled) {
-          clipboardStore.setCandidate(existing);
+        try {
+          const existing = await invoke<ClipboardCandidate | null>(
+            "get_clipboard_candidate",
+          );
+          if (existing && clipboardStore.watchEnabled) {
+            clipboardStore.setCandidate(existing);
+          }
+        } catch {
+          // ignore missing candidate
         }
       }
     } catch {
@@ -57,13 +69,15 @@ export function useClipboardPrompt(options?: {
     options?.onSuppressBlurDismiss?.();
     const text = clipboardStore.candidate?.text ?? null;
     // Rust 端打开气泡/主窗；text 作为 last_candidate 被失焦清掉时的兜底
-    const ok = await invoke<boolean>("accept_clipboard_action", { mode, text }).catch(
-      () => false,
-    );
-    clipboardStore.clearCandidate();
-    if (!ok) {
-      await invoke("clear_clipboard_dedup").catch(() => undefined);
-      await closePromptWindow();
+    try {
+      const ok = await invoke<boolean>("accept_clipboard_action", { mode, text });
+      clipboardStore.clearCandidate();
+      if (!ok) {
+        await invoke("clear_clipboard_dedup").catch(() => undefined);
+        await closePromptWindow();
+      }
+    } catch (error) {
+      ElMessage.error(error instanceof Error ? error.message : String(error));
     }
   }
 

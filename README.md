@@ -1,18 +1,20 @@
 # 多多解密
 
-基于 **Tauri 2 + Vue 3 + TypeScript** 的桌面加解密工具骨架。当前阶段只搭框架与扩展点，加解密算法和完整插件运行时后续迭代。
+基于 **Tauri 2 + Vue 3 + TypeScript** 的桌面加解密工具。主路径 AES（CBC / PKCS7）在前端通过 crypto-js 完成；插件运行时装载仍为后续迭代（插件页标明「开发中」）。
 
 目标平台：Windows / macOS / Linux。
 
-## 功能骨架
+## 功能概览
 
 - 悬浮角标：可拖动；左键打开主界面；右键弹出菜单
 - 系统托盘：左键打开主界面；右键菜单与角标一致
-- 独立功能窗口：打开主界面只显示加解密；功能设置、意见反馈、插件管理、关于各自单独成窗（无侧栏切换）
+- 独立功能窗口：打开主界面只显示加解密；功能设置、意见反馈、插件管理、关于、Hosts 各自单独成窗（无侧栏切换）
+- AES 工作台：内置业务预设 / 自定义 Key·IV，支持加密、解密、转 KV，操作历史本地保存
 - 剪贴板监听：识别文本变化后提示是否立即加密/解密（可在设置中关闭）
 - 鼠标跟随（`Ctrl+Shift+G`）：角标跟随光标，点击/拖选/双击选中文本后自动复制并打开加解密（macOS 需辅助功能权限，见下）
+- 对照模式、Hosts 方案管理 / 快捷切换、鼠标轨迹特效
 - 主题：跟随系统深浅色，也可强制浅色/深色
-- 插件：扫描 `plugin.json` 清单并注册贡献点（编辑器 / 拖尾特效 / 算法预设）
+- 插件：扫描 `plugin.json` 清单；编辑器主题 / 加解密预设槽位 UI 已就绪，运行时装载仍为 Phase 0
 
 ## 开发启动
 
@@ -60,7 +62,7 @@ npm run tauri build
 
 ## macOS 打包
 
-**说明**：DMG 只能在 macOS 上构建，无法在 Windows 上交叉编译。当前产出为 **Universal Binary**（Intel + Apple Silicon 合一）。Gitee 无免费 macOS Runner，需 Mac 本机或自建 Mac 构建机。
+**说明**：DMG 只能在 macOS 上构建，无法在 Windows 上交叉编译。当前产出为 **Universal Binary**（Intel + Apple Silicon 合一）。Gitee 无免费 macOS Runner，需 Mac 本机或自建 Mac 构建机。当前依赖Github-actions公共打包。
 
 ### 环境（在 Mac 上执行）
 
@@ -148,7 +150,7 @@ src/                         Vue 前端
   stores/                    Pinia（theme / clipboard / plugins / app）
   composables/               主题、剪贴板提示、窗口拖动
   plugins-runtime/           JS 插件加载器与沙箱扩展点
-  services/crypto.ts         加解密 invoke 接口（Rust stub）
+  services/aes-ops.ts        前端 AES 编排（主路径）
   website/                   官网（独立 Vite 构建）
 src-tauri/                   Rust 核心
   src/windows.rs             窗口显示、按需创建功能窗、角标尺寸
@@ -182,5 +184,5 @@ plugins/<id>/
 ## 后续迭代
 
 1. 角标位置持久化、主窗口深链与提示 UI 打磨
-2. Rust 加解密实现与密钥管理
-3. iframe 沙箱真正执行插件；落地 monaco / 鼠标拖尾 / crypto-presets
+2. 反馈通道接入（当前为占位页）
+3. iframe 沙箱真正执行插件；落地 monaco 主题 / crypto-presets 贡献点

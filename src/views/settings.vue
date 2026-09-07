@@ -172,8 +172,14 @@ onUnmounted(() => {
 
 async function onWatchChange(value: string | number | boolean) {
   const enabled = Boolean(value);
+  const previous = clipboardStore.watchEnabled;
   clipboardStore.setWatchEnabled(enabled);
-  await invoke("set_clipboard_watch", { enabled }).catch(() => undefined);
+  try {
+    await invoke("set_clipboard_watch", { enabled });
+  } catch (error) {
+    clipboardStore.setWatchEnabled(previous);
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
 }
 
 async function onBadgeSizeChange(value: string | number | boolean | undefined) {
@@ -181,35 +187,59 @@ async function onBadgeSizeChange(value: string | number | boolean | undefined) {
   if (!Number.isFinite(size)) {
     return;
   }
+  const previous = badgeSize.value;
   badgeSize.value = size;
-  await invoke("set_badge_size_pref", { size }).catch(() => undefined);
+  try {
+    await invoke("set_badge_size_pref", { size });
+  } catch (error) {
+    badgeSize.value = previous;
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
 }
 
 async function onFollowPrefChange(value: string | number | boolean) {
   const enabled = Boolean(value);
+  const previous = followPref.value;
   followPref.value = enabled;
   if (!enabled && recording.value) {
     await cancelRecording();
   }
-  await invoke("set_mouse_follow_pref", { enabled }).catch(() => undefined);
+  try {
+    await invoke("set_mouse_follow_pref", { enabled });
+  } catch (error) {
+    followPref.value = previous;
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
 }
 
 async function onComparePrefChange(value: string | number | boolean) {
   const enabled = Boolean(value);
+  const previous = comparePref.value;
   comparePref.value = enabled;
   if (!enabled && compareRecording.value) {
     await cancelCompareRecording();
   }
-  await invoke("set_compare_mode_pref", { enabled }).catch(() => undefined);
+  try {
+    await invoke("set_compare_mode_pref", { enabled });
+  } catch (error) {
+    comparePref.value = previous;
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
 }
 
 async function onHostsQuickPrefChange(value: string | number | boolean) {
   const enabled = Boolean(value);
+  const previous = hostsQuickPref.value;
   hostsQuickPref.value = enabled;
   if (!enabled && hostsQuickRecording.value) {
     await cancelHostsQuickRecording();
   }
-  await invoke("set_hosts_quick_pref", { enabled }).catch(() => undefined);
+  try {
+    await invoke("set_hosts_quick_pref", { enabled });
+  } catch (error) {
+    hostsQuickPref.value = previous;
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
 }
 
 async function onAutostartChange(value: string | number | boolean) {
@@ -286,10 +316,17 @@ async function onTrailColorReset() {
   }
 }
 
-function onThemeChange(value: string | number | boolean | undefined) {
-  if (value === "system" || value === "light" || value === "dark") {
-    themeStore.setPreference(value);
-    void invoke("set_theme_pref", { preference: value }).catch(() => undefined);
+async function onThemeChange(value: string | number | boolean | undefined) {
+  if (value !== "system" && value !== "light" && value !== "dark") {
+    return;
+  }
+  const previous = themeStore.preference;
+  themeStore.setPreference(value);
+  try {
+    await invoke("set_theme_pref", { preference: value });
+  } catch (error) {
+    themeStore.setPreference(previous);
+    ElMessage.error(error instanceof Error ? error.message : String(error));
   }
 }
 </script>

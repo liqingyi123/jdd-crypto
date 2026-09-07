@@ -194,13 +194,9 @@ pub fn list_plugins(app: AppHandle) -> Vec<plugin_host::PluginManifest> {
 
 #[tauri::command]
 pub fn crypto_transform(request: CryptoRequest) -> Result<CryptoResponse, String> {
-    let _ = (request.algorithm, request.key_id, request.iv_id);
-    Err(format!(
-        "crypto_transform is a stub (mode={}, plaintext={}, ciphertext={})",
-        request.mode,
-        request.plaintext.as_deref().unwrap_or(""),
-        request.ciphertext.as_deref().unwrap_or("")
-    ))
+    let _ = request;
+    // AES 主路径在前端 crypto-js；此命令保留兼容，暂未实现。
+    Err("crypto_transform 未实现：请使用前端 AES 工作台".to_string())
 }
 
 #[tauri::command]
@@ -229,6 +225,11 @@ pub fn set_mouse_follow_shortcut(
     shortcut: String,
 ) -> Result<String, String> {
     let normalized = crate::mouse_follow::validate_shortcut(&shortcut)?;
+    crate::global_shortcuts::ensure_no_conflict(
+        &app,
+        &normalized,
+        crate::global_shortcuts::ShortcutOwner::MouseFollow,
+    )?;
     if let Ok(mut current) = state.mouse_follow_shortcut.lock() {
         *current = normalized.clone();
     }
@@ -273,6 +274,11 @@ pub fn set_compare_mode_shortcut(
     shortcut: String,
 ) -> Result<String, String> {
     let normalized = crate::mouse_follow::validate_shortcut(&shortcut)?;
+    crate::global_shortcuts::ensure_no_conflict(
+        &app,
+        &normalized,
+        crate::global_shortcuts::ShortcutOwner::Compare,
+    )?;
     if let Ok(mut current) = state.compare_mode_shortcut.lock() {
         *current = normalized.clone();
     }
@@ -578,6 +584,11 @@ pub fn set_hosts_quick_shortcut(
     shortcut: String,
 ) -> Result<String, String> {
     let normalized = crate::mouse_follow::validate_shortcut(&shortcut)?;
+    crate::global_shortcuts::ensure_no_conflict(
+        &app,
+        &normalized,
+        crate::global_shortcuts::ShortcutOwner::HostsQuick,
+    )?;
     if let Ok(mut current) = state.hosts_quick_shortcut.lock() {
         *current = normalized.clone();
     }

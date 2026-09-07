@@ -27,7 +27,11 @@ export function usePluginSlots() {
   }
 
   function slotOf(kind: PluginKind) {
-    return findSlot(state.value, kind)!;
+    const found = findSlot(state.value, kind);
+    if (found) {
+      return found;
+    }
+    return findSlot(defaultPluginSlots(), kind)!;
   }
 
   async function toggleSlot(kind: PluginKind, enabled: boolean) {
