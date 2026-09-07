@@ -3,6 +3,7 @@ import { nextTick, onMounted, onUnmounted, shallowRef, useTemplateRef } from "vu
 import { invoke } from "@tauri-apps/api/core";
 import { runAes, runAesPreferDecrypt } from "@/services/aes-ops";
 import { useSystemTheme } from "@/composables/use-system-theme";
+import { beautifyJsonDisplay } from "@/utils/json-display";
 
 useSystemTheme();
 
@@ -22,24 +23,6 @@ const bodyEl = useTemplateRef<HTMLElement>("bodyEl");
 let runToken = 0;
 
 let unlisten: (() => void) | undefined;
-
-/** Pretty-print JSON when possible; otherwise keep original text. */
-function beautifyResult(raw: string): string {
-  const trimmed = raw.trim();
-  if (!trimmed) {
-    return raw;
-  }
-  if (
-    !(trimmed.startsWith("{") || trimmed.startsWith("[") || trimmed.startsWith('"'))
-  ) {
-    return raw;
-  }
-  try {
-    return JSON.stringify(JSON.parse(trimmed), null, 2);
-  } catch {
-    return raw;
-  }
-}
 
 /** True when decrypted payload is a JSON object or array. */
 function isJsonPayload(raw: string): boolean {
@@ -117,7 +100,7 @@ async function runBubble(payload: BubblePayload) {
         return;
       }
       lastMode.value = "decrypt";
-      resultText.value = beautifyResult(result.content);
+      resultText.value = beautifyJsonDisplay(result.content);
       visible.value = true;
       loading.value = false;
       await scrollBodyToBottom();
@@ -152,7 +135,7 @@ async function runBubble(payload: BubblePayload) {
           : "自动加密失败";
       return;
     }
-    resultText.value = beautifyResult(result.content);
+    resultText.value = beautifyJsonDisplay(result.content);
   } catch {
     if (token !== runToken) {
       return;

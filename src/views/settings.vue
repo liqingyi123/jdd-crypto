@@ -79,6 +79,9 @@ const followPref = shallowRef(true);
 const comparePref = shallowRef(true);
 const hostsQuickPref = shallowRef(true);
 const autostartEnabled = shallowRef(false);
+const intranetServerBase = shallowRef("http://172.20.2.169:7101/");
+const intranetServerSaving = shallowRef(false);
+const DEFAULT_INTRANET_SERVER = "http://172.20.2.169:7101/";
 const trailEnabled = shallowRef(DEFAULT_MOUSE_TRAIL_PREF.enabled);
 const trailEffect = shallowRef<MouseTrailEffect>(DEFAULT_MOUSE_TRAIL_PREF.effect);
 const trailColors = shallowRef<MouseTrailColors>({ ...DEFAULT_MOUSE_TRAIL_COLORS });
@@ -213,6 +216,11 @@ onMounted(async () => {
     autostartEnabled.value = false;
   }
   try {
+    intranetServerBase.value = await invoke<string>("get_intranet_server_base");
+  } catch {
+    intranetServerBase.value = DEFAULT_INTRANET_SERVER;
+  }
+  try {
     const pref = await invoke<MouseTrailPref>("get_mouse_trail_pref");
     applyTrailPref(pref);
   } catch {
@@ -319,6 +327,29 @@ async function onAutostartChange(value: string | number | boolean) {
   }
 }
 
+async function persistIntranetServerBase(raw: string) {
+  const previous = intranetServerBase.value;
+  intranetServerSaving.value = true;
+  try {
+    const saved = await invoke<string>("set_intranet_server_base", { base: raw });
+    intranetServerBase.value = saved;
+    ElMessage.success("服务器地址已保存");
+  } catch (error) {
+    intranetServerBase.value = previous;
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  } finally {
+    intranetServerSaving.value = false;
+  }
+}
+
+async function onIntranetServerSave() {
+  await persistIntranetServerBase(intranetServerBase.value);
+}
+
+async function onIntranetServerReset() {
+  await persistIntranetServerBase(DEFAULT_INTRANET_SERVER);
+}
+
 async function onTrailEnabledChange(value: string | number | boolean) {
   const enabled = Boolean(value);
   trailEnabled.value = enabled;
@@ -417,6 +448,31 @@ async function onThemeChange(value: string | number | boolean | undefined) {
         </label>
       </div>
       <p>开启后登录系统时自动启动多多解密；默认关闭。</p>
+    </section>
+    <section>
+      <h2>内网服务器</h2>
+      <p>
+        用于检查更新与拉取 Hosts 预置配置。默认
+        <code>{{ DEFAULT_INTRANET_SERVER }}</code>，保存后重启仍生效。
+      </p>
+      <div class="row intranet-row">
+        <ElInput
+          v-model="intranetServerBase"
+          clearable
+          placeholder="http://172.20.2.169:7101/"
+          @keyup.enter="onIntranetServerSave"
+        />
+        <ElButton
+          type="primary"
+          :loading="intranetServerSaving"
+          @click="onIntranetServerSave"
+        >
+          保存
+        </ElButton>
+        <ElButton :disabled="intranetServerSaving" @click="onIntranetServerReset">
+          恢复默认
+        </ElButton>
+      </div>
     </section>
     <section>
       <div class="section-head">
@@ -605,6 +661,21 @@ h3 {
 
 .trail-color-row {
   margin-top: 8px;
+}
+
+.intranet-row {
+  margin-top: 12px;
+  align-items: stretch;
+}
+
+.intranet-row :deep(.el-input) {
+  flex: 1;
+  min-width: 0;
+}
+
+code {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.9em;
 }
 
 .trail-shortcut-hint {

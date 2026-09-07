@@ -32,9 +32,6 @@ const MARKER_END: &str = "# <<< jdd-crypto-hosts-end";
 const SWITCHHOSTS_START: &str = "# --- SWITCHHOSTS_CONTENT_START ---";
 const SWITCHHOSTS_END: &str = "# --- SWITCHHOSTS_CONTENT_END ---";
 
-const PRESET_CONFIG_URL: &str =
-    "http://172.20.2.169:7101/appStore/Software/PC/developer/jdd-crypto/swh_data.json";
-
 static ID_SEQ: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -576,7 +573,8 @@ fn strip_managed_block(raw: &str) -> String {
     out
 }
 
-/// Remove SwitchHosts managed segments. START may appear mid-file; keep content before/after.
+/// Remove SwitchHosts managed segments. Used when exporting the OS "system" hosts
+/// snapshot (content outside both SwitchHosts and this app's managed block).
 fn strip_switchhosts_block(raw: &str) -> String {
     let lines: Vec<&str> = raw.lines().collect();
     let mut out = String::new();
@@ -606,35 +604,89 @@ fn strip_switchhosts_block(raw: &str) -> String {
     out
 }
 
+fn format_managed_block(managed: &str) -> String {
+    let managed = managed.trim();
+    if managed.is_empty() {
+        return String::new();
+    }
+    let mut block = String::new();
+    block.push_str(MARKER_BEGIN);
+    block.push('\n');
+    block.push_str(managed);
+    if !managed.ends_with('\n') {
+        block.push('\n');
+    }
+    block.push_str(MARKER_END);
+    block.push('\n');
+    block
+}
+
+fn ensure_blank_line_before_append(buf: &mut String) {
+    if buf.is_empty() {
+        return;
+    }
+    if buf.ends_with("\n\n") {
+        return;
+    }
+    if buf.ends_with('\n') {
+        buf.push('\n');
+    } else {
+        buf.push_str("\n\n");
+    }
+}
+
+/// Split hosts text at the first SwitchHosts START line.
+/// Returns `(before, from_start_to_eof)` where `from_start_to_eof` may be empty.
+fn split_at_switchhosts(raw: &str) -> (String, String) {
+    let lines: Vec<&str> = raw.lines().collect();
+    let Some(idx) = lines.iter().position(|line| line.trim() == SWITCHHOSTS_START) else {
+        let mut all = raw.to_string();
+        if !all.is_empty() && !all.ends_with('\n') {
+            all.push('\n');
+        }
+        return (all, String::new());
+    };
+    let mut before = String::new();
+    for line in &lines[..idx] {
+        before.push_str(line);
+        before.push('\n');
+    }
+    let mut after = String::new();
+    for line in &lines[idx..] {
+        after.push_str(line);
+        after.push('\n');
+    }
+    (before, after)
+}
+
+/// Compose system hosts: keep SwitchHosts content intact and insert this app's
+/// managed block **above** `# --- SWITCHHOSTS_CONTENT_START ---` so conflicting
+/// hostnames resolve to our entries first (first match wins).
 fn compose_hosts_file(existing: &str, managed: &str) -> String {
-    let mut base = strip_switchhosts_block(existing);
-    base = strip_managed_block(&base);
+    let mut base = strip_managed_block(existing);
     while base.ends_with("\n\n\n") {
         base.pop();
     }
     if !base.is_empty() && !base.ends_with('\n') {
         base.push('\n');
     }
-    let managed = managed.trim();
-    if managed.is_empty() {
+
+    let block = format_managed_block(managed);
+    if block.is_empty() {
         return base;
     }
-    if !base.is_empty() && !base.ends_with("\n\n") {
-        if base.ends_with('\n') {
-            base.push('\n');
-        } else {
-            base.push_str("\n\n");
+
+    let (mut before, after) = split_at_switchhosts(&base);
+    ensure_blank_line_before_append(&mut before);
+    before.push_str(&block);
+    if !after.is_empty() {
+        // One blank line between our block and SwitchHosts when possible.
+        if !before.ends_with("\n\n") {
+            before.push('\n');
         }
+        before.push_str(&after);
     }
-    base.push_str(MARKER_BEGIN);
-    base.push('\n');
-    base.push_str(managed);
-    if !managed.ends_with('\n') {
-        base.push('\n');
-    }
-    base.push_str(MARKER_END);
-    base.push('\n');
-    base
+    before
 }
 
 fn write_system_hosts(managed: &str) -> Result<(), String> {
@@ -1337,12 +1389,13 @@ fn parse_switchhosts_raw(raw: &str) -> Result<(Vec<HostsScheme>, u32), String> {
 
 /// Fetch intranet preset SwitchHosts JSON and merge into local store.
 pub fn pull_preset_config(app: &AppHandle) -> Result<ImportResult, String> {
+    let preset_url = crate::intranet_server::hosts_preset_url(app);
     let client = reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
         .build()
         .map_err(|e| format!("创建 HTTP 客户端失败: {e}"))?;
     let response = client
-        .get(PRESET_CONFIG_URL)
+        .get(&preset_url)
         .send()
         .map_err(|e| format!("拉取预置配置失败: {e}"))?;
     if !response.status().is_success() {
@@ -1414,30 +1467,49 @@ mod tests {
     }
 
     #[test]
-    fn compose_strips_switchhosts_mid_file() {
+    fn compose_clears_managed_keeps_switchhosts() {
         let existing = format!(
-            "127.0.0.1 localhost\n\n{SWITCHHOSTS_START}\n1.1.1.1 old.swh\n# keep-after\n9.9.9.9 after.swh\n\n{MARKER_BEGIN}\nmine\n{MARKER_END}\n"
+            "127.0.0.1 localhost\n{MARKER_BEGIN}\nold\n{MARKER_END}\n{SWITCHHOSTS_START}\n1.1.1.1 swh\n{SWITCHHOSTS_END}\n"
         );
-        // Without END, strip stops at MARKER_BEGIN so mid content after START until marker is removed;
-        // but "keep-after" between START and MARKER is also removed (SwitchHosts owned until marker).
-        let next = compose_hosts_file(&existing, "2.2.2.2 jdd.test");
-        assert!(!next.contains(SWITCHHOSTS_START));
-        assert!(!next.contains("1.1.1.1 old.swh"));
-        assert!(next.contains("127.0.0.1 localhost"));
-        assert!(next.contains("2.2.2.2 jdd.test"));
-        assert!(next.contains(MARKER_BEGIN));
+        let cleared = compose_hosts_file(&existing, "");
+        assert!(!cleared.contains(MARKER_BEGIN));
+        assert!(cleared.contains(SWITCHHOSTS_START));
+        assert!(cleared.contains("1.1.1.1 swh"));
     }
 
     #[test]
-    fn compose_strips_switchhosts_with_end_keeps_trailing() {
+    fn compose_inserts_above_switchhosts_and_keeps_it() {
+        let existing = format!(
+            "127.0.0.1 localhost\n\n{SWITCHHOSTS_START}\n1.1.1.1 old.swh\n# keep-after\n9.9.9.9 after.swh\n\n{MARKER_BEGIN}\nmine\n{MARKER_END}\n"
+        );
+        let next = compose_hosts_file(&existing, "2.2.2.2 jdd.test");
+        assert!(next.contains(SWITCHHOSTS_START));
+        assert!(next.contains("1.1.1.1 old.swh"));
+        assert!(next.contains("9.9.9.9 after.swh"));
+        assert!(next.contains("127.0.0.1 localhost"));
+        assert!(next.contains("2.2.2.2 jdd.test"));
+        assert!(next.contains(MARKER_BEGIN));
+        assert!(!next.contains("\nmine\n"));
+        let managed_pos = next.find(MARKER_BEGIN).expect("managed block");
+        let swh_pos = next.find(SWITCHHOSTS_START).expect("switchhosts");
+        assert!(managed_pos < swh_pos, "managed block must sit above SwitchHosts");
+    }
+
+    #[test]
+    fn compose_inserts_above_switchhosts_with_end_keeps_trailing() {
         let existing = format!(
             "127.0.0.1 localhost\n{SWITCHHOSTS_START}\n1.1.1.1 old.swh\n{SWITCHHOSTS_END}\n# trailing\n8.8.8.8 keep.me\n"
         );
         let next = compose_hosts_file(&existing, "2.2.2.2 jdd.test");
-        assert!(!next.contains(SWITCHHOSTS_START));
-        assert!(!next.contains("1.1.1.1 old.swh"));
+        assert!(next.contains(SWITCHHOSTS_START));
+        assert!(next.contains("1.1.1.1 old.swh"));
+        assert!(next.contains(SWITCHHOSTS_END));
         assert!(next.contains("8.8.8.8 keep.me"));
         assert!(next.contains("127.0.0.1 localhost"));
+        assert!(next.contains("2.2.2.2 jdd.test"));
+        let managed_pos = next.find(MARKER_BEGIN).expect("managed block");
+        let swh_pos = next.find(SWITCHHOSTS_START).expect("switchhosts");
+        assert!(managed_pos < swh_pos);
     }
 
     #[test]

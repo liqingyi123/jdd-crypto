@@ -1,3 +1,5 @@
+import { beautifyJsonDisplay } from "@/utils/json-display";
+
 export type DiffKind = "equal" | "add" | "change";
 
 export interface DiffSegment {
@@ -71,20 +73,7 @@ export function diffHighlightRight(left: string, right: string): DiffSegment[] {
   return segments;
 }
 
-/** Pretty-print JSON when possible. */
+/** Pretty-print JSON when possible (also expands one level of embedded JSON strings). */
 export function beautifyText(raw: string): string {
-  const trimmed = raw.trim();
-  if (!trimmed) {
-    return raw;
-  }
-  if (
-    !(trimmed.startsWith("{") || trimmed.startsWith("[") || trimmed.startsWith('"'))
-  ) {
-    return raw;
-  }
-  try {
-    return JSON.stringify(JSON.parse(trimmed), null, 2);
-  } catch {
-    return raw;
-  }
+  return beautifyJsonDisplay(raw);
 }

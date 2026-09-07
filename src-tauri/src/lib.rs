@@ -6,6 +6,7 @@ mod compare_mode;
 mod global_shortcuts;
 mod hosts_manager;
 mod hosts_quick;
+mod intranet_server;
 mod mouse_follow;
 mod mouse_trail;
 mod overlay_toast;
@@ -99,6 +100,8 @@ pub fn run() {
             commands::reset_mouse_trail_pref,
             commands::get_autostart_pref,
             commands::set_autostart_pref,
+            commands::get_intranet_server_base,
+            commands::set_intranet_server_base,
             commands::hosts_list,
             commands::hosts_upsert,
             commands::hosts_refresh,

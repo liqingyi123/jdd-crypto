@@ -1,6 +1,7 @@
 import prettier from "prettier/standalone";
 import parserBabel from "prettier/plugins/babel";
 import parserEstree from "prettier/plugins/estree";
+import { beautifyJsonDisplay } from "@/utils/json-display";
 
 async function formatWith(
   str: string,
@@ -27,8 +28,10 @@ export async function prettierFormat(
   if (!str.trim()) {
     return str;
   }
+  // Expand one level of embedded JSON strings before pretty-print.
+  const prepared = beautifyJsonDisplay(str);
   try {
-    return await formatWith(str, "json", tabWidth);
+    return await formatWith(prepared, "json", tabWidth);
   } catch {
     // fall through
   }

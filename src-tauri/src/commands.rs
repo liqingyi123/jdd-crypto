@@ -357,6 +357,16 @@ pub fn set_autostart_pref(app: AppHandle, enabled: bool) -> Result<bool, String>
 }
 
 #[tauri::command]
+pub fn get_intranet_server_base(app: AppHandle) -> String {
+    crate::intranet_server::load_base(&app)
+}
+
+#[tauri::command]
+pub fn set_intranet_server_base(app: AppHandle, base: String) -> Result<String, String> {
+    crate::intranet_server::save_base(&app, &base)
+}
+
+#[tauri::command]
 pub fn hosts_list(app: AppHandle) -> Vec<crate::hosts_manager::HostsScheme> {
     crate::hosts_manager::list_schemes(&app)
 }

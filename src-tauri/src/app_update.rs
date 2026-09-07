@@ -4,7 +4,8 @@ use std::io::{Read, Write};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 
-const UPDATE_BASE: &str = "http://172.20.2.169:7101/appStore/Software/PC/developer/jdd-crypto";
+use crate::intranet_server;
+
 const UPDATE_LOG_FILE: &str = "更新日志.txt";
 const PROGRESS_EVENT: &str = "app://update-download-progress";
 const FETCH_TIMEOUT: Duration = Duration::from_secs(15);
@@ -70,13 +71,21 @@ fn http_client(timeout: Duration) -> Result<reqwest::blocking::Client, String> {
         .map_err(|error| error.to_string())
 }
 
-fn update_log_url() -> String {
-    format!("{}/{}", UPDATE_BASE, urlencoding::encode(UPDATE_LOG_FILE))
+fn update_log_url(app: &AppHandle) -> String {
+    format!(
+        "{}/{}",
+        intranet_server::update_resource_base(app),
+        urlencoding::encode(UPDATE_LOG_FILE)
+    )
 }
 
-fn installer_url(version: &str) -> String {
+fn installer_url(app: &AppHandle, version: &str) -> String {
     let file_name = installer_file_name(version);
-    format!("{}/{}", UPDATE_BASE, urlencoding::encode(&file_name))
+    format!(
+        "{}/{}",
+        intranet_server::update_resource_base(app),
+        urlencoding::encode(&file_name)
+    )
 }
 
 #[cfg(target_os = "macos")]
@@ -94,10 +103,10 @@ fn installer_file_name(_version: &str) -> String {
     String::new()
 }
 
-fn fetch_changelog() -> Result<String, String> {
+fn fetch_changelog(app: &AppHandle) -> Result<String, String> {
     let client = http_client(FETCH_TIMEOUT)?;
     let response = client
-        .get(update_log_url())
+        .get(update_log_url(app))
         .send()
         .map_err(|_| "无法连接更新服务器".to_string())?;
     if !response.status().is_success() {
@@ -159,7 +168,7 @@ pub fn check_update(app: &AppHandle, manual: bool) -> Result<UpdateCheckResult, 
         };
     }
 
-    let changelog = match fetch_changelog() {
+    let changelog = match fetch_changelog(app) {
         Ok(text) => text,
         Err(error) => {
             if manual {
@@ -202,7 +211,7 @@ pub fn download_installer(app: &AppHandle, version: &str) -> Result<String, Stri
 
     let client = http_client(DOWNLOAD_TIMEOUT)?;
     let response = client
-        .get(installer_url(version))
+        .get(installer_url(app, version))
         .send()
         .map_err(|_| "下载失败，无法连接更新服务器".to_string())?;
     if !response.status().is_success() {
