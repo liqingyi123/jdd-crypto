@@ -81,7 +81,7 @@ onMounted(() => {
               v-else-if="availability[entry.version] === 'missing'"
               class="dl-miss"
             >
-              此版本未上线当前平台
+              此版本当前平台现无安装包
             </span>
             <span v-else class="dl-checking">检测安装包…</span>
           </div>
