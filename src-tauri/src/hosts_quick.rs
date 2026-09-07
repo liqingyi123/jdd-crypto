@@ -1,6 +1,7 @@
 //! Near-cursor Host quick-switch popup + global shortcut.
 
 use std::str::FromStr;
+use std::sync::atomic::Ordering;
 use std::thread;
 use std::time::Duration;
 
@@ -10,11 +11,13 @@ use tauri::{
 use tauri_plugin_global_shortcut::Shortcut;
 use tauri_plugin_store::StoreExt;
 
+use crate::global_shortcuts;
 use crate::state::{AppState, DEFAULT_HOSTS_QUICK_SHORTCUT};
 use crate::windows;
 
 const SETTINGS_STORE: &str = "settings.json";
 const SHORTCUT_KEY: &str = "hostsQuickShortcut";
+const PREF_KEY: &str = "hostsQuickEnabled";
 
 pub const HOSTS_QUICK_LABEL: &str = "hosts-quick";
 const HOSTS_QUICK_WIDTH: f64 = 300.0;
@@ -39,8 +42,40 @@ pub fn save_shortcut(app: &AppHandle, shortcut: &str) {
     }
 }
 
+pub fn load_pref(app: &AppHandle) -> bool {
+    let Ok(store) = app.store(SETTINGS_STORE) else {
+        return true;
+    };
+    store
+        .get(PREF_KEY)
+        .and_then(|value| value.as_bool())
+        .unwrap_or(true)
+}
+
+pub fn save_pref(app: &AppHandle, enabled: bool) {
+    if let Ok(store) = app.store(SETTINGS_STORE) {
+        store.set(PREF_KEY, serde_json::json!(enabled));
+        let _ = store.save();
+    }
+}
+
+pub fn apply_pref(app: &AppHandle, enabled: bool) {
+    let state = app.state::<AppState>();
+    state
+        .hosts_quick_pref_enabled
+        .store(enabled, Ordering::Relaxed);
+    save_pref(app, enabled);
+    if !enabled {
+        hide(app);
+    }
+    let _ = global_shortcuts::register_all(app);
+}
+
 pub fn handle_shortcut(app: &AppHandle, shortcut: &Shortcut) {
     let state = app.state::<AppState>();
+    if !state.hosts_quick_pref_enabled.load(Ordering::Relaxed) {
+        return;
+    }
     let expected = state
         .hosts_quick_shortcut
         .lock()

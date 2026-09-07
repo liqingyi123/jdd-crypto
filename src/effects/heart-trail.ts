@@ -13,20 +13,27 @@ interface GlowNode {
 interface HeartStamp {
   x: number;
   y: number;
+  /** Outward fling velocity (px / frame). */
+  vx: number;
+  vy: number;
   life: number;
   size: number;
   angle: number;
+  /** Radians per frame — keeps hearts spinning while they fade. */
+  spin: number;
 }
 
 const DEFAULT_COLOR = "#FF2EC8";
-/** Dense enough for a continuous nebula band. */
+/** Dense enough for a continuous soft glow band. */
 const GLOW_GAP = 6;
 /** Hearts are sparse accents — path is carried by glow. */
 const HEART_GAP = 40;
-const MAX_GLOW = 140;
-const MAX_HEART = 18;
-/** ~1s fade — longer linger for a smoother continuous trail. */
-const LIFE_DECAY = 0.018;
+const MAX_GLOW = 220;
+const MAX_HEART = 28;
+/** ~1.5s+ fade — longer linger for a smoother continuous trail. */
+const LIFE_DECAY = 0.011;
+/** Per-frame drag so flung hearts ease out instead of flying forever. */
+const HEART_DRAG = 0.94;
 const GLOW_SPRITE = 96;
 const HEART_SPRITE = 40;
 
@@ -87,7 +94,7 @@ function createHeartSprite(color: string, size: number): HTMLCanvasElement {
 }
 
 /**
- * Dense path hearts + continuous soft glow ribbon (pre-baked sprites, no live blur).
+ * Path hearts + soft glow ribbon (pre-baked sprites). Line is the original style, thinner.
  */
 export class HeartTrail implements MouseTrailEngine {
   private readonly canvas: HTMLCanvasElement;
@@ -176,20 +183,24 @@ export class HeartTrail implements MouseTrailEngine {
       }
       if (this.heartCarry >= HEART_GAP) {
         this.heartCarry -= HEART_GAP;
-        // Force left/right of the glow band — never on the centerline.
+        // Spawn ahead along travel, then fling left/right + keep going forward.
         const nx = -uy;
         const ny = ux;
         const side = Math.random() < 0.5 ? -1 : 1;
-        const dist = 6 + Math.random() * 18;
-        const offset = dist * side;
-        // Outer hearts run smaller (dist 6→24 → size larger→smaller).
-        const outer = (dist - 6) / 18;
-        const size = 24 - outer * 12 + Math.random() * 3;
+        const lateral = (1.4 + Math.random() * 2.2) * side;
+        const forward = 1.8 + Math.random() * 2.4;
+        const spawnAhead = 10 + Math.random() * 16;
+        const size = 14 + Math.random() * 10;
+        // Spin matches fling side so rotation feels thrown, not stamped.
+        const spin = -side * (0.03 + Math.random() * 0.05);
         this.pushHeart(
-          px + nx * offset,
-          py + ny * offset,
+          px + ux * spawnAhead,
+          py + uy * spawnAhead,
+          nx * lateral + ux * forward,
+          ny * lateral + uy * forward,
           Math.random() * Math.PI * 2,
           size,
+          spin,
         );
       }
     }
@@ -200,12 +211,11 @@ export class HeartTrail implements MouseTrailEngine {
   }
 
   leaveScreen() {
+    // Break path continuity for next entry, but let existing particles fade out.
     this.hasLast = false;
     this.glowCarry = 0;
     this.heartCarry = 0;
-    this.glow = [];
-    this.hearts = [];
-    this.stopLoop(true);
+    this.kick();
   }
 
   start() {
@@ -234,16 +244,27 @@ export class HeartTrail implements MouseTrailEngine {
     this.glow.push({ x, y, life: 1 });
   }
 
-  private pushHeart(x: number, y: number, angle: number, size: number) {
+  private pushHeart(
+    x: number,
+    y: number,
+    vx: number,
+    vy: number,
+    angle: number,
+    size: number,
+    spin: number,
+  ) {
     if (this.hearts.length >= MAX_HEART) {
       this.hearts.shift();
     }
     this.hearts.push({
       x,
       y,
+      vx,
+      vy,
       life: 1,
       size,
       angle,
+      spin,
     });
   }
 
@@ -296,24 +317,29 @@ export class HeartTrail implements MouseTrailEngine {
       return false;
     }
 
-    // Continuous magenta ribbon — head (cursor / last) bright, tail faint.
+    // Soft glow ribbon — same style as before, ~65% width so it reads thinner.
     ctx.globalCompositeOperation = "lighter";
     const glowCount = this.glow.length;
     for (let i = 0; i < glowCount; i += 1) {
       const node = this.glow[i];
       const along = glowCount <= 1 ? 1 : i / (glowCount - 1);
-      // Milder head→tail contrast than along².
       const fade = along;
-      const size = (40 + 28 * fade) * (0.55 + 0.45 * node.life);
+      const size = (26 + 18 * fade) * (0.55 + 0.45 * node.life);
       const half = size * 0.5;
       ctx.globalAlpha = 0.48 * node.life * (0.35 + 0.65 * fade);
       ctx.drawImage(this.glowSprite, node.x - half, node.y - half, size, size);
     }
 
-    // Hearts on top of the glow band.
+    // Hearts fling outward from the path — spin + gentle pulse while fading.
     ctx.globalCompositeOperation = "source-over";
     for (const heart of this.hearts) {
-      const size = heart.size * (0.55 + 0.45 * heart.life);
+      heart.x += heart.vx;
+      heart.y += heart.vy;
+      heart.vx *= HEART_DRAG;
+      heart.vy *= HEART_DRAG;
+      heart.angle += heart.spin;
+      const pulse = 1 + 0.12 * Math.sin(heart.life * Math.PI * 3);
+      const size = heart.size * (0.55 + 0.45 * heart.life) * pulse;
       const half = size * 0.5;
       ctx.globalAlpha = heart.life;
       ctx.setTransform(1, 0, 0, 1, heart.x, heart.y);

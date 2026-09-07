@@ -553,6 +553,16 @@ pub fn take_pending_overlay_toast() -> Option<String> {
 }
 
 #[tauri::command]
+pub fn get_hosts_quick_pref(state: State<AppState>) -> bool {
+    state.hosts_quick_pref_enabled.load(Ordering::Relaxed)
+}
+
+#[tauri::command]
+pub fn set_hosts_quick_pref(app: AppHandle, enabled: bool) {
+    crate::hosts_quick::apply_pref(&app, enabled);
+}
+
+#[tauri::command]
 pub fn get_hosts_quick_shortcut(state: State<AppState>) -> String {
     state
         .hosts_quick_shortcut

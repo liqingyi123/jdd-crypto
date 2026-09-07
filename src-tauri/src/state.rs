@@ -33,6 +33,7 @@ pub struct AppState {
     pub compare_pref_enabled: AtomicBool,
     pub compare_active: AtomicBool,
     pub compare_mode_shortcut: Mutex<String>,
+    pub hosts_quick_pref_enabled: AtomicBool,
     pub hosts_quick_shortcut: Mutex<String>,
     pub pending_update: Mutex<Option<UpdateCheckResult>>,
 }
@@ -53,6 +54,7 @@ impl Default for AppState {
             compare_pref_enabled: AtomicBool::new(true),
             compare_active: AtomicBool::new(false),
             compare_mode_shortcut: Mutex::new(DEFAULT_COMPARE_MODE_SHORTCUT.to_string()),
+            hosts_quick_pref_enabled: AtomicBool::new(true),
             hosts_quick_shortcut: Mutex::new(DEFAULT_HOSTS_QUICK_SHORTCUT.to_string()),
             pending_update: Mutex::new(None),
         }

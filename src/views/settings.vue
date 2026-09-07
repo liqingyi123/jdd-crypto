@@ -59,6 +59,7 @@ const {
   previewDisplay: hostsQuickPreviewDisplay,
   buttonRef: hostsQuickButtonRef,
   startRecording: startHostsQuickRecording,
+  cancelRecording: cancelHostsQuickRecording,
   onRecordKey: onHostsQuickRecordKey,
   loadShortcut: loadHostsQuickShortcut,
 } = useShortcutRecorder({
@@ -76,6 +77,7 @@ const themeOptions: Array<{ value: ThemePreference; label: string }> = [
 const badgeSize = shallowRef(DEFAULT_BADGE_SIZE);
 const followPref = shallowRef(true);
 const comparePref = shallowRef(true);
+const hostsQuickPref = shallowRef(true);
 const autostartEnabled = shallowRef(false);
 const trailEnabled = shallowRef(DEFAULT_MOUSE_TRAIL_PREF.enabled);
 const trailEffect = shallowRef<MouseTrailEffect>(DEFAULT_MOUSE_TRAIL_PREF.effect);
@@ -137,6 +139,11 @@ onMounted(async () => {
     // browser preview
   }
   try {
+    hostsQuickPref.value = await invoke<boolean>("get_hosts_quick_pref");
+  } catch {
+    // browser preview
+  }
+  try {
     autostartEnabled.value = await invoke<boolean>("get_autostart_pref");
   } catch {
     autostartEnabled.value = false;
@@ -194,6 +201,15 @@ async function onComparePrefChange(value: string | number | boolean) {
     await cancelCompareRecording();
   }
   await invoke("set_compare_mode_pref", { enabled }).catch(() => undefined);
+}
+
+async function onHostsQuickPrefChange(value: string | number | boolean) {
+  const enabled = Boolean(value);
+  hostsQuickPref.value = enabled;
+  if (!enabled && hostsQuickRecording.value) {
+    await cancelHostsQuickRecording();
+  }
+  await invoke("set_hosts_quick_pref", { enabled }).catch(() => undefined);
 }
 
 async function onAutostartChange(value: string | number | boolean) {
@@ -412,6 +428,9 @@ function onThemeChange(value: string | number | boolean | undefined) {
     <section>
       <div class="section-head">
         <h2>Host 快速切换</h2>
+        <label class="row">
+          <ElSwitch :model-value="hostsQuickPref" @change="onHostsQuickPrefChange" />
+        </label>
       </div>
       <p>
         按下快捷键后在鼠标旁打开 Host 方案列表，切换开关后窗口自动关闭。
@@ -421,6 +440,7 @@ function onThemeChange(value: string | number | boolean | undefined) {
         <div ref="hostsQuickButtonRef">
           <ElButton
             :type="hostsQuickRecording ? 'primary' : 'default'"
+            :disabled="!hostsQuickPref"
             @click="startHostsQuickRecording"
             @keydown="onHostsQuickRecordKey"
           >

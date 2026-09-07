@@ -128,6 +128,8 @@ pub fn run() {
             commands::take_pending_overlay_toast,
             commands::get_hosts_quick_shortcut,
             commands::set_hosts_quick_shortcut,
+            commands::get_hosts_quick_pref,
+            commands::set_hosts_quick_pref,
             commands::check_app_update,
             commands::download_app_update,
             commands::install_app_update,
@@ -173,6 +175,10 @@ pub fn run() {
             if let Ok(mut current) = app.state::<AppState>().hosts_quick_shortcut.lock() {
                 *current = hosts_quick_shortcut;
             }
+            let hosts_quick_pref = hosts_quick::load_pref(app.handle());
+            app.state::<AppState>()
+                .hosts_quick_pref_enabled
+                .store(hosts_quick_pref, Ordering::Relaxed);
             mouse_follow::start_follow_loop(app.handle().clone());
             let _ = global_shortcuts::register_all(app.handle());
             if let Some(tip) = app.get_webview_window("compare-tip") {
