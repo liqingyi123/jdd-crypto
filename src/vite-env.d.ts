@@ -6,6 +6,14 @@ declare module "*.vue" {
   export default component;
 }
 
+declare module "@/assets/screensaver/parallax/parallax.js" {
+  const Parallax: new (element: HTMLElement) => {
+    enable: () => void;
+    disable: () => void;
+  };
+  export default Parallax;
+}
+
 declare module "element-plus/es/components/message/style/css";
 declare module "element-plus/es/components/message-box/style/css";
 

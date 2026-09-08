@@ -28,6 +28,9 @@ const BrightnessBubbleApp = defineAsyncComponent(
 const OverlayToastApp = defineAsyncComponent(
   () => import("@/windows/overlay-toast-app.vue"),
 );
+const ScreensaverApp = defineAsyncComponent(
+  () => import("@/windows/screensaver-app.vue"),
+);
 const MainApp = defineAsyncComponent(() => import("@/windows/main-app.vue"));
 const FeatureApp = defineAsyncComponent(() => import("@/windows/feature-app.vue"));
 const AppUpdateHost = defineAsyncComponent(
@@ -35,6 +38,7 @@ const AppUpdateHost = defineAsyncComponent(
 );
 
 const isMouseTrail = computed(() => props.windowLabel.startsWith("mouse-trail"));
+const isScreensaver = computed(() => props.windowLabel.startsWith("screensaver"));
 </script>
 
 <template>
@@ -46,6 +50,7 @@ const isMouseTrail = computed(() => props.windowLabel.startsWith("mouse-trail"))
   <HostsQuickApp v-else-if="windowLabel === 'hosts-quick'" />
   <BrightnessBubbleApp v-else-if="windowLabel === 'brightness-bubble'" />
   <OverlayToastApp v-else-if="windowLabel === 'overlay-toast'" />
+  <ScreensaverApp v-else-if="isScreensaver" />
   <MainApp v-else-if="windowLabel === 'main'" />
   <MouseTrailApp v-else-if="isMouseTrail" />
   <FeatureApp v-else :window-label="windowLabel" />

@@ -13,6 +13,7 @@ pub const DEFAULT_MOUSE_FOLLOW_SHORTCUT: &str = "Ctrl+Alt+G";
 pub const DEFAULT_COMPARE_MODE_SHORTCUT: &str = "Ctrl+Alt+D";
 pub const DEFAULT_HOSTS_QUICK_SHORTCUT: &str = "Ctrl+Alt+S";
 pub const DEFAULT_BRIGHTNESS_QUICK_SHORTCUT: &str = "Ctrl+Alt+L";
+pub const DEFAULT_SCREENSAVER_SHORTCUT: &str = "Ctrl+Alt+P";
 
 #[derive(Clone, Serialize)]
 pub struct ClipboardCandidate {
@@ -38,6 +39,9 @@ pub struct AppState {
     pub hosts_quick_shortcut: Mutex<String>,
     pub brightness_quick_pref_enabled: AtomicBool,
     pub brightness_quick_shortcut: Mutex<String>,
+    pub screensaver_pref_enabled: AtomicBool,
+    pub screensaver_shortcut: Mutex<String>,
+    pub screensaver_active: AtomicBool,
     pub pending_update: Mutex<Option<UpdateCheckResult>>,
 }
 
@@ -61,6 +65,9 @@ impl Default for AppState {
             hosts_quick_shortcut: Mutex::new(DEFAULT_HOSTS_QUICK_SHORTCUT.to_string()),
             brightness_quick_pref_enabled: AtomicBool::new(true),
             brightness_quick_shortcut: Mutex::new(DEFAULT_BRIGHTNESS_QUICK_SHORTCUT.to_string()),
+            screensaver_pref_enabled: AtomicBool::new(true),
+            screensaver_shortcut: Mutex::new(DEFAULT_SCREENSAVER_SHORTCUT.to_string()),
+            screensaver_active: AtomicBool::new(false),
             pending_update: Mutex::new(None),
         }
     }

@@ -22,6 +22,7 @@ pub enum ShortcutOwner {
     Compare,
     HostsQuick,
     BrightnessQuick,
+    Screensaver,
 }
 
 fn shortcut_id(raw: &str) -> Result<u32, String> {
@@ -66,6 +67,11 @@ pub fn ensure_no_conflict(
         .lock()
         .map(|guard| guard.clone())
         .unwrap_or_else(|_| crate::state::DEFAULT_BRIGHTNESS_QUICK_SHORTCUT.to_string());
+    let screensaver = state
+        .screensaver_shortcut
+        .lock()
+        .map(|guard| guard.clone())
+        .unwrap_or_else(|_| crate::state::DEFAULT_SCREENSAVER_SHORTCUT.to_string());
 
     if !matches!(owner, ShortcutOwner::MouseFollow)
         && shortcut_id(&follow)? == candidate_id
@@ -84,6 +90,11 @@ pub fn ensure_no_conflict(
         && shortcut_id(&brightness_quick)? == candidate_id
     {
         return Err(format!("与屏幕亮度快捷键 {brightness_quick} 冲突"));
+    }
+    if !matches!(owner, ShortcutOwner::Screensaver)
+        && shortcut_id(&screensaver)? == candidate_id
+    {
+        return Err(format!("与屏幕保护快捷键 {screensaver} 冲突"));
     }
 
     Ok(())
@@ -144,6 +155,18 @@ pub fn register_all(app: &AppHandle) -> Result<(), String> {
             Shortcut::from_str(&brightness_quick).map_err(|err| err.to_string())?;
         global
             .register(brightness_quick)
+            .map_err(|err| err.to_string())?;
+    }
+
+    if state.screensaver_pref_enabled.load(Ordering::Relaxed) {
+        let screensaver = state
+            .screensaver_shortcut
+            .lock()
+            .map(|guard| guard.clone())
+            .unwrap_or_else(|_| crate::state::DEFAULT_SCREENSAVER_SHORTCUT.to_string());
+        let screensaver = Shortcut::from_str(&screensaver).map_err(|err| err.to_string())?;
+        global
+            .register(screensaver)
             .map_err(|err| err.to_string())?;
     }
 

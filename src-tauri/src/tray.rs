@@ -4,6 +4,7 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Manager, Runtime};
 
 use crate::brightness_quick;
+use crate::screensaver;
 use crate::windows;
 
 pub fn build_app_menu<R: Runtime, M: Manager<R>>(app: &M) -> tauri::Result<Menu<R>> {
@@ -11,6 +12,7 @@ pub fn build_app_menu<R: Runtime, M: Manager<R>>(app: &M) -> tauri::Result<Menu<
     let settings = MenuItem::with_id(app, "settings", "功能设置", true, None::<&str>)?;
     let hosts = MenuItem::with_id(app, "hosts", "Host管理", true, None::<&str>)?;
     let brightness = MenuItem::with_id(app, "brightness", "亮度调节", true, None::<&str>)?;
+    let screensaver_item = MenuItem::with_id(app, "screensaver", "屏幕保护", true, None::<&str>)?;
     let about = MenuItem::with_id(app, "about", "关于", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
     let sep = PredefinedMenuItem::separator(app)?;
@@ -22,6 +24,7 @@ pub fn build_app_menu<R: Runtime, M: Manager<R>>(app: &M) -> tauri::Result<Menu<
             &settings,
             &hosts,
             &brightness,
+            &screensaver_item,
             &about,
             &sep,
             &quit,
@@ -35,6 +38,7 @@ pub fn handle_menu_id(app: &AppHandle, id: &str) {
         "settings" => windows::show_feature(app, "settings"),
         "hosts" => windows::show_feature(app, "hosts"),
         "brightness" => brightness_quick::show(app),
+        "screensaver" => screensaver::show(app),
         "about" => windows::show_feature(app, "about"),
         "quit" => app.exit(0),
         _ => {}

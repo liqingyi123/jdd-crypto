@@ -84,6 +84,22 @@ const {
   defaultShortcut: "Ctrl+Alt+L",
 });
 
+const {
+  recording: screensaverRecording,
+  errorMessage: screensaverErrorMessage,
+  display: screensaverDisplay,
+  previewDisplay: screensaverPreviewDisplay,
+  buttonRef: screensaverButtonRef,
+  startRecording: startScreensaverRecording,
+  cancelRecording: cancelScreensaverRecording,
+  onRecordKey: onScreensaverRecordKey,
+  loadShortcut: loadScreensaverShortcut,
+} = useShortcutRecorder({
+  getCommand: "get_screensaver_shortcut",
+  setCommand: "set_screensaver_shortcut",
+  defaultShortcut: "Ctrl+Alt+P",
+});
+
 const themeOptions: Array<{ value: ThemePreference; label: string }> = [
   { value: "system", label: "跟随系统" },
   { value: "light", label: "浅色" },
@@ -95,6 +111,8 @@ const followPref = shallowRef(true);
 const comparePref = shallowRef(true);
 const hostsQuickPref = shallowRef(true);
 const brightnessQuickPref = shallowRef(true);
+const screensaverPref = shallowRef(true);
+const screensaverEffect = shallowRef<"parallax">("parallax");
 const autostartEnabled = shallowRef(false);
 const intranetServerBase = shallowRef("http://172.20.2.169:7101/");
 const intranetServerSaving = shallowRef(false);
@@ -234,6 +252,17 @@ onMounted(async () => {
     // browser preview
   }
   try {
+    screensaverPref.value = await invoke<boolean>("get_screensaver_pref");
+  } catch {
+    // browser preview
+  }
+  try {
+    await invoke<{ effect: string }>("get_screensaver_effect_pref");
+    screensaverEffect.value = "parallax";
+  } catch {
+    screensaverEffect.value = "parallax";
+  }
+  try {
     autostartEnabled.value = await invoke<boolean>("get_autostart_pref");
   } catch {
     autostartEnabled.value = false;
@@ -253,6 +282,7 @@ onMounted(async () => {
   await loadCompareShortcut();
   await loadHostsQuickShortcut();
   await loadBrightnessShortcut();
+  await loadScreensaverShortcut();
   try {
     unlistenTrailPref = await listen<MouseTrailPref>("app://mouse-trail-pref", (event) => {
       applyTrailPref(event.payload);
@@ -350,6 +380,32 @@ async function onBrightnessQuickPrefChange(value: string | number | boolean) {
     await invoke("set_brightness_quick_pref", { enabled });
   } catch (error) {
     brightnessQuickPref.value = previous;
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
+}
+
+async function onScreensaverPrefChange(value: string | number | boolean) {
+  const enabled = Boolean(value);
+  const previous = screensaverPref.value;
+  screensaverPref.value = enabled;
+  if (!enabled && screensaverRecording.value) {
+    await cancelScreensaverRecording();
+  }
+  try {
+    await invoke("set_screensaver_pref", { enabled });
+  } catch (error) {
+    screensaverPref.value = previous;
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
+}
+
+async function onScreensaverEffectChange(_value: string | number | boolean | undefined) {
+  const previous = screensaverEffect.value;
+  screensaverEffect.value = "parallax";
+  try {
+    await invoke<{ effect: string }>("set_screensaver_effect", { effect: "parallax" });
+  } catch (error) {
+    screensaverEffect.value = previous;
     ElMessage.error(error instanceof Error ? error.message : String(error));
   }
 }
@@ -666,6 +722,49 @@ async function onThemeChange(value: string | number | boolean | undefined) {
               {{ brightnessErrorMessage }}
             </p>
             <p>最多 4 个键，需包含修饰键。点击按钮后按下新组合，Esc 或点击其他区域取消。</p>
+          </section>
+          <section>
+            <div class="section-head">
+              <h2>屏幕保护</h2>
+              <label class="row">
+                <ElSwitch
+                  :model-value="screensaverPref"
+                  @change="onScreensaverPrefChange"
+                />
+              </label>
+            </div>
+            <p>
+              按下快捷键后在所有显示器全屏显示屏幕保护特效；按 ESC 或再次快捷键退出。开启期间会暂时关闭鼠标轨迹。
+            </p>
+            <div class="row">
+              <span>快捷键</span>
+              <div ref="screensaverButtonRef">
+                <ElButton
+                  :type="screensaverRecording ? 'primary' : 'default'"
+                  :disabled="!screensaverPref"
+                  @click="startScreensaverRecording"
+                  @keydown="onScreensaverRecordKey"
+                >
+                  {{
+                    screensaverRecording
+                      ? screensaverPreviewDisplay
+                      : screensaverDisplay
+                  }}
+                </ElButton>
+              </div>
+            </div>
+            <p v-if="screensaverErrorMessage" class="error">
+              {{ screensaverErrorMessage }}
+            </p>
+            <p>最多 4 个键，需包含修饰键。点击按钮后按下新组合，Esc 或点击其他区域取消。</p>
+            <h3>特效</h3>
+            <ElRadioGroup
+              :model-value="screensaverEffect"
+              :disabled="!screensaverPref"
+              @change="onScreensaverEffectChange"
+            >
+              <ElRadio value="parallax">海景视差</ElRadio>
+            </ElRadioGroup>
           </section>
         </div>
       </ElTabPane>

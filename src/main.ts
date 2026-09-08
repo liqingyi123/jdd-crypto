@@ -16,6 +16,7 @@ async function resolveWindowLabel(): Promise<string> {
 async function bootstrap() {
   const windowLabel = await resolveWindowLabel();
   const isMouseTrail = windowLabel.startsWith("mouse-trail");
+  const isScreensaver = windowLabel.startsWith("screensaver");
   const isTransparentChrome =
     windowLabel === "badge" ||
     windowLabel === "clipboard-prompt" ||
@@ -36,6 +37,11 @@ async function bootstrap() {
     } catch {
       // browser preview
     }
+  } else if (isScreensaver) {
+    document.documentElement.classList.add("badge-window");
+    document.body.style.background = "#000";
+    document.body.style.margin = "0";
+    document.body.style.overflow = "hidden";
   } else if (windowLabel === "compare-tip" || windowLabel === "overlay-toast") {
     await import("./styles/theme.css");
     document.documentElement.classList.add("badge-window");

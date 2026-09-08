@@ -48,6 +48,8 @@ static TRAIL_SHORTCUT_IDS: OnceLock<(u32, [u32; 6])> = OnceLock::new();
 
 static CURSOR_LOOP_STARTED: AtomicBool = AtomicBool::new(false);
 static TRAIL_ENABLED: AtomicBool = AtomicBool::new(false);
+/// Runtime suppress while screensaver is active (does not change user pref).
+static TRAIL_SUPPRESSED: AtomicBool = AtomicBool::new(false);
 static DISPLAY_LISTENER_STARTED: AtomicBool = AtomicBool::new(false);
 static DISPLAY_CHANGE_SEQ: AtomicU64 = AtomicU64::new(0);
 static APP_FOR_DISPLAY: OnceLock<AppHandle> = OnceLock::new();
@@ -466,13 +468,29 @@ fn switch_effect_by_index(app: &AppHandle, index: usize) -> Result<MouseTrailPre
     Ok(updated)
 }
 
+fn trail_visually_active() -> bool {
+    TRAIL_ENABLED.load(Ordering::Relaxed) && !TRAIL_SUPPRESSED.load(Ordering::Relaxed)
+}
+
+/// Hide trail overlays while screensaver is on; keeps user `enabled` pref intact.
+pub fn pause_for_screensaver(app: &AppHandle) {
+    TRAIL_SUPPRESSED.store(true, Ordering::Relaxed);
+    schedule_sync_overlays(app, false);
+}
+
+/// Restore trail overlays after screensaver if user preference is still enabled.
+pub fn resume_after_screensaver(app: &AppHandle) {
+    TRAIL_SUPPRESSED.store(false, Ordering::Relaxed);
+    schedule_sync_overlays(app, TRAIL_ENABLED.load(Ordering::Relaxed));
+}
+
 /// Flip the enabled flag and schedule overlay sync off the invoke path
 /// so settings UI does not wait on WebView creation.
 pub fn set_enabled(app: &AppHandle, enabled: bool) {
     ensure_display_listener(app);
     TRAIL_ENABLED.store(enabled, Ordering::Relaxed);
     ensure_cursor_loop(app);
-    schedule_sync_overlays(app, enabled);
+    schedule_sync_overlays(app, trail_visually_active());
 }
 
 fn ensure_display_listener(app: &AppHandle) {
@@ -502,7 +520,7 @@ fn notify_display_changed() {
 
 fn on_display_changed(app: &AppHandle) {
     let handle = app.clone();
-    let trail_on = TRAIL_ENABLED.load(Ordering::Relaxed);
+    let trail_on = trail_visually_active();
     let _ = app.run_on_main_thread(move || {
         crate::windows::relocate_windows_to_visible_monitors(&handle);
         if !trail_on {
@@ -544,7 +562,7 @@ fn restore_interactive_focus(app: &AppHandle) {
 
 /// Keep trail overlays above other windows without stealing focus.
 pub fn raise_overlays(app: &AppHandle) {
-    if !TRAIL_ENABLED.load(Ordering::Relaxed) {
+    if !trail_visually_active() {
         return;
     }
     // Badge first, then trail last so trail stays topmost among our windows
@@ -563,7 +581,7 @@ pub fn raise_overlays(app: &AppHandle) {
 
 /// Raise immediately, then once more after a short delay (focus race).
 pub fn schedule_raise_overlays(app: &AppHandle) {
-    if !TRAIL_ENABLED.load(Ordering::Relaxed) {
+    if !trail_visually_active() {
         return;
     }
     raise_overlays(app);
@@ -666,7 +684,7 @@ fn cursor_loop(app: AppHandle) {
         .checked_sub(RAISE_INTERVAL)
         .unwrap_or_else(Instant::now);
     loop {
-        if TRAIL_ENABLED.load(Ordering::Relaxed) {
+        if trail_visually_active() {
             if let Some((x, y)) = crate::windows::cursor_pos_public() {
                 if last != Some((x, y)) {
                     last = Some((x, y));

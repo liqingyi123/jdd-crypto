@@ -12,6 +12,7 @@ mod intranet_server;
 mod mouse_follow;
 mod mouse_trail;
 mod overlay_toast;
+mod screensaver;
 mod state;
 mod tray;
 mod windows;
@@ -56,6 +57,7 @@ pub fn run() {
                         compare_mode::handle_shortcut(app, shortcut);
                         hosts_quick::handle_shortcut(app, shortcut);
                         brightness_quick::handle_shortcut(app, shortcut);
+                        screensaver::handle_shortcut(app, shortcut);
                     }
                 })
                 .build(),
@@ -136,6 +138,14 @@ pub fn run() {
             commands::set_brightness_quick_pref,
             commands::get_brightness_quick_shortcut,
             commands::set_brightness_quick_shortcut,
+            commands::hide_screensaver,
+            commands::toggle_screensaver,
+            commands::get_screensaver_pref,
+            commands::set_screensaver_pref,
+            commands::get_screensaver_shortcut,
+            commands::set_screensaver_shortcut,
+            commands::get_screensaver_effect_pref,
+            commands::set_screensaver_effect,
             commands::check_app_update,
             commands::download_app_update,
             commands::install_app_update,
@@ -193,6 +203,14 @@ pub fn run() {
             app.state::<AppState>()
                 .brightness_quick_pref_enabled
                 .store(brightness_quick_pref, Ordering::Relaxed);
+            let screensaver_shortcut = screensaver::load_shortcut(app.handle());
+            if let Ok(mut current) = app.state::<AppState>().screensaver_shortcut.lock() {
+                *current = screensaver_shortcut;
+            }
+            let screensaver_pref = screensaver::load_pref(app.handle());
+            app.state::<AppState>()
+                .screensaver_pref_enabled
+                .store(screensaver_pref, Ordering::Relaxed);
             mouse_follow::start_follow_loop(app.handle().clone());
             let _ = global_shortcuts::register_all(app.handle());
             if let Some(tip) = app.get_webview_window("compare-tip") {

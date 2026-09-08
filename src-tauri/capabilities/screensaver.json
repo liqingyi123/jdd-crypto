@@ -1,0 +1,27 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "screensaver-overlays",
+  "description": "Per-monitor fullscreen screensaver overlays",
+  "windows": [
+    "screensaver-0",
+    "screensaver-1",
+    "screensaver-2",
+    "screensaver-3",
+    "screensaver-4",
+    "screensaver-5",
+    "screensaver-6",
+    "screensaver-7"
+  ],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-close",
+    "core:window:allow-set-size",
+    "core:window:allow-set-position",
+    "core:window:allow-set-focus",
+    "core:window:allow-set-always-on-top",
+    "core:window:allow-set-skip-taskbar"
+  ]
+}

@@ -255,7 +255,7 @@ pub fn watch_badge_position(app: &AppHandle) {
 }
 
 /// Move app windows that no longer intersect any monitor onto the nearest work area.
-/// Skips mouse-trail overlays (managed by mouse_trail::sync_overlays).
+/// Skips mouse-trail / screensaver overlays (managed by their own sync).
 pub fn relocate_windows_to_visible_monitors(app: &AppHandle) {
     let monitors = app.available_monitors().unwrap_or_default();
     if monitors.is_empty() {
@@ -276,7 +276,7 @@ pub fn relocate_windows_to_visible_monitors(app: &AppHandle) {
         .collect();
 
     for (label, win) in app.webview_windows() {
-        if label.starts_with("mouse-trail-") {
+        if label.starts_with("mouse-trail-") || label.starts_with("screensaver-") {
             continue;
         }
         let Ok(pos) = win.outer_position() else {
