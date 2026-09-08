@@ -2,7 +2,7 @@ use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::OnceLock;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use tauri::{
@@ -21,6 +21,9 @@ const DEFAULT_DOTS_COLOR: &str = "#00D1CE";
 const DEFAULT_HEART_COLOR: &str = "#FF2EC8";
 const DEFAULT_RIPPLE_COLOR: &str = "#2A2A2E";
 const DISPLAY_CHANGE_DEBOUNCE: Duration = Duration::from_millis(300);
+/// Re-assert TOPMOST so trail stays above other apps / our popups.
+const RAISE_INTERVAL: Duration = Duration::from_millis(300);
+const RAISE_FOCUS_RETRY: Duration = Duration::from_millis(50);
 const TRAIL_ARM_SHORTCUT: &str = "Ctrl+T";
 const TRAIL_EFFECT_SHORTCUTS: [&str; 6] = [
     "Ctrl+1",
@@ -523,7 +526,7 @@ fn schedule_sync_overlays(app: &AppHandle, visible: bool) {
             if visible {
                 // Focus interactive windows first, then re-raise trail above them.
                 restore_interactive_focus(&handle_for_main);
-                raise_overlays(&handle_for_main);
+                schedule_raise_overlays(&handle_for_main);
             }
         });
     });
@@ -539,12 +542,13 @@ fn restore_interactive_focus(app: &AppHandle) {
     }
 }
 
-/// Keep trail overlays above other app windows without stealing focus.
+/// Keep trail overlays above other windows without stealing focus.
 pub fn raise_overlays(app: &AppHandle) {
     if !TRAIL_ENABLED.load(Ordering::Relaxed) {
         return;
     }
-    // Badge first, then trail last so trail stays topmost among our windows.
+    // Badge first, then trail last so trail stays topmost among our windows
+    // and reclaim TOPMOST order against other apps.
     if let Some(badge) = app.get_webview_window("badge") {
         let _ = badge.set_always_on_top(true);
     }
@@ -555,6 +559,22 @@ pub fn raise_overlays(app: &AppHandle) {
         let _ = win.set_ignore_cursor_events(true);
         let _ = win.set_always_on_top(true);
     }
+}
+
+/// Raise immediately, then once more after a short delay (focus race).
+pub fn schedule_raise_overlays(app: &AppHandle) {
+    if !TRAIL_ENABLED.load(Ordering::Relaxed) {
+        return;
+    }
+    raise_overlays(app);
+    let handle = app.clone();
+    thread::spawn(move || {
+        thread::sleep(RAISE_FOCUS_RETRY);
+        let app = handle.clone();
+        let _ = handle.run_on_main_thread(move || {
+            raise_overlays(&app);
+        });
+    });
 }
 
 pub fn sync_overlays(app: &AppHandle, visible: bool) {
@@ -642,6 +662,9 @@ fn ensure_cursor_loop(app: &AppHandle) {
 
 fn cursor_loop(app: AppHandle) {
     let mut last: Option<(i32, i32)> = None;
+    let mut last_raise = Instant::now()
+        .checked_sub(RAISE_INTERVAL)
+        .unwrap_or_else(Instant::now);
     loop {
         if TRAIL_ENABLED.load(Ordering::Relaxed) {
             if let Some((x, y)) = crate::windows::cursor_pos_public() {
@@ -650,6 +673,13 @@ fn cursor_loop(app: AppHandle) {
                     let payload = MouseTrailCursor { x, y };
                     let _ = app.emit_filter("app://mouse-trail-cursor", payload, is_overlay_target);
                 }
+            }
+            if last_raise.elapsed() >= RAISE_INTERVAL {
+                last_raise = Instant::now();
+                let handle = app.clone();
+                let _ = app.run_on_main_thread(move || {
+                    raise_overlays(&handle);
+                });
             }
             // ~60fps for smoother trail continuity across engines.
             thread::sleep(Duration::from_millis(16));

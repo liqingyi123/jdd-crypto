@@ -60,7 +60,7 @@ fn focus_window(app: &AppHandle, win: &WebviewWindow) {
     let _ = win.show();
     let _ = win.set_focus();
     // Re-raise trail after focus so overlays stay above feature/main windows.
-    crate::mouse_trail::raise_overlays(app);
+    crate::mouse_trail::schedule_raise_overlays(app);
 }
 
 pub fn show_main(app: &AppHandle, hint: Option<CryptoHint>) {
@@ -104,7 +104,7 @@ pub fn show_feature(app: &AppHandle, label: &str) {
 
     if let Ok(win) = result {
         bind_close_to_hide(&win);
-        crate::mouse_trail::raise_overlays(app);
+        crate::mouse_trail::schedule_raise_overlays(app);
     }
 }
 
@@ -488,6 +488,7 @@ pub fn show_crypto_bubble(app: &AppHandle, hint: CryptoHint) {
         let _ = win.set_focus();
         emit_crypto_bubble_hint(app, &win, &hint);
         hide_clipboard_prompt(app);
+        crate::mouse_trail::schedule_raise_overlays(app);
         return;
     }
 
@@ -523,6 +524,7 @@ pub fn show_crypto_bubble(app: &AppHandle, hint: CryptoHint) {
             let _ = win.set_focus();
             emit_crypto_bubble_hint(app, &win, &hint);
             hide_clipboard_prompt(app);
+            crate::mouse_trail::schedule_raise_overlays(app);
         }
         Err(err) => {
             eprintln!("[crypto-bubble] create failed: {err}");

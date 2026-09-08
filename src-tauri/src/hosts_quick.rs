@@ -111,6 +111,7 @@ pub fn show(app: &AppHandle) {
         let _ = win.show();
         let _ = win.set_focus();
         let _ = win.emit("hosts://quick-open", ());
+        crate::mouse_trail::schedule_raise_overlays(app);
         return;
     }
 
@@ -138,6 +139,7 @@ pub fn show(app: &AppHandle) {
         let _ = win.set_position(PhysicalPosition::new(target.0, target.1));
         let _ = win.set_always_on_top(true);
         windows::bind_close_to_hide(&win);
+        crate::mouse_trail::schedule_raise_overlays(app);
         let handle = app.clone();
         thread::spawn(move || {
             thread::sleep(Duration::from_millis(80));

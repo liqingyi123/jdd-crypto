@@ -283,6 +283,7 @@ fn show_tip(app: &AppHandle, message: &str) {
         let _ = win.show();
         let _ = win.emit("app://compare-tip", message);
         let _ = app.emit("app://compare-tip", message);
+        crate::mouse_trail::schedule_raise_overlays(app);
     }
 }
 
@@ -313,6 +314,7 @@ pub fn show_compare_bubble(app: &AppHandle, payload: CompareBubblePayload) {
         let _ = win.set_focus();
         let _ = win.emit("app://compare-bubble", &payload);
         let _ = app.emit("app://compare-bubble", &payload);
+        crate::mouse_trail::schedule_raise_overlays(app);
         return;
     }
 
@@ -340,6 +342,7 @@ pub fn show_compare_bubble(app: &AppHandle, payload: CompareBubblePayload) {
         windows::bind_close_to_hide(&win);
         let _ = win.set_position(PhysicalPosition::new(x, y));
         let _ = win.set_always_on_top(true);
+        crate::mouse_trail::schedule_raise_overlays(app);
         let _ = win.emit("app://compare-bubble", &payload);
         let handle = app.clone();
         let delayed = payload.clone();

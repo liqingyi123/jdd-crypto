@@ -120,6 +120,7 @@ fn show_on_main(app: &AppHandle, message: String) {
         let _ = win.set_ignore_cursor_events(true);
         let _ = win.show();
         emit_toast(app, &message);
+        crate::mouse_trail::schedule_raise_overlays(app);
         let handle = app.clone();
         let msg = message.clone();
         thread::spawn(move || {
@@ -158,6 +159,7 @@ fn show_on_main(app: &AppHandle, message: String) {
             let _ = win.set_always_on_top(true);
             let _ = win.set_ignore_cursor_events(true);
             windows::bind_close_to_hide(&win);
+            crate::mouse_trail::schedule_raise_overlays(app);
             let handle = app.clone();
             let msg = message.clone();
             thread::spawn(move || {
