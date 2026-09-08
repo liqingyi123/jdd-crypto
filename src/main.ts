@@ -22,6 +22,8 @@ async function bootstrap() {
     windowLabel === "crypto-bubble" ||
     windowLabel === "compare-tip" ||
     windowLabel === "compare-bubble" ||
+    windowLabel === "hosts-quick" ||
+    windowLabel === "brightness-bubble" ||
     windowLabel === "overlay-toast";
 
   if (isMouseTrail) {

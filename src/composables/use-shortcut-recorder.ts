@@ -66,7 +66,7 @@ export function useShortcutRecorder(options?: {
 }) {
   const getCommand = options?.getCommand ?? "get_mouse_follow_shortcut";
   const setCommand = options?.setCommand ?? "set_mouse_follow_shortcut";
-  const shortcut = shallowRef(options?.defaultShortcut ?? "Ctrl+Shift+G");
+  const shortcut = shallowRef(options?.defaultShortcut ?? "Ctrl+Alt+G");
   const recording = shallowRef(false);
   const preview = shallowRef("");
   const errorMessage = shallowRef("");

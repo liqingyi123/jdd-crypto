@@ -22,6 +22,9 @@ const CompareBubbleApp = defineAsyncComponent(
 const HostsQuickApp = defineAsyncComponent(
   () => import("@/windows/hosts-quick-app.vue"),
 );
+const BrightnessBubbleApp = defineAsyncComponent(
+  () => import("@/windows/brightness-bubble-app.vue"),
+);
 const OverlayToastApp = defineAsyncComponent(
   () => import("@/windows/overlay-toast-app.vue"),
 );
@@ -41,6 +44,7 @@ const isMouseTrail = computed(() => props.windowLabel.startsWith("mouse-trail"))
   <CompareTipApp v-else-if="windowLabel === 'compare-tip'" />
   <CompareBubbleApp v-else-if="windowLabel === 'compare-bubble'" />
   <HostsQuickApp v-else-if="windowLabel === 'hosts-quick'" />
+  <BrightnessBubbleApp v-else-if="windowLabel === 'brightness-bubble'" />
   <OverlayToastApp v-else-if="windowLabel === 'overlay-toast'" />
   <MainApp v-else-if="windowLabel === 'main'" />
   <MouseTrailApp v-else-if="isMouseTrail" />

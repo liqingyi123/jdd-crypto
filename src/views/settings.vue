@@ -49,7 +49,7 @@ const {
 } = useShortcutRecorder({
   getCommand: "get_compare_mode_shortcut",
   setCommand: "set_compare_mode_shortcut",
-  defaultShortcut: "Ctrl+Shift+D",
+  defaultShortcut: "Ctrl+Alt+D",
 });
 
 const {
@@ -68,6 +68,22 @@ const {
   defaultShortcut: "Ctrl+Alt+S",
 });
 
+const {
+  recording: brightnessRecording,
+  errorMessage: brightnessErrorMessage,
+  display: brightnessDisplay,
+  previewDisplay: brightnessPreviewDisplay,
+  buttonRef: brightnessButtonRef,
+  startRecording: startBrightnessRecording,
+  cancelRecording: cancelBrightnessRecording,
+  onRecordKey: onBrightnessRecordKey,
+  loadShortcut: loadBrightnessShortcut,
+} = useShortcutRecorder({
+  getCommand: "get_brightness_quick_shortcut",
+  setCommand: "set_brightness_quick_shortcut",
+  defaultShortcut: "Ctrl+Alt+L",
+});
+
 const themeOptions: Array<{ value: ThemePreference; label: string }> = [
   { value: "system", label: "跟随系统" },
   { value: "light", label: "浅色" },
@@ -78,6 +94,7 @@ const badgeSize = shallowRef(DEFAULT_BADGE_SIZE);
 const followPref = shallowRef(true);
 const comparePref = shallowRef(true);
 const hostsQuickPref = shallowRef(true);
+const brightnessQuickPref = shallowRef(true);
 const autostartEnabled = shallowRef(false);
 const intranetServerBase = shallowRef("http://172.20.2.169:7101/");
 const intranetServerSaving = shallowRef(false);
@@ -212,6 +229,11 @@ onMounted(async () => {
     // browser preview
   }
   try {
+    brightnessQuickPref.value = await invoke<boolean>("get_brightness_quick_pref");
+  } catch {
+    // browser preview
+  }
+  try {
     autostartEnabled.value = await invoke<boolean>("get_autostart_pref");
   } catch {
     autostartEnabled.value = false;
@@ -230,6 +252,7 @@ onMounted(async () => {
   await loadShortcut();
   await loadCompareShortcut();
   await loadHostsQuickShortcut();
+  await loadBrightnessShortcut();
   try {
     unlistenTrailPref = await listen<MouseTrailPref>("app://mouse-trail-pref", (event) => {
       applyTrailPref(event.payload);
@@ -312,6 +335,21 @@ async function onHostsQuickPrefChange(value: string | number | boolean) {
     await invoke("set_hosts_quick_pref", { enabled });
   } catch (error) {
     hostsQuickPref.value = previous;
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
+}
+
+async function onBrightnessQuickPrefChange(value: string | number | boolean) {
+  const enabled = Boolean(value);
+  const previous = brightnessQuickPref.value;
+  brightnessQuickPref.value = enabled;
+  if (!enabled && brightnessRecording.value) {
+    await cancelBrightnessRecording();
+  }
+  try {
+    await invoke("set_brightness_quick_pref", { enabled });
+  } catch (error) {
+    brightnessQuickPref.value = previous;
     ElMessage.error(error instanceof Error ? error.message : String(error));
   }
 }
@@ -549,7 +587,7 @@ async function onThemeChange(value: string | number | boolean | undefined) {
         </div>
       </ElTabPane>
 
-      <ElTabPane label="鼠标轨迹" name="trail">
+      <ElTabPane label="系统易用性" name="usability">
         <div class="tab-panels">
           <section>
             <div class="section-head">
@@ -593,6 +631,41 @@ async function onThemeChange(value: string | number | boolean | undefined) {
                 </ElButton>
               </div>
             </template>
+          </section>
+          <section>
+            <div class="section-head">
+              <h2>屏幕亮度调节</h2>
+              <label class="row">
+                <ElSwitch
+                  :model-value="brightnessQuickPref"
+                  @change="onBrightnessQuickPrefChange"
+                />
+              </label>
+            </div>
+            <p>
+              按下快捷键后在鼠标旁打开亮度气泡，为每个显示器显示进度条，拖动即可调节该屏物理亮度。
+            </p>
+            <div class="row">
+              <span>快捷键</span>
+              <div ref="brightnessButtonRef">
+                <ElButton
+                  :type="brightnessRecording ? 'primary' : 'default'"
+                  :disabled="!brightnessQuickPref"
+                  @click="startBrightnessRecording"
+                  @keydown="onBrightnessRecordKey"
+                >
+                  {{
+                    brightnessRecording
+                      ? brightnessPreviewDisplay
+                      : brightnessDisplay
+                  }}
+                </ElButton>
+              </div>
+            </div>
+            <p v-if="brightnessErrorMessage" class="error">
+              {{ brightnessErrorMessage }}
+            </p>
+            <p>最多 4 个键，需包含修饰键。点击按钮后按下新组合，Esc 或点击其他区域取消。</p>
           </section>
         </div>
       </ElTabPane>

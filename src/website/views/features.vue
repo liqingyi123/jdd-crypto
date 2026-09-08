@@ -36,8 +36,8 @@ const isMacos = detectPlatform() === "macos";
         <ol>
           <li>
             鼠标跟随（macOS）与 Windows 相同，默认快捷键为
-            <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd>（Mac 键盘上的 Control 即 Ctrl）；文本对比模式默认为
-            <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>，均可在设置中自定义。首次使用若快捷键无反应、或选中文本后无法自动复制，请在
+            <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>G</kbd>（Mac 键盘上的 Control 即 Ctrl）；文本对比模式默认为
+            <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>D</kbd>，均可在设置中自定义。首次使用若快捷键无反应、或选中文本后无法自动复制，请在
             <strong>系统设置 → 隐私与安全性 → 辅助功能</strong>
             中为「多多工具箱」开启权限（全局快捷键与模拟 ⌘C 均依赖此项）。
           </li>

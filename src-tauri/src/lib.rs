@@ -1,5 +1,7 @@
 mod app_update;
 mod autostart_pref;
+mod brightness_control;
+mod brightness_quick;
 mod clipboard;
 mod commands;
 mod compare_mode;
@@ -53,6 +55,7 @@ pub fn run() {
                         mouse_follow::handle_follow_shortcut(app, shortcut);
                         compare_mode::handle_shortcut(app, shortcut);
                         hosts_quick::handle_shortcut(app, shortcut);
+                        brightness_quick::handle_shortcut(app, shortcut);
                     }
                 })
                 .build(),
@@ -126,6 +129,13 @@ pub fn run() {
             commands::set_hosts_quick_shortcut,
             commands::get_hosts_quick_pref,
             commands::set_hosts_quick_pref,
+            commands::list_display_brightness,
+            commands::set_display_brightness,
+            commands::hide_brightness_bubble,
+            commands::get_brightness_quick_pref,
+            commands::set_brightness_quick_pref,
+            commands::get_brightness_quick_shortcut,
+            commands::set_brightness_quick_shortcut,
             commands::check_app_update,
             commands::download_app_update,
             commands::install_app_update,
@@ -175,6 +185,14 @@ pub fn run() {
             app.state::<AppState>()
                 .hosts_quick_pref_enabled
                 .store(hosts_quick_pref, Ordering::Relaxed);
+            let brightness_quick_shortcut = brightness_quick::load_shortcut(app.handle());
+            if let Ok(mut current) = app.state::<AppState>().brightness_quick_shortcut.lock() {
+                *current = brightness_quick_shortcut;
+            }
+            let brightness_quick_pref = brightness_quick::load_pref(app.handle());
+            app.state::<AppState>()
+                .brightness_quick_pref_enabled
+                .store(brightness_quick_pref, Ordering::Relaxed);
             mouse_follow::start_follow_loop(app.handle().clone());
             let _ = global_shortcuts::register_all(app.handle());
             if let Some(tip) = app.get_webview_window("compare-tip") {

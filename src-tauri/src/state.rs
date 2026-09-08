@@ -9,9 +9,10 @@ pub const BADGE_HIDDEN_SIZE: u32 = 0;
 pub const MIN_BADGE_SIZE: u32 = 38;
 /// Default badge diameter in CSS/logical pixels. Keep in sync with `src/constants/badge.ts`.
 pub const DEFAULT_BADGE_SIZE: u32 = 68;
-pub const DEFAULT_MOUSE_FOLLOW_SHORTCUT: &str = "Ctrl+Shift+G";
-pub const DEFAULT_COMPARE_MODE_SHORTCUT: &str = "Ctrl+Shift+D";
+pub const DEFAULT_MOUSE_FOLLOW_SHORTCUT: &str = "Ctrl+Alt+G";
+pub const DEFAULT_COMPARE_MODE_SHORTCUT: &str = "Ctrl+Alt+D";
 pub const DEFAULT_HOSTS_QUICK_SHORTCUT: &str = "Ctrl+Alt+S";
+pub const DEFAULT_BRIGHTNESS_QUICK_SHORTCUT: &str = "Ctrl+Alt+L";
 
 #[derive(Clone, Serialize)]
 pub struct ClipboardCandidate {
@@ -35,6 +36,8 @@ pub struct AppState {
     pub compare_mode_shortcut: Mutex<String>,
     pub hosts_quick_pref_enabled: AtomicBool,
     pub hosts_quick_shortcut: Mutex<String>,
+    pub brightness_quick_pref_enabled: AtomicBool,
+    pub brightness_quick_shortcut: Mutex<String>,
     pub pending_update: Mutex<Option<UpdateCheckResult>>,
 }
 
@@ -56,6 +59,8 @@ impl Default for AppState {
             compare_mode_shortcut: Mutex::new(DEFAULT_COMPARE_MODE_SHORTCUT.to_string()),
             hosts_quick_pref_enabled: AtomicBool::new(true),
             hosts_quick_shortcut: Mutex::new(DEFAULT_HOSTS_QUICK_SHORTCUT.to_string()),
+            brightness_quick_pref_enabled: AtomicBool::new(true),
+            brightness_quick_shortcut: Mutex::new(DEFAULT_BRIGHTNESS_QUICK_SHORTCUT.to_string()),
             pending_update: Mutex::new(None),
         }
     }

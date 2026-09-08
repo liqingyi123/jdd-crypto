@@ -21,6 +21,7 @@ pub enum ShortcutOwner {
     MouseFollow,
     Compare,
     HostsQuick,
+    BrightnessQuick,
 }
 
 fn shortcut_id(raw: &str) -> Result<u32, String> {
@@ -60,6 +61,11 @@ pub fn ensure_no_conflict(
         .lock()
         .map(|guard| guard.clone())
         .unwrap_or_else(|_| crate::state::DEFAULT_HOSTS_QUICK_SHORTCUT.to_string());
+    let brightness_quick = state
+        .brightness_quick_shortcut
+        .lock()
+        .map(|guard| guard.clone())
+        .unwrap_or_else(|_| crate::state::DEFAULT_BRIGHTNESS_QUICK_SHORTCUT.to_string());
 
     if !matches!(owner, ShortcutOwner::MouseFollow)
         && shortcut_id(&follow)? == candidate_id
@@ -73,6 +79,11 @@ pub fn ensure_no_conflict(
         && shortcut_id(&hosts_quick)? == candidate_id
     {
         return Err(format!("与 Hosts 快捷切换快捷键 {hosts_quick} 冲突"));
+    }
+    if !matches!(owner, ShortcutOwner::BrightnessQuick)
+        && shortcut_id(&brightness_quick)? == candidate_id
+    {
+        return Err(format!("与屏幕亮度快捷键 {brightness_quick} 冲突"));
     }
 
     Ok(())
@@ -120,6 +131,19 @@ pub fn register_all(app: &AppHandle) -> Result<(), String> {
         let hosts_quick = Shortcut::from_str(&hosts_quick).map_err(|err| err.to_string())?;
         global
             .register(hosts_quick)
+            .map_err(|err| err.to_string())?;
+    }
+
+    if state.brightness_quick_pref_enabled.load(Ordering::Relaxed) {
+        let brightness_quick = state
+            .brightness_quick_shortcut
+            .lock()
+            .map(|guard| guard.clone())
+            .unwrap_or_else(|_| crate::state::DEFAULT_BRIGHTNESS_QUICK_SHORTCUT.to_string());
+        let brightness_quick =
+            Shortcut::from_str(&brightness_quick).map_err(|err| err.to_string())?;
+        global
+            .register(brightness_quick)
             .map_err(|err| err.to_string())?;
     }
 
