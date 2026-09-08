@@ -695,9 +695,9 @@ $sh = New-Object -ComObject WScript.Shell
 $want = '{exe_s}'
 $ico = '{ico_s},0'
 $targets = @(
-  [IO.Path]::Combine($env:USERPROFILE, 'Desktop', '多多解密.lnk'),
-  [IO.Path]::Combine($env:PUBLIC, 'Desktop', '多多解密.lnk'),
-  [IO.Path]::Combine($env:APPDATA, 'Microsoft\Windows\Start Menu\Programs', '多多解密.lnk')
+  [IO.Path]::Combine($env:USERPROFILE, 'Desktop', '多多工具箱.lnk'),
+  [IO.Path]::Combine($env:PUBLIC, 'Desktop', '多多工具箱.lnk'),
+  [IO.Path]::Combine($env:APPDATA, 'Microsoft\Windows\Start Menu\Programs', '多多工具箱.lnk')
 )
 foreach ($p in $targets) {{
   if (-not (Test-Path -LiteralPath $p)) {{ continue }}

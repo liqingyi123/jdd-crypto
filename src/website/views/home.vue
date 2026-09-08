@@ -84,8 +84,8 @@ onUnmounted(() => {
   <section ref="heroRef" class="hero">
     <div class="hero-grid" aria-hidden="true" />
     <div class="container hero-inner">
-      <img class="hero-logo parallax" :src="`${base}app-icon.png`" width="96" height="96" alt="多多解密" />
-      <p class="hero-brand display-font parallax">多多解密</p>
+      <img class="hero-logo parallax" :src="`${base}app-icon.png`" width="96" height="96" alt="多多工具箱" />
+      <p class="hero-brand display-font parallax">多多工具箱</p>
       <h1 class="hero-title display-font parallax">桌面加解密，少打扰多效率</h1>
       <p class="hero-lead parallax">
         奖多多内部专用的跨平台桌面工具：角标常驻、剪贴板静默解密与结果气泡、鼠标跟随选文、文本对比、Host 内网预置与快捷切换，以及可玩的鼠标拖尾特效。

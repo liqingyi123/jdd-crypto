@@ -10,11 +10,11 @@ const contacts = [
 <template>
   <div class="page-section">
     <div class="container about">
-      <img class="about-logo" :src="`${base}app-icon.png`" width="72" height="72" alt="多多解密" />
+      <img class="about-logo" :src="`${base}app-icon.png`" width="72" height="72" alt="多多工具箱" />
       <p class="section-kicker">About</p>
-      <h1 class="section-title display-font">关于多多解密</h1>
+      <h1 class="section-title display-font">关于多多工具箱</h1>
       <p class="section-lead">
-        奖多多内部专用跨平台桌面端加解密工具。当前支持 Windows 与 macOS（Universal），面向日常加解密、文本处理与 Host 管理场景。
+        奖多多内部专用跨平台桌面端工具库。当前支持 Windows 与 macOS（Universal），面向日常加解密、文本处理与 Host 管理场景。
       </p>
 
       <div class="panels">

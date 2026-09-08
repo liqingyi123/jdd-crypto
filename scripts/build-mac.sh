@@ -11,7 +11,7 @@ rustup target add aarch64-apple-darwin x86_64-apple-darwin
 npm run tauri -- build --target universal-apple-darwin
 
 version="$(node -p "require('./package.json').version")"
-product_name="多多解密"
+product_name="多多工具箱"
 expected_name="${product_name}_${version}_universal.dmg"
 dmg_dir="$root/src-tauri/target/universal-apple-darwin/release/bundle/dmg"
 

@@ -50,7 +50,7 @@ const {
     <div v-else class="body">
       <p class="hint">
         <template v-if="isDmgInstall">
-          安装镜像已下载。点击后将打开 dmg，请将「多多解密」拖入「应用程序」文件夹。
+          安装镜像已下载。点击后将打开 dmg，请将「多多工具箱」拖入「应用程序」文件夹。
         </template>
         <template v-else>安装包已下载完成，可立即安装新版本。</template>
       </p>

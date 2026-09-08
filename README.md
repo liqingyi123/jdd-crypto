@@ -1,4 +1,4 @@
-# 多多解密
+# 多多工具箱
 
 基于 **Tauri 2 + Vue 3 + TypeScript** 的桌面加解密工具。主路径 AES（CBC / PKCS7）在前端通过 crypto-js 完成。
 
@@ -83,25 +83,25 @@ npx tauri build -- --target universal-apple-darwin
 
 ### 产物
 
-- `src-tauri/target/universal-apple-darwin/release/bundle/dmg/多多解密_<version>_universal.dmg`
-- `src-tauri/target/universal-apple-darwin/release/bundle/macos/多多解密.app`
+- `src-tauri/target/universal-apple-darwin/release/bundle/dmg/多多工具箱_<version>_universal.dmg`
+- `src-tauri/target/universal-apple-darwin/release/bundle/macos/多多工具箱.app`
 
-`build-mac.sh` 会将 dmg 复制/对齐为内网商店命名：`多多解密_{version}_universal.dmg`。
+`build-mac.sh` 会将 dmg 复制/对齐为内网商店命名：`多多工具箱_{version}_universal.dmg`。
 
-验证 Universal：`lipo -info src-tauri/target/universal-apple-darwin/release/bundle/macos/多多解密.app/Contents/MacOS/*` 应含 `x86_64` 与 `arm64`。
+验证 Universal：`lipo -info src-tauri/target/universal-apple-darwin/release/bundle/macos/多多工具箱.app/Contents/MacOS/*` 应含 `x86_64` 与 `arm64`。
 
 ### 上传内网商店
 
 与 Windows 同目录，文件名区分：
 
-- Windows: `多多解密_{version}_x64-setup.exe`
-- macOS: `多多解密_{version}_universal.dmg`
+- Windows: `多多工具箱_{version}_x64-setup.exe`
+- macOS: `多多工具箱_{version}_universal.dmg`
 
 Gitee 流水线接入说明见 [`docs/gitee-mac-build.md`](docs/gitee-mac-build.md)。
 
 ### 鼠标跟随（macOS）
 
-与 Windows 相同，默认快捷键为 `Ctrl+Shift+G`（Mac 键盘上的 Control 即 Ctrl）。首次使用若快捷键无反应、或选中文本后无法自动复制，请在 **系统设置 → 隐私与安全性 → 辅助功能** 中为「多多解密」开启权限（全局快捷键与模拟 ⌘C 均依赖此项）。
+与 Windows 相同，默认快捷键为 `Ctrl+Shift+G`（Mac 键盘上的 Control 即 Ctrl）。首次使用若快捷键无反应、或选中文本后无法自动复制，请在 **系统设置 → 隐私与安全性 → 辅助功能** 中为「多多工具箱」开启权限（全局快捷键与模拟 ⌘C 均依赖此项）。
 
 ### 内网检查更新
 
@@ -109,7 +109,7 @@ macOS 与 Windows **共用**内网目录与同一份更新日志：
 
 - 目录：`http://172.20.2.169:7101/appStore/Software/PC/developer/jdd-crypto/`
 - 更新日志：`http://172.20.2.169:7101/appStore/Software/PC/developer/jdd-crypto/更新日志.txt`（桌面端检查更新与官网「更新日志 / 下载最新版」均从此拉取，**仓库内不再维护副本**）
-- 发现新版本后，Mac 下载 `多多解密_{version}_universal.dmg`，打开 dmg 后手动拖入「应用程序」
+- 发现新版本后，Mac 下载 `多多工具箱_{version}_universal.dmg`，打开 dmg 后手动拖入「应用程序」
 - 未签名包若被 Gatekeeper 拦截，请右键应用选择「打开」
 
 ## 版本号更新清单
@@ -125,8 +125,8 @@ macOS 与 Windows **共用**内网目录与同一份更新日志：
 
 发版时还需上传到内网目录（文件名中的 `{version}` 与上面版本一致）：
 
-- Windows：`多多解密_{version}_x64-setup.exe`
-- macOS：`多多解密_{version}_universal.dmg`
+- Windows：`多多工具箱_{version}_x64-setup.exe`
+- macOS：`多多工具箱_{version}_universal.dmg`
 
 `更新日志.txt` 条目格式示例：
 

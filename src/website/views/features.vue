@@ -39,11 +39,11 @@ const isMacos = detectPlatform() === "macos";
             <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd>（Mac 键盘上的 Control 即 Ctrl）；文本对比模式默认为
             <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>，均可在设置中自定义。首次使用若快捷键无反应、或选中文本后无法自动复制，请在
             <strong>系统设置 → 隐私与安全性 → 辅助功能</strong>
-            中为「多多解密」开启权限（全局快捷键与模拟 ⌘C 均依赖此项）。
+            中为「多多工具箱」开启权限（全局快捷键与模拟 ⌘C 均依赖此项）。
           </li>
           <li>
             内网检查更新，发现新版本后，Mac 下载
-            <code>多多解密_{version}_universal.dmg</code>，打开 dmg 后手动拖入「应用程序」；未签名包若被 Gatekeeper 拦截，请右键应用选择「打开」。
+            <code>多多工具箱_{version}_universal.dmg</code>，打开 dmg 后手动拖入「应用程序」；未签名包若被 Gatekeeper 拦截，请右键应用选择「打开」。
           </li>
         </ol>
       </aside>

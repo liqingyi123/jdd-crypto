@@ -90,12 +90,12 @@ fn installer_url(app: &AppHandle, version: &str) -> String {
 
 #[cfg(target_os = "macos")]
 fn installer_file_name(version: &str) -> String {
-    format!("多多解密_{version}_universal.dmg")
+    format!("多多工具箱_{version}_universal.dmg")
 }
 
 #[cfg(target_os = "windows")]
 fn installer_file_name(version: &str) -> String {
-    format!("多多解密_{version}_x64-setup.exe")
+    format!("多多工具箱_{version}_x64-setup.exe")
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
@@ -283,7 +283,7 @@ mod tests {
 
     #[test]
     fn parses_latest_semver_and_notes() {
-        let text = r#"## 多多解密升级日志 ##
+        let text = r#"## 多多工具箱升级日志 ##
 
 【0.3.3】
 1. old item
@@ -303,7 +303,7 @@ mod tests {
     fn windows_installer_file_name() {
         assert_eq!(
             super::installer_file_name("0.4.3"),
-            "多多解密_0.4.3_x64-setup.exe"
+            "多多工具箱_0.4.3_x64-setup.exe"
         );
     }
 
@@ -312,7 +312,7 @@ mod tests {
     fn macos_installer_file_name() {
         assert_eq!(
             super::installer_file_name("0.4.3"),
-            "多多解密_0.4.3_universal.dmg"
+            "多多工具箱_0.4.3_universal.dmg"
         );
     }
 }

@@ -28,8 +28,8 @@ const badgeStyle = computed(() => {
 
 const badgeTip = computed(() => {
   const title = appVersion.value
-    ? `多多解密 v${appVersion.value}`
-    : "多多解密";
+    ? `多多工具箱 v${appVersion.value}`
+    : "多多工具箱";
   return [
     title,
     "左键：打开主界面",
@@ -133,7 +133,7 @@ function onPointerUp() {
       @pointerup="onPointerUp"
       @pointercancel="onPointerUp"
     >
-      <img :src="appIcon" alt="多多解密" />
+      <img :src="appIcon" alt="多多工具箱" />
     </button>
   </div>
 </template>

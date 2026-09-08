@@ -14,7 +14,7 @@ Gitee 官方流水线通常不提供免费的 macOS Runner，因此 **Mac DMG �
 
 1. `rustup target add aarch64-apple-darwin x86_64-apple-darwin`
 2. `npx tauri build -- --target universal-apple-darwin`
-3. 将 dmg 对齐为 `多多解密_{version}_universal.dmg`
+3. 将 dmg 对齐为 `多多工具箱_{version}_universal.dmg`
 
 构建时间与安装包体积约为单架构的 ~2 倍。
 
@@ -30,7 +30,7 @@ stages:
       - npm run build:mac
       - |
         VERSION=$(node -p "require('./package.json').version")
-        DMG="src-tauri/target/universal-apple-darwin/release/bundle/dmg/多多解密_${VERSION}_universal.dmg"
+        DMG="src-tauri/target/universal-apple-darwin/release/bundle/dmg/多多工具箱_${VERSION}_universal.dmg"
         # 上传到内网 AppStore（示例，按实际接口调整）
         curl -F "file=@${DMG}" \
           "http://172.20.2.169:7101/appStore/Software/PC/developer/jdd-crypto/upload"
@@ -40,14 +40,14 @@ stages:
 
 | 平台 | 文件名 |
 |------|--------|
-| Windows | `多多解密_{version}_x64-setup.exe` |
-| macOS | `多多解密_{version}_universal.dmg` |
+| Windows | `多多工具箱_{version}_x64-setup.exe` |
+| macOS | `多多工具箱_{version}_universal.dmg` |
 
 ## 注意事项
 
 - 代码签名与 Apple 公证（Notarization）未在本仓库配置，内网分发可按需后续补充
 - Mac / Windows 共用内网目录与同一份 `更新日志.txt`（仅维护在商店目录，仓库内不另存）；发布新版本时需上传对应平台安装包：
-  - Windows: `多多解密_{version}_x64-setup.exe`
-  - macOS: `多多解密_{version}_universal.dmg`
+  - Windows: `多多工具箱_{version}_x64-setup.exe`
+  - macOS: `多多工具箱_{version}_universal.dmg`
 - Mac 检查更新：下载 dmg 后点击「打开安装包」，将应用拖入「应用程序」；未签名时可能需要「右键 → 打开」
 - 旧版 `*_aarch64.dmg` 已不再被客户端下载，发版请使用 `*_universal.dmg`

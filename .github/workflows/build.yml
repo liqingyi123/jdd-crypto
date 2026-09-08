@@ -58,7 +58,7 @@ jobs:
         shell: bash
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          EXPECTED_NAME="多多解密_${VERSION}_universal.dmg"
+          EXPECTED_NAME="多多工具箱_${VERSION}_universal.dmg"
           DMG_DIR="src-tauri/target/universal-apple-darwin/release/bundle/dmg"
           if [[ ! -d "$DMG_DIR" ]]; then
             echo "[error] DMG directory not found: $DMG_DIR"

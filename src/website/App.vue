@@ -11,7 +11,7 @@ import GlobalTrailLayer from "./components/global-trail-layer.vue";
       <RouterView />
     </main>
     <footer class="site-footer">
-      <div class="container">© 多多解密 · 奖多多内部桌面加解密工具</div>
+      <div class="container">© 多多工具箱 · 奖多多内部桌面加解密工具</div>
     </footer>
   </div>
 </template>

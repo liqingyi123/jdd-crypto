@@ -19,16 +19,22 @@ const pages: Record<string, { title: string; component: Component }> = {
 };
 
 const page = computed(() => pages[props.windowLabel]);
-const fillContent = computed(() => props.windowLabel === "hosts");
+const fillContent = computed(
+  () => props.windowLabel === "hosts" || props.windowLabel === "settings",
+);
+const showPageTitle = computed(() => props.windowLabel !== "settings");
 </script>
 
 <template>
   <ElConfigProvider :locale="zhCn">
     <div v-if="page" class="shell" :class="{ 'shell-fill': fillContent }">
-      <header class="header">
+      <header v-if="showPageTitle" class="header">
         <h1 class="title">{{ page.title }}</h1>
       </header>
-      <section class="content" :class="{ 'content-fill': fillContent }">
+      <section
+        class="content"
+        :class="{ 'content-fill': fillContent, 'content-settings': !showPageTitle }"
+      >
         <component :is="page.component" />
       </section>
     </div>
@@ -55,6 +61,10 @@ const fillContent = computed(() => props.windowLabel === "hosts");
   flex: 1;
   padding: 8px 24px 24px;
   overflow: auto;
+}
+
+.content-settings {
+  padding: 4px 24px 16px;
 }
 
 .shell-fill .content-fill {

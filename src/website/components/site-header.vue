@@ -38,7 +38,7 @@ function onDownloadClick(event: MouseEvent) {
     <div class="container header-inner">
       <RouterLink class="brand" to="/">
         <img class="brand-logo" :src="`${base}app-icon.png`" width="32" height="32" alt="" />
-        <span class="display-font">多多解密</span>
+        <span class="display-font">多多工具箱</span>
       </RouterLink>
       <nav class="nav" aria-label="主导航">
         <RouterLink

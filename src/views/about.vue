@@ -34,9 +34,9 @@ function onCheckUpdate() {
 
 <template>
   <div class="page">
-    <img class="logo" :src="appIcon" alt="多多解密" />
-    <h2>多多解密</h2>
-    <p class="lead">奖多多内部专用跨平台桌面端加解密工具</p>
+    <img class="logo" :src="appIcon" alt="多多工具箱" />
+    <h2>多多工具箱</h2>
+    <p class="lead">奖多多内部专用跨平台桌面端工具库</p>
 
     <dl class="meta">
       <div>

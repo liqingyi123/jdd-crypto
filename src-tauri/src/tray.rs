@@ -41,7 +41,7 @@ pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let menu = build_app_menu(app)?;
     let version = app.package_info().version.to_string();
     let tooltip = format!(
-        "多多解密 v{version}\n左键打开加解密主界面\n中键打开 Host 管理\n右击打开菜单"
+        "多多工具箱 v{version}\n左键打开加解密主界面\n中键打开 Host 管理\n右击打开菜单"
     );
     let mut builder = TrayIconBuilder::with_id("main-tray")
         .menu(&menu)

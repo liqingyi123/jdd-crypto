@@ -87,6 +87,7 @@ const trailEffect = shallowRef<MouseTrailEffect>(DEFAULT_MOUSE_TRAIL_PREF.effect
 const trailColors = shallowRef<MouseTrailColors>({ ...DEFAULT_MOUSE_TRAIL_COLORS });
 const committedTrailColors = shallowRef<MouseTrailColors>({ ...DEFAULT_MOUSE_TRAIL_COLORS });
 const trailColorsResetting = shallowRef(false);
+const activeTab = shallowRef("general");
 
 const activeColorEffect = computed((): ColorableTrailEffect | null => {
   const effect = trailEffect.value;
@@ -418,200 +419,267 @@ async function onThemeChange(value: string | number | boolean | undefined) {
 
 <template>
   <div class="page">
-    <section>
-      <h2>外观</h2>
-      <ElRadioGroup :model-value="preference" @change="onThemeChange">
-        <ElRadio
-          v-for="item in themeOptions"
-          :key="item.value"
-          :value="item.value"
-        >
-          {{ item.label }}
-        </ElRadio>
-      </ElRadioGroup>
-      <h3>角标大小</h3>
-      <ElRadioGroup :model-value="badgeSize" @change="onBadgeSizeChange">
-        <ElRadio
-          v-for="item in badgeSizeOptions"
-          :key="item.value"
-          :value="item.value"
-        >
-          {{ item.label }}
-        </ElRadio>
-      </ElRadioGroup>
-    </section>
-    <section>
-      <div class="section-head">
-        <h2>开机自启动</h2>
-        <label class="row">
-          <ElSwitch :model-value="autostartEnabled" @change="onAutostartChange" />
-        </label>
-      </div>
-      <p>开启后登录系统时自动启动多多解密；默认关闭。</p>
-    </section>
-    <section>
-      <h2>内网服务器</h2>
-      <p>
-        用于检查更新与拉取 Hosts 预置配置。默认
-        <code>{{ DEFAULT_INTRANET_SERVER }}</code>，保存后重启仍生效。
-      </p>
-      <div class="row intranet-row">
-        <ElInput
-          v-model="intranetServerBase"
-          clearable
-          placeholder="http://172.20.2.169:7101/"
-          @keyup.enter="onIntranetServerSave"
-        />
-        <ElButton
-          type="primary"
-          :loading="intranetServerSaving"
-          @click="onIntranetServerSave"
-        >
-          保存
-        </ElButton>
-        <ElButton :disabled="intranetServerSaving" @click="onIntranetServerReset">
-          恢复默认
-        </ElButton>
-      </div>
-    </section>
-    <section>
-      <div class="section-head">
-        <h2>剪贴板</h2>
-        <label class="row">
-          <ElSwitch :model-value="watchEnabled" @change="onWatchChange" />
-        </label>
-      </div>
-      <p>
-        自动识别剪贴板并静默尝试解密（仅 JSON 结果弹气泡），关闭后不再轮询剪贴板，避免打扰与隐私风险。</p>
-    </section>
-    <section>
-      <div class="section-head">
-        <h2>鼠标轨迹特效</h2>
-        <label class="row">
-          <ElSwitch :model-value="trailEnabled" @change="onTrailEnabledChange" />
-        </label>
-      </div>
-      <p>我的鼠标指针哪去啦？？！！<br />在所有显示器工作区跟随鼠标绘制炫酷好玩的拖尾特效以帮助更好的寻找鼠标位置。</p>
-      <p class="trail-shortcut-hint">
-        快捷键：按住 Ctrl，依次按下 T 与数字键 1–6（Ctrl+T+数字）切换特效；松开 Ctrl 后需重新按下 T。
-      </p>
-      <ElRadioGroup
-        :model-value="trailEffect"
-        :disabled="!trailEnabled"
-        @change="onTrailEffectChange"
-      >
-        <ElRadio
-          v-for="item in trailEffectOptions"
-          :key="item.value"
-          :value="item.value"
-        >
-          {{ item.label }}
-          <span class="trail-key">Ctrl+T+{{ item.shortcutKey }}</span>
-        </ElRadio>
-      </ElRadioGroup>
-      <template v-if="showTrailColor && activeColorEffect">
-        <h3>特效颜色</h3>
-        <div class="row trail-color-row">
-          <ElColorPicker
-            :model-value="trailColors[activeColorEffect]"
-            :clearable="false"
-            popper-class="trail-color-picker"
-            @active-change="onTrailColorActiveChange"
-            @change="onTrailColorChange"
-          />
-          <ElButton :loading="trailColorsResetting" @click="onTrailColorReset">
-            恢复默认颜色
-          </ElButton>
+    <ElTabs v-model="activeTab" class="settings-tabs">
+      <ElTabPane label="常规" name="general">
+        <div class="tab-panels">
+          <section>
+            <h2>外观</h2>
+            <ElRadioGroup :model-value="preference" @change="onThemeChange">
+              <ElRadio
+                v-for="item in themeOptions"
+                :key="item.value"
+                :value="item.value"
+              >
+                {{ item.label }}
+              </ElRadio>
+            </ElRadioGroup>
+            <h3>角标大小</h3>
+            <ElRadioGroup :model-value="badgeSize" @change="onBadgeSizeChange">
+              <ElRadio
+                v-for="item in badgeSizeOptions"
+                :key="item.value"
+                :value="item.value"
+              >
+                {{ item.label }}
+              </ElRadio>
+            </ElRadioGroup>
+          </section>
+          <section>
+            <div class="section-head">
+              <h2>开机自启动</h2>
+              <label class="row">
+                <ElSwitch :model-value="autostartEnabled" @change="onAutostartChange" />
+              </label>
+            </div>
+            <p>开启后登录系统时自动启动多多工具箱。</p>
+          </section>
+          <section>
+            <h2>内网服务器</h2>
+            <p>
+              用于检查更新与拉取 Hosts 预置配置。默认
+              <code>{{ DEFAULT_INTRANET_SERVER }}</code>，保存后重启仍生效。
+            </p>
+            <div class="row intranet-row">
+              <ElInput
+                v-model="intranetServerBase"
+                clearable
+                placeholder="http://172.20.2.169:7101/"
+                @keyup.enter="onIntranetServerSave"
+              />
+              <ElButton
+                type="primary"
+                :loading="intranetServerSaving"
+                @click="onIntranetServerSave"
+              >
+                保存
+              </ElButton>
+              <ElButton :disabled="intranetServerSaving" @click="onIntranetServerReset">
+                恢复默认
+              </ElButton>
+            </div>
+          </section>
         </div>
-      </template>
-    </section>
-    <section>
-      <div class="section-head">
-        <h2>鼠标跟随</h2>
-        <label class="row">
-          <ElSwitch :model-value="followPref" @change="onFollowPrefChange" />
-        </label>
-      </div>
-      <p>按下快捷键开启后会跟随鼠标移动并自动等待鼠标下次的文本选中，按下鼠标选中文本后松开会自动打开加解密页面并代入选中的文本。</p>
-      <div class="row">
-        <span>快捷键</span>
-        <div ref="buttonRef">
-          <ElButton
-            :type="recording ? 'primary' : 'default'"
-            :disabled="!followPref"
-            @click="startRecording"
-            @keydown="onRecordKey"
-          >
-            {{ recording ? previewDisplay : display }}
-          </ElButton>
+      </ElTabPane>
+
+      <ElTabPane label="加解密" name="crypto">
+        <div class="tab-panels">
+          <section>
+            <div class="section-head">
+              <h2>剪贴板</h2>
+              <label class="row">
+                <ElSwitch :model-value="watchEnabled" @change="onWatchChange" />
+              </label>
+            </div>
+            <p>
+              自动识别剪贴板并静默尝试解密（仅 JSON 结果弹气泡），关闭后不再轮询剪贴板，避免打扰与隐私风险。
+            </p>
+          </section>
+          <section>
+            <div class="section-head">
+              <h2>鼠标跟随</h2>
+              <label class="row">
+                <ElSwitch :model-value="followPref" @change="onFollowPrefChange" />
+              </label>
+            </div>
+            <p>
+              按下快捷键开启后会跟随鼠标移动并自动等待鼠标下次的文本选中，按下鼠标选中文本后松开会自动打开加解密页面并代入选中的文本。
+            </p>
+            <div class="row">
+              <span>快捷键</span>
+              <div ref="buttonRef">
+                <ElButton
+                  :type="recording ? 'primary' : 'default'"
+                  :disabled="!followPref"
+                  @click="startRecording"
+                  @keydown="onRecordKey"
+                >
+                  {{ recording ? previewDisplay : display }}
+                </ElButton>
+              </div>
+            </div>
+            <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
+            <p>最多 4 个键，需包含修饰键。点击按钮后按下新组合，Esc 或点击其他区域取消。</p>
+          </section>
+          <section>
+            <div class="section-head">
+              <h2>文本对比模式</h2>
+              <label class="row">
+                <ElSwitch :model-value="comparePref" @change="onComparePrefChange" />
+              </label>
+            </div>
+            <p>
+              开启后可用快捷键进入对比模式：框选并解密两段文本，在中央气泡中左右对比并高亮后段差异。再次按下同一快捷键退出。
+            </p>
+            <div class="row">
+              <span>快捷键</span>
+              <div ref="compareButtonRef">
+                <ElButton
+                  :type="compareRecording ? 'primary' : 'default'"
+                  :disabled="!comparePref"
+                  @click="startCompareRecording"
+                  @keydown="onCompareRecordKey"
+                >
+                  {{ compareRecording ? comparePreviewDisplay : compareDisplay }}
+                </ElButton>
+              </div>
+            </div>
+            <p v-if="compareErrorMessage" class="error">{{ compareErrorMessage }}</p>
+            <p>最多 4 个键，需包含修饰键。点击按钮后按下新组合，Esc 或点击其他区域取消。</p>
+          </section>
         </div>
-      </div>
-      <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
-      <p>最多 4 个键，需包含修饰键。点击按钮后按下新组合，Esc 或点击其他区域取消。</p>
-    </section>
-    <section>
-      <div class="section-head">
-        <h2>文本对比模式</h2>
-        <label class="row">
-          <ElSwitch :model-value="comparePref" @change="onComparePrefChange" />
-        </label>
-      </div>
-      <p>
-        开启后可用快捷键进入对比模式：框选并解密两段文本，在中央气泡中左右对比并高亮后段差异。再次按下同一快捷键退出。
-      </p>
-      <div class="row">
-        <span>快捷键</span>
-        <div ref="compareButtonRef">
-          <ElButton
-            :type="compareRecording ? 'primary' : 'default'"
-            :disabled="!comparePref"
-            @click="startCompareRecording"
-            @keydown="onCompareRecordKey"
-          >
-            {{ compareRecording ? comparePreviewDisplay : compareDisplay }}
-          </ElButton>
+      </ElTabPane>
+
+      <ElTabPane label="鼠标轨迹" name="trail">
+        <div class="tab-panels">
+          <section>
+            <div class="section-head">
+              <h2>鼠标轨迹特效</h2>
+              <label class="row">
+                <ElSwitch :model-value="trailEnabled" @change="onTrailEnabledChange" />
+              </label>
+            </div>
+            <p>
+              我的鼠标指针哪去啦？？！！<br />在所有显示器工作区跟随鼠标绘制炫酷好玩的拖尾特效以帮助更好的寻找鼠标位置。
+            </p>
+            <p class="trail-shortcut-hint">
+              快捷键：按住 Ctrl，依次按下 T 与数字键 1–6（Ctrl+T+数字）切换特效；松开 Ctrl 后需重新按下 T。
+            </p>
+            <ElRadioGroup
+              :model-value="trailEffect"
+              :disabled="!trailEnabled"
+              @change="onTrailEffectChange"
+            >
+              <ElRadio
+                v-for="item in trailEffectOptions"
+                :key="item.value"
+                :value="item.value"
+              >
+                {{ item.label }}
+                <span class="trail-key">Ctrl+T+{{ item.shortcutKey }}</span>
+              </ElRadio>
+            </ElRadioGroup>
+            <template v-if="showTrailColor && activeColorEffect">
+              <h3>特效颜色</h3>
+              <div class="row trail-color-row">
+                <ElColorPicker
+                  :model-value="trailColors[activeColorEffect]"
+                  :clearable="false"
+                  popper-class="trail-color-picker"
+                  @active-change="onTrailColorActiveChange"
+                  @change="onTrailColorChange"
+                />
+                <ElButton :loading="trailColorsResetting" @click="onTrailColorReset">
+                  恢复默认颜色
+                </ElButton>
+              </div>
+            </template>
+          </section>
         </div>
-      </div>
-      <p v-if="compareErrorMessage" class="error">{{ compareErrorMessage }}</p>
-      <p>最多 4 个键，需包含修饰键。点击按钮后按下新组合，Esc 或点击其他区域取消。</p>
-    </section>
-    <section>
-      <div class="section-head">
-        <h2>Host 快速切换</h2>
-        <label class="row">
-          <ElSwitch :model-value="hostsQuickPref" @change="onHostsQuickPrefChange" />
-        </label>
-      </div>
-      <p>
-        按下快捷键后在鼠标旁打开 Host 方案列表，切换开关后窗口自动关闭。
-      </p>
-      <div class="row">
-        <span>快捷键</span>
-        <div ref="hostsQuickButtonRef">
-          <ElButton
-            :type="hostsQuickRecording ? 'primary' : 'default'"
-            :disabled="!hostsQuickPref"
-            @click="startHostsQuickRecording"
-            @keydown="onHostsQuickRecordKey"
-          >
-            {{
-              hostsQuickRecording
-                ? hostsQuickPreviewDisplay
-                : hostsQuickDisplay
-            }}
-          </ElButton>
+      </ElTabPane>
+
+      <ElTabPane label="Host管理" name="hosts">
+        <div class="tab-panels">
+          <section>
+            <div class="section-head">
+              <h2>Host 快速切换</h2>
+              <label class="row">
+                <ElSwitch :model-value="hostsQuickPref" @change="onHostsQuickPrefChange" />
+              </label>
+            </div>
+            <p>
+              按下快捷键后在鼠标旁打开 Host 方案列表，切换开关后窗口自动关闭。
+            </p>
+            <div class="row">
+              <span>快捷键</span>
+              <div ref="hostsQuickButtonRef">
+                <ElButton
+                  :type="hostsQuickRecording ? 'primary' : 'default'"
+                  :disabled="!hostsQuickPref"
+                  @click="startHostsQuickRecording"
+                  @keydown="onHostsQuickRecordKey"
+                >
+                  {{
+                    hostsQuickRecording
+                      ? hostsQuickPreviewDisplay
+                      : hostsQuickDisplay
+                  }}
+                </ElButton>
+              </div>
+            </div>
+            <p v-if="hostsQuickErrorMessage" class="error">
+              {{ hostsQuickErrorMessage }}
+            </p>
+            <p>最多 4 个键，需包含修饰键。点击按钮后按下新组合，Esc 或点击其他区域取消。</p>
+          </section>
         </div>
-      </div>
-      <p v-if="hostsQuickErrorMessage" class="error">
-        {{ hostsQuickErrorMessage }}
-      </p>
-      <p>最多 4 个键，需包含修饰键。点击按钮后按下新组合，Esc 或点击其他区域取消。</p>
-    </section>
+      </ElTabPane>
+    </ElTabs>
   </div>
 </template>
 
 <style scoped>
 .page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+
+.settings-tabs {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.settings-tabs :deep(.el-tabs__header) {
+  flex-shrink: 0;
+  margin: 0 0 12px;
+}
+
+.settings-tabs :deep(.el-tabs__nav-wrap) {
+  margin-bottom: 0;
+}
+
+.settings-tabs :deep(.el-tabs__item) {
+  height: 36px;
+  line-height: 36px;
+  padding: 0 16px;
+}
+
+.settings-tabs :deep(.el-tabs__content) {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-bottom: 8px;
+}
+
+.settings-tabs :deep(.el-tab-pane) {
+  height: 100%;
+}
+
+.tab-panels {
   display: flex;
   flex-direction: column;
   gap: 24px;

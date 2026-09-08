@@ -13,9 +13,9 @@ export function detectPlatform(): DownloadPlatform {
 
 export function installerFileName(platform: DownloadPlatform, version: string): string {
   if (platform === "macos") {
-    return `多多解密_${version}_universal.dmg`;
+    return `多多工具箱_${version}_universal.dmg`;
   }
-  return `多多解密_${version}_x64-setup.exe`;
+  return `多多工具箱_${version}_x64-setup.exe`;
 }
 
 export function installerUrl(platform: DownloadPlatform, version: string): string {
