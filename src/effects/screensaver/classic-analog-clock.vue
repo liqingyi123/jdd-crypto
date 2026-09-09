@@ -185,7 +185,7 @@ onUnmounted(() => {
   width: 24px;
   height: 24px;
   border-radius: 20px;
-  background: #ff1138;
+  background: #fff;
 }
 
 .hour-hand,
@@ -232,8 +232,8 @@ onUnmounted(() => {
   transform: translateX(-50%);
   font-size: 11px;
   font-weight: bold;
-  background: #110022;
-  color: #ff1138;
+  background: transparent;
+  color: #fff;
   line-height: 1.4;
   text-align: center;
   white-space: nowrap;
