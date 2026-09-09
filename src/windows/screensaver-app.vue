@@ -6,6 +6,8 @@ import ParallaxSeaside from "@/effects/screensaver/parallax-seaside.vue";
 import CoronaSunrise from "@/effects/screensaver/corona-sunrise.vue";
 import SnowRelic from "@/effects/screensaver/snow-relic.vue";
 import FluorescentClock from "@/effects/screensaver/fluorescent-clock.vue";
+import ClassicAnalogClock from "@/effects/screensaver/classic-analog-clock.vue";
+import TextCompassClock from "@/effects/screensaver/text-compass-clock.vue";
 import {
   DEFAULT_SCREENSAVER_PREF,
   normalizeScreensaverPref,
@@ -60,6 +62,8 @@ onUnmounted(() => {
     <CoronaSunrise v-else-if="pref.background === 'corona'" />
     <SnowRelic v-else-if="pref.background === 'snow'" />
     <FluorescentClock v-if="pref.clock === 'lcd3d'" />
+    <ClassicAnalogClock v-else-if="pref.clock === 'analog'" />
+    <TextCompassClock v-else-if="pref.clock === 'compass'" />
     <p class="hint">按 ESC 退出</p>
   </div>
 </template>

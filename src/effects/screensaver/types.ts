@@ -1,5 +1,5 @@
 export type ScreensaverBackground = "parallax" | "corona" | "snow";
-export type ScreensaverClock = "lcd3d";
+export type ScreensaverClock = "lcd3d" | "analog" | "compass";
 
 export type ScreensaverPref = {
   background: ScreensaverBackground;
@@ -18,7 +18,10 @@ export function normalizeScreensaverBackground(raw: unknown): ScreensaverBackgro
   return "parallax";
 }
 
-export function normalizeScreensaverClock(_raw: unknown): ScreensaverClock {
+export function normalizeScreensaverClock(raw: unknown): ScreensaverClock {
+  if (raw === "analog" || raw === "compass" || raw === "lcd3d") {
+    return raw;
+  }
   return "lcd3d";
 }
 

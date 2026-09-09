@@ -22,6 +22,7 @@ import {
 import {
   DEFAULT_SCREENSAVER_PREF,
   normalizeScreensaverBackground,
+  normalizeScreensaverClock,
   normalizeScreensaverPref,
   type ScreensaverBackground,
   type ScreensaverClock,
@@ -432,12 +433,15 @@ async function onScreensaverBackgroundChange(
   }
 }
 
-async function onScreensaverClockChange(_value: string | number | boolean | undefined) {
+async function onScreensaverClockChange(
+  value: string | number | boolean | undefined,
+) {
+  const clock = normalizeScreensaverClock(value);
   const previous = screensaverClock.value;
-  screensaverClock.value = "lcd3d";
+  screensaverClock.value = clock;
   try {
     const pref = await invoke<ScreensaverPref>("set_screensaver_clock", {
-      clock: "lcd3d",
+      clock,
     });
     const normalized = normalizeScreensaverPref(pref);
     screensaverBackground.value = normalized.background;
@@ -812,6 +816,8 @@ async function onThemeChange(value: string | number | boolean | undefined) {
               @change="onScreensaverClockChange"
             >
               <ElRadio value="lcd3d">3D液晶时钟</ElRadio>
+              <ElRadio value="analog">经典指针</ElRadio>
+              <ElRadio value="compass">文字罗盘</ElRadio>
             </ElRadioGroup>
           </section>
         </div>
