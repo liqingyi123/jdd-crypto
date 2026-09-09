@@ -88,7 +88,8 @@ onUnmounted(() => {
       <p class="hero-brand display-font parallax">多多工具箱</p>
       <h1 class="hero-title display-font parallax">桌面加解密，少打扰多效率</h1>
       <p class="hero-lead parallax">
-        奖多多内部专用的跨平台桌面工具：角标常驻、剪贴板静默解密与结果气泡、鼠标跟随选文、文本对比、Host 内网预置与快捷切换，以及可玩的鼠标拖尾特效。
+        奖多多内部专用的跨平台桌面工具：角标常驻、剪贴板静默解密与结果气泡、鼠标跟随选文、文本对比、Host
+        快捷切换、屏幕亮度调节、多屏屏保，以及可玩的鼠标拖尾特效。
       </p>
       <div class="hero-actions">
         <RouterLink class="btn btn-primary" to="/features">了解功能</RouterLink>

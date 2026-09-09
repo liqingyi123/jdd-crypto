@@ -14,14 +14,15 @@ const contacts = [
       <p class="section-kicker">About</p>
       <h1 class="section-title display-font">关于多多工具箱</h1>
       <p class="section-lead">
-        奖多多内部专用跨平台桌面端工具库。当前支持 Windows 与 macOS（Universal），面向日常加解密、文本处理与 Host 管理场景。
+        奖多多内部专用跨平台桌面端工具库。当前支持 Windows 与 macOS（Universal），面向日常加解密、文本处理、Host 管理与系统易用性场景。
       </p>
 
       <div class="panels">
         <section class="panel">
           <h2>产品定位</h2>
           <p>
-            用悬浮角标与托盘降低启动成本，用剪贴板静默解密、结果气泡与鼠标跟随减少复制粘贴往返；支持文本对比、Host 内网预置拉取与快捷切换，以及可玩可替换的拖尾特效。
+            用悬浮角标与托盘降低启动成本，用剪贴板静默解密、结果气泡与鼠标跟随减少复制粘贴往返；支持文本对比、Host
+            内网预置与快捷切换、多显示器亮度调节与屏保，以及可玩可替换的拖尾特效。
           </p>
         </section>
         <section class="panel">
