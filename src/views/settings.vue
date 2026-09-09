@@ -899,32 +899,6 @@ async function onThemeChange(value: string | number | boolean | undefined) {
   min-height: 0;
   overflow: auto;
   padding-bottom: 8px;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--el-text-color-secondary) 45%, transparent)
-    transparent;
-}
-
-.settings-tabs :deep(.el-tabs__content::-webkit-scrollbar) {
-  width: 6px;
-}
-
-.settings-tabs :deep(.el-tabs__content::-webkit-scrollbar-track) {
-  background: transparent;
-}
-
-.settings-tabs :deep(.el-tabs__content::-webkit-scrollbar-thumb) {
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--el-text-color-secondary) 40%, transparent);
-}
-
-.settings-tabs :deep(.el-tabs__content::-webkit-scrollbar-thumb:hover) {
-  background: color-mix(in srgb, var(--el-text-color-secondary) 65%, transparent);
-}
-
-.settings-tabs :deep(.el-tabs__content::-webkit-scrollbar-button) {
-  display: none;
-  width: 0;
-  height: 0;
 }
 
 .settings-tabs :deep(.el-tab-pane) {

@@ -310,35 +310,6 @@ onUnmounted(() => {
   overflow: auto;
   padding: 0 10px 10px 14px;
   cursor: text;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--text-muted) 45%, transparent) transparent;
-}
-
-.body::-webkit-scrollbar {
-  width: 8px;
-}
-
-.body::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.body::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--text-muted) 40%, transparent);
-  border-radius: 999px;
-  border: 2px solid transparent;
-  background-clip: content-box;
-}
-
-.body::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, var(--text-muted) 65%, transparent);
-  border: 2px solid transparent;
-  background-clip: content-box;
-}
-
-.body::-webkit-scrollbar-button {
-  display: none;
-  width: 0;
-  height: 0;
 }
 
 .muted {

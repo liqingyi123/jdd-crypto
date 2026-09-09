@@ -198,29 +198,6 @@ onUnmounted(() => {
   min-height: 0;
   overflow: auto;
   padding: 10px;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--text-muted) 45%, transparent) transparent;
-}
-
-.col-body::-webkit-scrollbar {
-  width: 8px;
-}
-
-.col-body::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.col-body::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--text-muted) 40%, transparent);
-  border-radius: 999px;
-  border: 2px solid transparent;
-  background-clip: content-box;
-}
-
-.col-body::-webkit-scrollbar-button {
-  display: none;
-  width: 0;
-  height: 0;
 }
 
 pre,
