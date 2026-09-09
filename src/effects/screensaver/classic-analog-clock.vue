@@ -3,6 +3,7 @@
  * Classic dashed-tick analog clock migrated from jiaoben6996.
  */
 import { computed, onMounted, onUnmounted, shallowRef } from "vue";
+import "./clock-chroma.css";
 
 function isInt(n: number) {
   return Math.floor(n) === n;
@@ -91,7 +92,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="analog-root">
+  <div class="analog-root clock-chroma">
     <div class="clock">
       <ul class="mark">
         <li
@@ -134,7 +135,7 @@ onUnmounted(() => {
   height: 500px;
   position: relative;
   margin: auto;
-  transform: scale(calc(min(500px, 86vmin) / 500px));
+  transform: scale(calc(min(720px, 94vmin) / 500px));
   transform-origin: center center;
 }
 
@@ -152,9 +153,9 @@ onUnmounted(() => {
   position: absolute;
   width: 6px;
   height: 2px;
-  background: #fff;
+  background: var(--clock-accent, #ff4d8d);
   transform-origin: 250px;
-  box-shadow: 0 0 10px #ffeab0;
+  box-shadow: 0 0 14px var(--clock-accent, #ff4d8d);
   left: 0;
   top: 0;
 }
@@ -166,16 +167,16 @@ onUnmounted(() => {
 
 .numbers {
   position: absolute;
-  left: 238px;
-  top: 238px;
-  font-size: 20px;
+  left: 233px;
+  top: 233px;
+  font-size: 28px;
   font-weight: 700;
   line-height: 1.5;
-  width: 24px;
-  height: 24px;
+  width: 34px;
+  height: 34px;
   text-align: center;
-  color: #fff;
-  text-shadow: 0 0 10px #ffeab0;
+  color: var(--clock-accent, #ff4d8d);
+  text-shadow: 0 0 14px var(--clock-accent, #ff4d8d);
 }
 
 .center {
@@ -185,13 +186,15 @@ onUnmounted(() => {
   width: 24px;
   height: 24px;
   border-radius: 20px;
-  background: #fff;
+  background: var(--clock-accent, #ff4d8d);
+  box-shadow: 0 0 16px var(--clock-accent, #ff4d8d);
 }
 
 .hour-hand,
 .minute-hand,
 .second-hand {
-  box-shadow: 2px 2px 5px #ffeab0;
+  background: var(--clock-accent, #ff4d8d);
+  box-shadow: 0 0 12px var(--clock-accent, #ff4d8d);
 }
 
 .hour-hand {
@@ -200,7 +203,6 @@ onUnmounted(() => {
   top: 150px;
   width: 6px;
   height: 140px;
-  background: #fff;
   transform-origin: 3px 100px;
 }
 
@@ -210,7 +212,6 @@ onUnmounted(() => {
   top: 70px;
   width: 4px;
   height: 220px;
-  background: #fff;
   transform-origin: 2px 180px;
 }
 
@@ -220,7 +221,6 @@ onUnmounted(() => {
   top: 40px;
   width: 2px;
   height: 280px;
-  background: #fff;
   transform-origin: 1px 210px;
 }
 
@@ -230,10 +230,11 @@ onUnmounted(() => {
   left: 50%;
   top: 330px;
   transform: translateX(-50%);
-  font-size: 11px;
+  font-size: 16px;
   font-weight: bold;
   background: transparent;
-  color: #fff;
+  color: var(--clock-accent, #ff4d8d);
+  text-shadow: 0 0 12px var(--clock-accent, #ff4d8d);
   line-height: 1.4;
   text-align: center;
   white-space: nowrap;

@@ -1,0 +1,13 @@
+@keyframes clock-chroma-hue {
+  from {
+    filter: hue-rotate(0deg) saturate(0.72) brightness(1.05);
+  }
+  to {
+    filter: hue-rotate(360deg) saturate(0.72) brightness(1.05);
+  }
+}
+
+.clock-chroma {
+  --clock-accent: #f0b0c8;
+  animation: clock-chroma-hue 36s linear infinite;
+}

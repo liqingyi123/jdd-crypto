@@ -4,6 +4,7 @@
  * Ring labels use Arabic digits instead of Chinese numerals.
  */
 import { computed, nextTick, onMounted, onUnmounted, shallowRef } from "vue";
+import "./clock-chroma.css";
 
 type DateInfo = {
   year: number;
@@ -193,7 +194,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="compass-root">
+  <div class="compass-root clock-chroma">
     <ul class="clock">
       <hr :class="{ active: hrActive }" />
       <li class="date">{{ dateText }}</li>
@@ -249,7 +250,7 @@ onUnmounted(() => {
   justify-content: center;
   pointer-events: none;
   z-index: 5;
-  color: #fff;
+  color: var(--clock-accent, #ff4d8d);
   font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
   font-size: 14px;
 }
@@ -261,9 +262,9 @@ onUnmounted(() => {
   width: 700px;
   height: 700px;
   position: relative;
-  line-height: 20px;
+  line-height: 28px;
   user-select: none;
-  transform: scale(calc(min(700px, 90vmin) / 700px));
+  transform: scale(calc(min(920px, 96vmin) / 700px));
   transform-origin: center center;
 }
 
@@ -271,19 +272,21 @@ onUnmounted(() => {
   position: absolute;
   z-index: 1;
   width: 100%;
-  height: 20px;
+  height: 36px;
+  line-height: 36px;
+  font-size: 30px;
   text-align: center;
-  top: 340px;
+  top: 332px;
   left: 0;
-  text-shadow: 0 0 8px rgba(0, 0, 0, 0.65);
+  text-shadow: 0 0 12px var(--clock-accent, #ff4d8d);
 }
 
 .hour {
   position: absolute;
   z-index: 3;
   width: 360px;
-  height: 20px;
-  top: 340px;
+  height: 28px;
+  top: 336px;
   left: 170px;
   transform: rotate(0deg);
 }
@@ -299,9 +302,10 @@ onUnmounted(() => {
 
 .hour > div > div {
   float: right;
-  width: 60px;
+  width: 88px;
+  font-size: 20px;
   text-align: right;
-  text-shadow: 0 0 6px rgba(0, 0, 0, 0.55);
+  text-shadow: 0 0 10px var(--clock-accent, #ff4d8d);
 }
 
 .minute {
@@ -310,10 +314,18 @@ onUnmounted(() => {
   left: 90px;
 }
 
+.minute > div > div {
+  font-size: 16px;
+}
+
 .sec {
   z-index: 5;
   width: 680px;
   left: 10px;
+}
+
+.sec > div > div {
+  font-size: 14px;
 }
 
 .clock > hr {
@@ -321,11 +333,12 @@ onUnmounted(() => {
   width: 0%;
   position: absolute;
   z-index: 1;
-  border: #ffffff solid 0;
-  border-bottom-width: 1px;
-  margin: 10px 0 0;
+  border: color-mix(in srgb, var(--clock-accent, #ff4d8d) 42%, transparent) solid 0;
+  border-bottom-width: 3px;
+  margin: 0;
   left: 50%;
   top: 50%;
+  transform: translateY(-1.5px);
   transition: width 0.3s ease-in-out 0s;
   overflow: visible;
 }
@@ -340,8 +353,9 @@ onUnmounted(() => {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background-color: yellow;
-  top: -2px;
+  background-color: var(--clock-accent, #ff4d8d);
+  box-shadow: 0 0 10px var(--clock-accent, #ff4d8d);
+  top: -1px;
   left: 0;
   position: absolute;
 }

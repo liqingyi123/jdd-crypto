@@ -72,16 +72,16 @@
 }
 .digit:nth-child(2):before, .digit:nth-child(2):after, .digit:nth-child(4):before, .digit:nth-child(4):after {
   content: '';
-  background: white;
+  background: #ff4d8d;
   display: block;
   position: absolute;
   text-align: center;
   width: 1vmax;
   height: 1vmax;
   left: calc(100% + 2vmax);
-  box-shadow: 0 0 1rem #840BFD, inset 0 0 0.25vmax #840BFD;
+  box-shadow: 0 0 1.6rem #ff4d8d, inset 0 0 0.35vmax #ff4d8d;
   font-size: 8vmax;
-  text-shadow: 0 0 1rem #840BFD;
+  text-shadow: 0 0 1.6rem #ff4d8d;
   -webkit-animation: pulse 1s alternate cubic-bezier(0.5, 0, 0.5, 1) infinite;
           animation: pulse 1s alternate cubic-bezier(0.5, 0, 0.5, 1) infinite;
 }
@@ -727,12 +727,12 @@
   content: '';
   display: block;
   position: absolute;
-  color: #840BFD;
-  background: white;
+  color: #ff4d8d;
+  background: #ff4d8d;
   -webkit-transition: all 0.9s cubic-bezier(0.5, 0, 0.5, 1);
   transition: all 0.9s cubic-bezier(0.5, 0, 0.5, 1);
   border-radius: 1ch;
-  box-shadow: 0 0 1rem #840BFD, inset 0 0 0.0525vmin #840BFD;
+  box-shadow: 0 0 1.6rem #ff4d8d, inset 0 0 0.08vmin #ff4d8d;
 }
 .line:after {
   -webkit-transition-timing-function: cubic-bezier(0.4, 0, 0.05, 1);

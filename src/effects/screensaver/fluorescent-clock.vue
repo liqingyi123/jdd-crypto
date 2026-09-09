@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from "vue";
 import "./fluorescent-clock.css";
+import "./clock-chroma.css";
 
 const timeRef = ref<HTMLElement | null>(null);
 const hours = ref("00");
@@ -61,7 +62,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="fluorescent-clock">
+  <div class="fluorescent-clock clock-chroma">
     <div
       ref="timeRef"
       class="time"
