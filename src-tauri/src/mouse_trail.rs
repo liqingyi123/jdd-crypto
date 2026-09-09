@@ -244,6 +244,7 @@ pub fn set_enabled_pref(app: AppHandle, enabled: bool) -> Result<MouseTrailPref,
     pref.enabled = enabled;
     save_pref(&app, &pref)?;
     set_enabled(&app, enabled);
+    let _ = crate::global_shortcuts::register_all(&app);
     emit_pref(&app, &pref);
     Ok(pref)
 }
@@ -303,6 +304,7 @@ pub fn reset_pref(app: AppHandle) -> Result<MouseTrailPref, String> {
     let pref = MouseTrailPref::default();
     save_pref(&app, &pref)?;
     set_enabled(&app, false);
+    let _ = crate::global_shortcuts::register_all(&app);
     emit_pref(&app, &pref);
     Ok(pref)
 }
@@ -311,6 +313,10 @@ pub fn init_from_store(app: &AppHandle) {
     ensure_display_listener(app);
     let pref = load_pref(app);
     set_enabled(app, pref.enabled);
+}
+
+pub fn is_enabled() -> bool {
+    TRAIL_ENABLED.load(Ordering::Relaxed)
 }
 
 fn trail_shortcut_ids() -> Result<(u32, [u32; 6]), String> {

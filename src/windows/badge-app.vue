@@ -32,7 +32,7 @@ const badgeTip = computed(() => {
     : "多多工具箱";
   return [
     title,
-    "左键：打开主界面",
+    "左键：打开加解密",
     "中键：打开 Host 管理",
     "右键：打开菜单",
     "可拖动",

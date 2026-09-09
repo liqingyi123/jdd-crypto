@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -47,8 +47,6 @@ const draftContent = shallowRef("");
 const dirty = shallowRef(false);
 const syncing = shallowRef(false);
 const fileInput = ref<HTMLInputElement | null>(null);
-const renamingId = shallowRef<string | null>(null);
-const renameDraft = shallowRef("");
 const createDialogVisible = shallowRef(false);
 const createNature = shallowRef<HostNature>("exclusive");
 const createType = shallowRef<HostSchemeType>("local");
@@ -66,11 +64,6 @@ const refreshingRemote = shallowRef(false);
 const draftUrl = shallowRef("");
 const draftInterval = shallowRef(0);
 const draftType = shallowRef<HostSchemeType>("local");
-const renameInputRef = ref<{ focus?: () => void; input?: HTMLInputElement } | null>(
-  null,
-);
-
-let stopRenameOutsideListen: (() => void) | undefined;
 
 const selected = computed(
   () => schemes.value.find((s) => s.id === selectedId.value) ?? null,
@@ -151,10 +144,6 @@ function natureLabel(nature: string): string {
   return nature === "keep" ? "保留" : "单开";
 }
 
-function sourceLabel(source: string): string {
-  return source === "imported" ? "导入" : "本地";
-}
-
 function isRemoteScheme(scheme: HostsScheme): boolean {
   const normalized = normalizeScheme(scheme);
   return normalized.type === "remote";
@@ -176,50 +165,7 @@ function schemeLastRefresh(scheme: HostsScheme): string {
   return normalizeScheme(scheme).last_refresh ?? "";
 }
 
-function cancelRename() {
-  renamingId.value = null;
-  renameDraft.value = "";
-}
-
-function bindRenameOutsideClose() {
-  stopRenameOutsideListen?.();
-  const onPointerDown = (event: PointerEvent) => {
-    const target = event.target;
-    if (!(target instanceof Element)) {
-      cancelRename();
-      return;
-    }
-    if (target.closest(".rename-row")) {
-      return;
-    }
-    cancelRename();
-  };
-  document.addEventListener("pointerdown", onPointerDown, true);
-  stopRenameOutsideListen = () => {
-    document.removeEventListener("pointerdown", onPointerDown, true);
-    stopRenameOutsideListen = undefined;
-  };
-}
-
-watch(renamingId, async (id) => {
-  if (!id) {
-    stopRenameOutsideListen?.();
-    return;
-  }
-  bindRenameOutsideClose();
-  await nextTick();
-  renameInputRef.value?.focus?.();
-  renameInputRef.value?.input?.focus?.();
-});
-
-onBeforeUnmount(() => {
-  stopRenameOutsideListen?.();
-});
-
 async function selectScheme(scheme: HostsScheme) {
-  if (renamingId.value) {
-    cancelRename();
-  }
   if (
     dirty.value &&
     selectedId.value &&
@@ -242,9 +188,6 @@ async function selectScheme(scheme: HostsScheme) {
 }
 
 async function selectSystemHosts() {
-  if (renamingId.value) {
-    cancelRename();
-  }
   if (dirty.value && selectedId.value && selectedId.value !== SYSTEM_ID) {
     ElMessage.warning("请先保存或放弃当前编辑");
     return;
@@ -327,9 +270,6 @@ function openCreateDialog() {
   if (dirty.value) {
     ElMessage.warning("请先保存或放弃当前编辑");
     return;
-  }
-  if (renamingId.value) {
-    cancelRename();
   }
   createNature.value = "exclusive";
   createType.value = "local";
@@ -482,37 +422,6 @@ async function toggleEnabled(scheme: HostsScheme, enabled: boolean) {
   }
 }
 
-function startRename(scheme: HostsScheme) {
-  if (dirty.value) {
-    ElMessage.warning("请先保存或放弃当前编辑");
-    return;
-  }
-  renamingId.value = scheme.id;
-  renameDraft.value = scheme.title;
-}
-
-async function confirmRename(scheme: HostsScheme) {
-  const title = renameDraft.value.trim();
-  if (!title) {
-    ElMessage.warning("标题不能为空");
-    return;
-  }
-  try {
-    const list = await invoke<HostsScheme[]>("hosts_rename", {
-      id: scheme.id,
-      title,
-    });
-    schemes.value = normalizeSchemes(list);
-    if (selectedId.value === scheme.id) {
-      draftTitle.value = title;
-    }
-    cancelRename();
-    ElMessage.success("已重命名");
-  } catch (err) {
-    ElMessage.error(String(err));
-  }
-}
-
 async function changeNature(scheme: HostsScheme, nature: HostNature) {
   if (scheme.nature === nature) {
     return;
@@ -553,9 +462,6 @@ async function confirmDeleteScheme() {
     schemes.value = normalizeSchemes(list);
     deleteDialogVisible.value = false;
     deleteTarget.value = null;
-    if (renamingId.value === scheme.id) {
-      cancelRename();
-    }
     if (selectedId.value === scheme.id) {
       selectedId.value = null;
       draftTitle.value = "";
@@ -580,22 +486,11 @@ async function confirmDeleteScheme() {
   }
 }
 
-function onMoreCommand(scheme: HostsScheme, command: string) {
-  if (command === "rename") {
-    startRename(scheme);
+function askDeleteSelected() {
+  if (!selected.value || viewingSystem.value) {
     return;
   }
-  if (command === "keep") {
-    void changeNature(scheme, "keep");
-    return;
-  }
-  if (command === "exclusive") {
-    void changeNature(scheme, "exclusive");
-    return;
-  }
-  if (command === "delete") {
-    askDeleteScheme(scheme);
-  }
+  askDeleteScheme(selected.value);
 }
 
 function triggerImport() {
@@ -856,36 +751,10 @@ defineExpose({ openCreateDialog, triggerImport, exportSwitchhosts });
           @click="selectScheme(scheme)"
         >
           <div class="item-main">
-            <div
-              v-if="renamingId === scheme.id"
-              class="rename-row"
-              @click.stop
-            >
-              <ElInput
-                ref="renameInputRef"
-                v-model="renameDraft"
-                size="small"
-                maxlength="64"
-                @keyup.enter="confirmRename(scheme)"
-                @keyup.esc="cancelRename"
-              />
-              <ElButton
-                type="primary"
-                size="small"
-                class="rename-ok"
-                @pointerdown.stop
-                @click="confirmRename(scheme)"
-              >
-                ✔
-              </ElButton>
-            </div>
-            <div v-else class="item-title" :title="scheme.title">
+            <div class="item-title" :title="scheme.title">
               {{ scheme.title }}
             </div>
             <div class="item-meta">
-              <ElTag size="small" effect="plain">
-                {{ sourceLabel(scheme.source) }}
-              </ElTag>
               <ElTag
                 v-if="isRemoteScheme(scheme)"
                 size="small"
@@ -895,11 +764,11 @@ defineExpose({ openCreateDialog, triggerImport, exportSwitchhosts });
                 远程
               </ElTag>
               <ElTag
+                v-else
                 size="small"
                 effect="plain"
-                :type="scheme.nature === 'exclusive' ? 'warning' : 'success'"
               >
-                {{ natureLabel(scheme.nature) }}
+                本地
               </ElTag>
               <ElTag
                 v-if="scheme.readonly"
@@ -909,6 +778,29 @@ defineExpose({ openCreateDialog, triggerImport, exportSwitchhosts });
               >
                 只读
               </ElTag>
+              <div
+                class="nature-switch"
+                role="group"
+                aria-label="方案性质"
+                @click.stop
+              >
+                <button
+                  type="button"
+                  class="nature-btn"
+                  :class="{ active: scheme.nature === 'keep' }"
+                  @click="changeNature(scheme, 'keep')"
+                >
+                  保留
+                </button>
+                <button
+                  type="button"
+                  class="nature-btn"
+                  :class="{ active: scheme.nature === 'exclusive' }"
+                  @click="changeNature(scheme, 'exclusive')"
+                >
+                  单开
+                </button>
+              </div>
             </div>
           </div>
           <div class="item-actions" @click.stop>
@@ -917,39 +809,6 @@ defineExpose({ openCreateDialog, triggerImport, exportSwitchhosts });
               size="small"
               @change="(value) => toggleEnabled(scheme, Boolean(value))"
             />
-            <ElDropdown
-              trigger="click"
-              @command="(cmd: string) => onMoreCommand(scheme, cmd)"
-            >
-              <button
-                type="button"
-                class="more-btn"
-                title="更多"
-                @click.stop
-              >
-                ···
-              </button>
-              <template #dropdown>
-                <ElDropdownMenu>
-                  <ElDropdownItem command="rename">重命名</ElDropdownItem>
-                  <ElDropdownItem
-                    command="keep"
-                    :disabled="scheme.nature === 'keep'"
-                  >
-                    性质：保留
-                  </ElDropdownItem>
-                  <ElDropdownItem
-                    command="exclusive"
-                    :disabled="scheme.nature === 'exclusive'"
-                  >
-                    性质：单开
-                  </ElDropdownItem>
-                  <ElDropdownItem command="delete" divided>
-                    删除
-                  </ElDropdownItem>
-                </ElDropdownMenu>
-              </template>
-            </ElDropdown>
           </div>
         </div>
         <p v-if="schemes.length === 0" class="empty">暂无方案，请拉取最新配置</p>
@@ -976,6 +835,9 @@ defineExpose({ openCreateDialog, triggerImport, exportSwitchhosts });
                 @click="saveScheme"
               >
                 保存
+              </ElButton>
+              <ElButton type="danger" plain @click="askDeleteSelected">
+                删除
               </ElButton>
             </template>
             <ElTag v-else type="info" size="small" effect="plain">只读</ElTag>
@@ -1194,17 +1056,6 @@ defineExpose({ openCreateDialog, triggerImport, exportSwitchhosts });
   white-space: nowrap;
 }
 
-.rename-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.rename-ok {
-  flex-shrink: 0;
-  padding: 5px 8px;
-}
-
 .item-meta {
   margin-top: 4px;
   display: flex;
@@ -1238,29 +1089,40 @@ defineExpose({ openCreateDialog, triggerImport, exportSwitchhosts });
   padding-top: 2px;
 }
 
-.more-btn {
-  box-sizing: border-box;
-  width: 24px;
-  height: 24px;
-  padding: 0;
+.nature-switch {
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 2px;
+  border-radius: 8px;
   border: 1px solid var(--el-border-color);
-  border-radius: 50%;
-  background: transparent;
-  color: var(--el-text-color-regular);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  line-height: 1;
-  cursor: pointer;
+  background: var(--el-fill-color-blank);
+}
+
+.nature-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-width: 36px;
+  height: 20px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--el-text-color-secondary);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
 }
 
-.more-btn:hover {
-  border-color: var(--el-color-primary);
-  color: var(--el-color-primary);
+.nature-btn.active {
   background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+  font-weight: 600;
+}
+
+.nature-btn:hover:not(.active) {
+  color: var(--el-text-color-regular);
 }
 
 .editor {

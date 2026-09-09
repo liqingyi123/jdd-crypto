@@ -35,9 +35,6 @@ onUnmounted(() => {
 <template>
   <ElConfigProvider :locale="zhCn">
     <div class="shell">
-      <header class="header">
-        <h1 class="title">加解密</h1>
-      </header>
       <section class="content">
         <CryptoHome />
       </section>
@@ -52,19 +49,10 @@ onUnmounted(() => {
   height: 100%;
 }
 
-.header {
-  padding: 18px 24px 8px;
-}
-
-.title {
-  margin: 0;
-  font-size: 20px;
-}
-
 .content {
   flex: 1;
   min-height: 0;
-  padding: 8px 24px 24px;
+  padding: 16px 24px 24px;
   overflow: hidden;
   display: flex;
   flex-direction: column;

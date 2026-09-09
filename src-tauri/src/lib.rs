@@ -213,6 +213,7 @@ pub fn run() {
                 .screensaver_pref_enabled
                 .store(screensaver_pref, Ordering::Relaxed);
             mouse_follow::start_follow_loop(app.handle().clone());
+            mouse_trail::init_from_store(app.handle());
             let _ = global_shortcuts::register_all(app.handle());
             if let Some(tip) = app.get_webview_window("compare-tip") {
                 let _ = tip.set_ignore_cursor_events(true);
@@ -221,7 +222,6 @@ pub fn run() {
             if let Some(compare) = app.get_webview_window("compare-bubble") {
                 windows::bind_close_to_hide(&compare);
             }
-            mouse_trail::init_from_store(app.handle());
             autostart_pref::sync_from_store(app.handle());
             crate::hosts_manager::start_refresh_loop(app.handle().clone());
             #[cfg(windows)]

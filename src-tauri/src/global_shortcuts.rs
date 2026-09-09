@@ -37,12 +37,14 @@ pub fn ensure_no_conflict(
 ) -> Result<(), String> {
     let candidate_id = shortcut_id(candidate)?;
 
-    if shortcut_id(TRAIL_ARM_SHORTCUT)? == candidate_id {
-        return Err(format!("与固定快捷键 {TRAIL_ARM_SHORTCUT} 冲突"));
-    }
-    for fixed in TRAIL_EFFECT_SHORTCUTS {
-        if shortcut_id(fixed)? == candidate_id {
-            return Err(format!("与固定快捷键 {fixed} 冲突"));
+    if crate::mouse_trail::is_enabled() {
+        if shortcut_id(TRAIL_ARM_SHORTCUT)? == candidate_id {
+            return Err(format!("与固定快捷键 {TRAIL_ARM_SHORTCUT} 冲突"));
+        }
+        for fixed in TRAIL_EFFECT_SHORTCUTS {
+            if shortcut_id(fixed)? == candidate_id {
+                return Err(format!("与固定快捷键 {fixed} 冲突"));
+            }
         }
     }
 
@@ -125,12 +127,14 @@ pub fn register_all(app: &AppHandle) -> Result<(), String> {
         global.register(compare).map_err(|err| err.to_string())?;
     }
 
-    let arm = Shortcut::from_str(TRAIL_ARM_SHORTCUT).map_err(|err| err.to_string())?;
-    global.register(arm).map_err(|err| err.to_string())?;
+    if crate::mouse_trail::is_enabled() {
+        let arm = Shortcut::from_str(TRAIL_ARM_SHORTCUT).map_err(|err| err.to_string())?;
+        global.register(arm).map_err(|err| err.to_string())?;
 
-    for shortcut in TRAIL_EFFECT_SHORTCUTS {
-        let parsed = Shortcut::from_str(shortcut).map_err(|err| err.to_string())?;
-        global.register(parsed).map_err(|err| err.to_string())?;
+        for shortcut in TRAIL_EFFECT_SHORTCUTS {
+            let parsed = Shortcut::from_str(shortcut).map_err(|err| err.to_string())?;
+            global.register(parsed).map_err(|err| err.to_string())?;
+        }
     }
 
     if state.hosts_quick_pref_enabled.load(Ordering::Relaxed) {

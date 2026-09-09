@@ -22,18 +22,17 @@ const page = computed(() => pages[props.windowLabel]);
 const fillContent = computed(
   () => props.windowLabel === "hosts" || props.windowLabel === "settings",
 );
-const showPageTitle = computed(() => props.windowLabel !== "settings");
 </script>
 
 <template>
   <ElConfigProvider :locale="zhCn">
     <div v-if="page" class="shell" :class="{ 'shell-fill': fillContent }">
-      <header v-if="showPageTitle" class="header">
-        <h1 class="title">{{ page.title }}</h1>
-      </header>
       <section
         class="content"
-        :class="{ 'content-fill': fillContent, 'content-settings': !showPageTitle }"
+        :class="{
+          'content-fill': fillContent,
+          'content-settings': props.windowLabel === 'settings',
+        }"
       >
         <component :is="page.component" />
       </section>
@@ -48,18 +47,9 @@ const showPageTitle = computed(() => props.windowLabel !== "settings");
   height: 100%;
 }
 
-.header {
-  padding: 18px 24px 8px;
-}
-
-.title {
-  margin: 0;
-  font-size: 20px;
-}
-
 .content {
   flex: 1;
-  padding: 8px 24px 24px;
+  padding: 16px 24px 24px;
   overflow: auto;
 }
 
@@ -72,5 +62,9 @@ const showPageTitle = computed(() => props.windowLabel !== "settings");
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+.shell-fill .content-fill:not(.content-settings) {
+  padding: 12px 16px 16px;
 }
 </style>

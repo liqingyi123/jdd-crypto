@@ -8,8 +8,8 @@ use crate::screensaver;
 use crate::windows;
 
 pub fn build_app_menu<R: Runtime, M: Manager<R>>(app: &M) -> tauri::Result<Menu<R>> {
-    let show_main = MenuItem::with_id(app, "show_main", "打开主界面", true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "功能设置", true, None::<&str>)?;
+    let show_main = MenuItem::with_id(app, "show_main", "加解密", true, None::<&str>)?;
     let hosts = MenuItem::with_id(app, "hosts", "Host管理", true, None::<&str>)?;
     let brightness = MenuItem::with_id(app, "brightness", "亮度调节", true, None::<&str>)?;
     let screensaver_item = MenuItem::with_id(app, "screensaver", "屏幕保护", true, None::<&str>)?;
@@ -20,8 +20,8 @@ pub fn build_app_menu<R: Runtime, M: Manager<R>>(app: &M) -> tauri::Result<Menu<
     Menu::with_items(
         app,
         &[
-            &show_main,
             &settings,
+            &show_main,
             &hosts,
             &brightness,
             &screensaver_item,
@@ -49,7 +49,7 @@ pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let menu = build_app_menu(app)?;
     let version = app.package_info().version.to_string();
     let tooltip = format!(
-        "多多工具箱 v{version}\n左键打开加解密主界面\n中键打开 Host 管理\n右击打开菜单"
+        "多多工具箱 v{version}\n左键打开加解密\n中键打开 Host 管理\n右击打开菜单"
     );
     let mut builder = TrayIconBuilder::with_id("main-tray")
         .menu(&menu)

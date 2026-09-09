@@ -2025,7 +2025,7 @@ dependencies = [
 
 [[package]]
 name = "jdd-crypto"
-version = "0.11.6"
+version = "0.11.7"
 dependencies = [
  "core-graphics 0.24.0",
  "reqwest 0.12.28",

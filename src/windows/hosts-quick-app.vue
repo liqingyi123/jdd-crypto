@@ -188,6 +188,32 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--el-text-color-secondary) 45%, transparent)
+    transparent;
+}
+
+.quick-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.quick-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.quick-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--el-text-color-secondary) 40%, transparent);
+}
+
+.quick-list::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--el-text-color-secondary) 65%, transparent);
+}
+
+.quick-list::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .quick-item {
