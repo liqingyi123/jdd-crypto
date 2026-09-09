@@ -7,7 +7,6 @@ import { onMounted, onUnmounted, ref } from "vue";
 import Parallax from "@/assets/screensaver/parallax/parallax.js";
 import ropeUrl from "@/assets/screensaver/parallax/rope.png";
 import "@/assets/screensaver/parallax/parallax-seaside.css";
-import FluorescentClock from "@/effects/screensaver/fluorescent-clock.vue";
 
 type ParallaxInstance = {
   disable: () => void;
@@ -134,7 +133,6 @@ onUnmounted(() => {
         <div class="wave paint depth-100" />
       </li>
     </ul>
-    <FluorescentClock />
   </div>
 </template>
 

@@ -21,25 +21,33 @@ const SETTINGS_STORE: &str = "settings.json";
 const SHORTCUT_KEY: &str = "screensaverShortcut";
 const PREF_KEY: &str = "screensaverEnabled";
 const EFFECT_STORE_KEY: &str = "screensaver";
-const DEFAULT_EFFECT: &str = "parallax";
+const DEFAULT_BACKGROUND: &str = "parallax";
+const DEFAULT_CLOCK: &str = "lcd3d";
 
 static ACTIVE: AtomicBool = AtomicBool::new(false);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScreensaverPref {
-    #[serde(default = "default_effect")]
-    pub effect: String,
+    #[serde(default = "default_background")]
+    pub background: String,
+    #[serde(default = "default_clock")]
+    pub clock: String,
 }
 
-fn default_effect() -> String {
-    DEFAULT_EFFECT.to_string()
+fn default_background() -> String {
+    DEFAULT_BACKGROUND.to_string()
+}
+
+fn default_clock() -> String {
+    DEFAULT_CLOCK.to_string()
 }
 
 impl Default for ScreensaverPref {
     fn default() -> Self {
         Self {
-            effect: DEFAULT_EFFECT.to_string(),
+            background: DEFAULT_BACKGROUND.to_string(),
+            clock: DEFAULT_CLOCK.to_string(),
         }
     }
 }
@@ -126,13 +134,50 @@ pub fn apply_pref(app: &AppHandle, enabled: bool) {
     let _ = global_shortcuts::register_all(app);
 }
 
+fn normalize_background(raw: &str) -> String {
+    match raw {
+        "corona" | "parallax" | "snow" => raw.to_string(),
+        _ => DEFAULT_BACKGROUND.to_string(),
+    }
+}
+
+fn normalize_clock(raw: &str) -> String {
+    match raw {
+        "lcd3d" => "lcd3d".to_string(),
+        _ => DEFAULT_CLOCK.to_string(),
+    }
+}
+
+fn pref_from_store_value(value: serde_json::Value) -> ScreensaverPref {
+    // Legacy: { "effect": "parallax" }
+    if let Some(effect) = value.get("effect").and_then(|v| v.as_str()) {
+        if value.get("background").is_none() {
+            return ScreensaverPref {
+                background: normalize_background(effect),
+                clock: DEFAULT_CLOCK.to_string(),
+            };
+        }
+    }
+    let background = value
+        .get("background")
+        .and_then(|v| v.as_str())
+        .map(normalize_background)
+        .unwrap_or_else(default_background);
+    let clock = value
+        .get("clock")
+        .and_then(|v| v.as_str())
+        .map(normalize_clock)
+        .unwrap_or_else(default_clock);
+    ScreensaverPref { background, clock }
+}
+
 pub fn load_effect_pref(app: &AppHandle) -> ScreensaverPref {
     let Ok(store) = app.store(SETTINGS_STORE) else {
         return ScreensaverPref::default();
     };
     store
         .get(EFFECT_STORE_KEY)
-        .and_then(|value| serde_json::from_value(value.clone()).ok())
+        .map(pref_from_store_value)
         .unwrap_or_default()
 }
 
@@ -145,20 +190,24 @@ pub fn save_effect_pref(app: &AppHandle, pref: &ScreensaverPref) {
     }
 }
 
-fn normalize_effect(effect: &str) -> String {
-    match effect {
-        "parallax" => "parallax".to_string(),
-        _ => DEFAULT_EFFECT.to_string(),
-    }
+fn emit_pref(app: &AppHandle, pref: &ScreensaverPref) {
+    let _ = app.emit_filter("app://screensaver-pref", pref, is_overlay_target);
+    let _ = app.emit("app://screensaver-pref", pref);
 }
 
-pub fn set_effect(app: &AppHandle, effect: String) -> ScreensaverPref {
-    let pref = ScreensaverPref {
-        effect: normalize_effect(&effect),
-    };
+pub fn set_background(app: &AppHandle, background: String) -> ScreensaverPref {
+    let mut pref = load_effect_pref(app);
+    pref.background = normalize_background(&background);
     save_effect_pref(app, &pref);
-    let _ = app.emit_filter("app://screensaver-effect", &pref.effect, is_overlay_target);
-    let _ = app.emit("app://screensaver-pref", &pref);
+    emit_pref(app, &pref);
+    pref
+}
+
+pub fn set_clock(app: &AppHandle, clock: String) -> ScreensaverPref {
+    let mut pref = load_effect_pref(app);
+    pref.clock = normalize_clock(&clock);
+    save_effect_pref(app, &pref);
+    emit_pref(app, &pref);
     pref
 }
 
@@ -195,11 +244,11 @@ pub fn show(app: &AppHandle) {
     let state = app.state::<AppState>();
     state.screensaver_active.store(true, Ordering::Relaxed);
     sync_overlays(app, true);
-    let effect = load_effect_pref(app).effect;
+    let pref = load_effect_pref(app);
     let handle = app.clone();
     thread::spawn(move || {
         thread::sleep(Duration::from_millis(80));
-        let _ = handle.emit_filter("app://screensaver-effect", &effect, is_overlay_target);
+        emit_pref(&handle, &pref);
         if let Some(win) = handle.get_webview_window(&overlay_label(0)) {
             let _ = win.set_focus();
         }

@@ -3,16 +3,18 @@ import { onMounted, onUnmounted, shallowRef } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import ParallaxSeaside from "@/effects/screensaver/parallax-seaside.vue";
+import CoronaSunrise from "@/effects/screensaver/corona-sunrise.vue";
+import SnowRelic from "@/effects/screensaver/snow-relic.vue";
+import FluorescentClock from "@/effects/screensaver/fluorescent-clock.vue";
+import {
+  DEFAULT_SCREENSAVER_PREF,
+  normalizeScreensaverPref,
+  type ScreensaverPref,
+} from "@/effects/screensaver/types";
 
-type ScreensaverEffect = "parallax";
+const pref = shallowRef<ScreensaverPref>({ ...DEFAULT_SCREENSAVER_PREF });
 
-const effect = shallowRef<ScreensaverEffect>("parallax");
-
-let unlistenEffect: UnlistenFn | null = null;
-
-function normalizeEffect(_raw: unknown): ScreensaverEffect {
-  return "parallax";
-}
+let unlistenPref: UnlistenFn | null = null;
 
 async function exitScreensaver() {
   try {
@@ -32,14 +34,14 @@ function onKeyDown(event: KeyboardEvent) {
 onMounted(async () => {
   window.addEventListener("keydown", onKeyDown);
   try {
-    const pref = await invoke<{ effect: string }>("get_screensaver_effect_pref");
-    effect.value = normalizeEffect(pref.effect);
+    const raw = await invoke<unknown>("get_screensaver_effect_pref");
+    pref.value = normalizeScreensaverPref(raw);
   } catch {
-    effect.value = "parallax";
+    pref.value = { ...DEFAULT_SCREENSAVER_PREF };
   }
   try {
-    unlistenEffect = await listen<string>("app://screensaver-effect", (event) => {
-      effect.value = normalizeEffect(event.payload);
+    unlistenPref = await listen<unknown>("app://screensaver-pref", (event) => {
+      pref.value = normalizeScreensaverPref(event.payload);
     });
   } catch {
     // browser preview
@@ -48,13 +50,16 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener("keydown", onKeyDown);
-  void unlistenEffect?.();
+  void unlistenPref?.();
 });
 </script>
 
 <template>
   <div class="screensaver-root">
-    <ParallaxSeaside v-if="effect === 'parallax'" />
+    <ParallaxSeaside v-if="pref.background === 'parallax'" />
+    <CoronaSunrise v-else-if="pref.background === 'corona'" />
+    <SnowRelic v-else-if="pref.background === 'snow'" />
+    <FluorescentClock v-if="pref.clock === 'lcd3d'" />
     <p class="hint">按 ESC 退出</p>
   </div>
 </template>

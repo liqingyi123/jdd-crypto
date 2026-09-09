@@ -656,11 +656,19 @@ pub fn get_screensaver_effect_pref(app: AppHandle) -> crate::screensaver::Screen
 }
 
 #[tauri::command]
-pub fn set_screensaver_effect(
+pub fn set_screensaver_background(
     app: AppHandle,
-    effect: String,
+    background: String,
 ) -> crate::screensaver::ScreensaverPref {
-    crate::screensaver::set_effect(&app, effect)
+    crate::screensaver::set_background(&app, background)
+}
+
+#[tauri::command]
+pub fn set_screensaver_clock(
+    app: AppHandle,
+    clock: String,
+) -> crate::screensaver::ScreensaverPref {
+    crate::screensaver::set_clock(&app, clock)
 }
 
 #[tauri::command]

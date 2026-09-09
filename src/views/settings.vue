@@ -19,6 +19,14 @@ import {
   type MouseTrailEffect,
   type MouseTrailPref,
 } from "@/effects/mouse-trail-types";
+import {
+  DEFAULT_SCREENSAVER_PREF,
+  normalizeScreensaverBackground,
+  normalizeScreensaverPref,
+  type ScreensaverBackground,
+  type ScreensaverClock,
+  type ScreensaverPref,
+} from "@/effects/screensaver/types";
 
 const themeStore = useThemeStore();
 const clipboardStore = useClipboardStore();
@@ -112,7 +120,10 @@ const comparePref = shallowRef(true);
 const hostsQuickPref = shallowRef(true);
 const brightnessQuickPref = shallowRef(true);
 const screensaverPref = shallowRef(true);
-const screensaverEffect = shallowRef<"parallax">("parallax");
+const screensaverBackground = shallowRef<ScreensaverBackground>(
+  DEFAULT_SCREENSAVER_PREF.background,
+);
+const screensaverClock = shallowRef<ScreensaverClock>(DEFAULT_SCREENSAVER_PREF.clock);
 const autostartEnabled = shallowRef(false);
 const intranetServerBase = shallowRef("http://172.20.2.169:7101/");
 const intranetServerSaving = shallowRef(false);
@@ -257,10 +268,13 @@ onMounted(async () => {
     // browser preview
   }
   try {
-    await invoke<{ effect: string }>("get_screensaver_effect_pref");
-    screensaverEffect.value = "parallax";
+    const raw = await invoke<ScreensaverPref>("get_screensaver_effect_pref");
+    const normalized = normalizeScreensaverPref(raw);
+    screensaverBackground.value = normalized.background;
+    screensaverClock.value = normalized.clock;
   } catch {
-    screensaverEffect.value = "parallax";
+    screensaverBackground.value = DEFAULT_SCREENSAVER_PREF.background;
+    screensaverClock.value = DEFAULT_SCREENSAVER_PREF.clock;
   }
   try {
     autostartEnabled.value = await invoke<boolean>("get_autostart_pref");
@@ -399,13 +413,37 @@ async function onScreensaverPrefChange(value: string | number | boolean) {
   }
 }
 
-async function onScreensaverEffectChange(_value: string | number | boolean | undefined) {
-  const previous = screensaverEffect.value;
-  screensaverEffect.value = "parallax";
+async function onScreensaverBackgroundChange(
+  value: string | number | boolean | undefined,
+) {
+  const background = normalizeScreensaverBackground(value);
+  const previous = screensaverBackground.value;
+  screensaverBackground.value = background;
   try {
-    await invoke<{ effect: string }>("set_screensaver_effect", { effect: "parallax" });
+    const pref = await invoke<ScreensaverPref>("set_screensaver_background", {
+      background,
+    });
+    const normalized = normalizeScreensaverPref(pref);
+    screensaverBackground.value = normalized.background;
+    screensaverClock.value = normalized.clock;
   } catch (error) {
-    screensaverEffect.value = previous;
+    screensaverBackground.value = previous;
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
+}
+
+async function onScreensaverClockChange(_value: string | number | boolean | undefined) {
+  const previous = screensaverClock.value;
+  screensaverClock.value = "lcd3d";
+  try {
+    const pref = await invoke<ScreensaverPref>("set_screensaver_clock", {
+      clock: "lcd3d",
+    });
+    const normalized = normalizeScreensaverPref(pref);
+    screensaverBackground.value = normalized.background;
+    screensaverClock.value = normalized.clock;
+  } catch (error) {
+    screensaverClock.value = previous;
     ElMessage.error(error instanceof Error ? error.message : String(error));
   }
 }
@@ -757,13 +795,23 @@ async function onThemeChange(value: string | number | boolean | undefined) {
               {{ screensaverErrorMessage }}
             </p>
             <p>最多 4 个键，需包含修饰键。点击按钮后按下新组合，Esc 或点击其他区域取消。</p>
-            <h3>特效</h3>
+            <h3>背景特效</h3>
             <ElRadioGroup
-              :model-value="screensaverEffect"
+              :model-value="screensaverBackground"
               :disabled="!screensaverPref"
-              @change="onScreensaverEffectChange"
+              @change="onScreensaverBackgroundChange"
             >
               <ElRadio value="parallax">海景视差</ElRadio>
+              <ElRadio value="corona">日冕生辉</ElRadio>
+              <ElRadio value="snow">雪国遗踪</ElRadio>
+            </ElRadioGroup>
+            <h3>时钟效果</h3>
+            <ElRadioGroup
+              :model-value="screensaverClock"
+              :disabled="!screensaverPref"
+              @change="onScreensaverClockChange"
+            >
+              <ElRadio value="lcd3d">3D液晶时钟</ElRadio>
             </ElRadioGroup>
           </section>
         </div>
