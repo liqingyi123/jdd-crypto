@@ -21,6 +21,7 @@ const CLOCK_OPTIONS: Array<{ id: ScreensaverClock; label: string }> = [
   { id: "lcd3d", label: "3D液晶" },
   { id: "analog", label: "经典指针" },
   { id: "compass", label: "文字罗盘" },
+  { id: "off", label: "关闭" },
 ];
 
 const background = shallowRef<ScreensaverBackground>("parallax");
@@ -80,6 +81,13 @@ function onKeyDown(event: KeyboardEvent) {
   }
 }
 
+function onPointerDown() {
+  if (!active.value) {
+    return;
+  }
+  void exitDemo();
+}
+
 function onFullscreenChange() {
   if (!active.value) {
     return;
@@ -90,10 +98,12 @@ function onFullscreenChange() {
 }
 
 window.addEventListener("keydown", onKeyDown);
+window.addEventListener("pointerdown", onPointerDown);
 document.addEventListener("fullscreenchange", onFullscreenChange);
 
 onUnmounted(() => {
   window.removeEventListener("keydown", onKeyDown);
+  window.removeEventListener("pointerdown", onPointerDown);
   document.removeEventListener("fullscreenchange", onFullscreenChange);
   if (document.fullscreenElement) {
     void document.exitFullscreen().catch(() => undefined);
@@ -156,7 +166,7 @@ onUnmounted(() => {
       <FluorescentClock v-if="clock === 'lcd3d'" />
       <ClassicAnalogClock v-else-if="clock === 'analog'" />
       <TextCompassClock v-else-if="clock === 'compass'" />
-      <p class="ss-exit-hint">按 ESC 或 F11 退出</p>
+      <p class="ss-exit-hint">按 ESC、F11 或点击鼠标退出</p>
     </div>
   </Teleport>
 </template>

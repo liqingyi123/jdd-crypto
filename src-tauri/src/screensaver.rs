@@ -143,7 +143,7 @@ fn normalize_background(raw: &str) -> String {
 
 fn normalize_clock(raw: &str) -> String {
     match raw {
-        "lcd3d" | "analog" | "compass" => raw.to_string(),
+        "lcd3d" | "analog" | "compass" | "off" => raw.to_string(),
         _ => DEFAULT_CLOCK.to_string(),
     }
 }

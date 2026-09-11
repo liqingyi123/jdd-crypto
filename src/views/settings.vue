@@ -776,7 +776,7 @@ async function onThemeChange(value: string | number | boolean | undefined) {
               </label>
             </div>
             <p>
-              按下快捷键后在所有显示器全屏显示屏幕保护特效；按 ESC 或再次快捷键退出。开启期间会暂时关闭鼠标轨迹。
+              按下快捷键后在所有显示器全屏显示屏幕保护特效；按 ESC、点击鼠标或再次快捷键退出。开启期间会暂时关闭鼠标轨迹。
             </p>
             <div class="row">
               <span>快捷键</span>
@@ -818,6 +818,7 @@ async function onThemeChange(value: string | number | boolean | undefined) {
               <ElRadio value="lcd3d">3D液晶时钟</ElRadio>
               <ElRadio value="analog">经典指针</ElRadio>
               <ElRadio value="compass">文字罗盘</ElRadio>
+              <ElRadio value="off">关闭</ElRadio>
             </ElRadioGroup>
           </section>
         </div>

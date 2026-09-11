@@ -483,14 +483,16 @@ fn trail_visually_active() -> bool {
 /// Hide trail overlays while screensaver is on; keeps user `enabled` pref intact.
 pub fn pause_for_screensaver(app: &AppHandle) {
     TRAIL_SUPPRESSED.store(true, Ordering::Relaxed);
-    schedule_sync_overlays(app, false);
+    schedule_set_overlays_hidden(app, true);
 }
 
 /// Restore trail overlays after screensaver if user preference is still enabled.
 pub fn resume_after_screensaver(app: &AppHandle) {
     TRAIL_SUPPRESSED.store(false, Ordering::Relaxed);
     wake_cursor_loop();
-    schedule_sync_overlays(app, TRAIL_ENABLED.load(Ordering::Relaxed));
+    if TRAIL_ENABLED.load(Ordering::Relaxed) {
+        schedule_set_overlays_hidden(app, false);
+    }
 }
 
 /// Flip the enabled flag and schedule overlay sync off the invoke path
@@ -556,6 +558,38 @@ fn schedule_sync_overlays(app: &AppHandle, visible: bool) {
             if visible {
                 // Focus interactive windows first, then re-raise trail above them.
                 restore_interactive_focus(&handle_for_main);
+                schedule_raise_overlays(&handle_for_main);
+            }
+        });
+    });
+}
+
+/// Temporarily hide/show existing trail overlays without destroying WebViews.
+fn set_overlays_hidden(app: &AppHandle, hidden: bool) {
+    for (label, win) in app.webview_windows() {
+        if !label.starts_with("mouse-trail-") {
+            continue;
+        }
+        if hidden {
+            let _ = win.hide();
+        } else {
+            let _ = win.set_ignore_cursor_events(true);
+            let _ = win.set_always_on_top(true);
+            let _ = win.show();
+        }
+    }
+    if !hidden {
+        raise_overlays(app);
+    }
+}
+
+fn schedule_set_overlays_hidden(app: &AppHandle, hidden: bool) {
+    let handle = app.clone();
+    thread::spawn(move || {
+        let handle_for_main = handle.clone();
+        let _ = handle.run_on_main_thread(move || {
+            set_overlays_hidden(&handle_for_main, hidden);
+            if !hidden {
                 schedule_raise_overlays(&handle_for_main);
             }
         });
@@ -695,7 +729,8 @@ fn cursor_loop(app: AppHandle) {
         if !trail_visually_active() {
             last = None;
             while !trail_visually_active() {
-                thread::park();
+                // Timeout avoids permanent hang if unpark races before park.
+                thread::park_timeout(Duration::from_millis(200));
             }
             continue;
         }
