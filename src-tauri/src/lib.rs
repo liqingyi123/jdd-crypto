@@ -161,7 +161,7 @@ pub fn run() {
             windows::position_badge_on_startup(app.handle());
             windows::watch_badge_position(app.handle());
             if let Some(main) = app.get_webview_window("main") {
-                windows::bind_close_to_hide(&main);
+                windows::bind_interactive_window(&main);
             }
             if let Some(bubble) = app.get_webview_window("crypto-bubble") {
                 windows::bind_close_to_hide(&bubble);

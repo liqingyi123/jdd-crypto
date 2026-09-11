@@ -116,10 +116,11 @@ export class DotsTrail implements MouseTrailEngine {
   leaveScreen() {
     this.mouse.x = null;
     this.mouse.y = null;
+    this.stop();
   }
 
   start() {
-    this.kick();
+    // Idle until first setMouse.
   }
 
   private kick() {
@@ -129,6 +130,10 @@ export class DotsTrail implements MouseTrailEngine {
     this.running = true;
     const tick = () => {
       if (!this.running) {
+        return;
+      }
+      if (this.mouse.x === null || this.mouse.y === null) {
+        this.stop();
         return;
       }
       this.render();

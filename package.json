@@ -1,7 +1,7 @@
 {
   "name": "jdd-crypto",
   "private": true,
-  "version": "0.11.7",
+  "version": "0.12.7",
   "type": "module",
   "engines": {
     "node": "^20.19.0 || >=22.12.0"

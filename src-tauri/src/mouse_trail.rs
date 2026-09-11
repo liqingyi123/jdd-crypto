@@ -2,7 +2,7 @@ use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::OnceLock;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use tauri::{
@@ -21,8 +21,6 @@ const DEFAULT_DOTS_COLOR: &str = "#00D1CE";
 const DEFAULT_HEART_COLOR: &str = "#FF2EC8";
 const DEFAULT_RIPPLE_COLOR: &str = "#2A2A2E";
 const DISPLAY_CHANGE_DEBOUNCE: Duration = Duration::from_millis(300);
-/// Re-assert TOPMOST so trail stays above other apps / our popups.
-const RAISE_INTERVAL: Duration = Duration::from_millis(300);
 const RAISE_FOCUS_RETRY: Duration = Duration::from_millis(50);
 const TRAIL_ARM_SHORTCUT: &str = "Ctrl+T";
 const TRAIL_EFFECT_SHORTCUTS: [&str; 6] = [
@@ -47,6 +45,7 @@ static TRAIL_CHORD_ARMED: AtomicBool = AtomicBool::new(false);
 static TRAIL_SHORTCUT_IDS: OnceLock<(u32, [u32; 6])> = OnceLock::new();
 
 static CURSOR_LOOP_STARTED: AtomicBool = AtomicBool::new(false);
+static CURSOR_LOOP_THREAD: OnceLock<thread::Thread> = OnceLock::new();
 static TRAIL_ENABLED: AtomicBool = AtomicBool::new(false);
 /// Runtime suppress while screensaver is active (does not change user pref).
 static TRAIL_SUPPRESSED: AtomicBool = AtomicBool::new(false);
@@ -254,6 +253,9 @@ pub fn set_effect_pref(app: AppHandle, effect: String) -> Result<MouseTrailPref,
     pref.effect = normalize_effect(&effect);
     save_pref(&app, &pref)?;
     emit_pref(&app, &pref);
+    if trail_visually_active() {
+        schedule_raise_overlays(&app);
+    }
     Ok(pref)
 }
 
@@ -487,6 +489,7 @@ pub fn pause_for_screensaver(app: &AppHandle) {
 /// Restore trail overlays after screensaver if user preference is still enabled.
 pub fn resume_after_screensaver(app: &AppHandle) {
     TRAIL_SUPPRESSED.store(false, Ordering::Relaxed);
+    wake_cursor_loop();
     schedule_sync_overlays(app, TRAIL_ENABLED.load(Ordering::Relaxed));
 }
 
@@ -496,6 +499,9 @@ pub fn set_enabled(app: &AppHandle, enabled: bool) {
     ensure_display_listener(app);
     TRAIL_ENABLED.store(enabled, Ordering::Relaxed);
     ensure_cursor_loop(app);
+    if trail_visually_active() {
+        wake_cursor_loop();
+    }
     schedule_sync_overlays(app, trail_visually_active());
 }
 
@@ -605,7 +611,7 @@ pub fn sync_overlays(app: &AppHandle, visible: bool) {
     let monitors = app.available_monitors().unwrap_or_default();
     for index in 0..MAX_OVERLAYS {
         let label = overlay_label(index);
-        if index >= monitors.len() {
+        if !visible || index >= monitors.len() {
             if let Some(win) = app.get_webview_window(&label) {
                 let _ = win.close();
             }
@@ -617,17 +623,9 @@ pub fn sync_overlays(app: &AppHandle, visible: bool) {
         if let Some(win) = app.get_webview_window(&label) {
             let _ = win.set_position(layout.physical_pos);
             let _ = win.set_size(layout.logical_size);
-            if visible {
-                let _ = win.set_ignore_cursor_events(true);
-                let _ = win.set_always_on_top(true);
-                let _ = win.show();
-            } else {
-                let _ = win.hide();
-            }
-            continue;
-        }
-
-        if !visible {
+            let _ = win.set_ignore_cursor_events(true);
+            let _ = win.set_always_on_top(true);
+            let _ = win.show();
             continue;
         }
 
@@ -676,6 +674,12 @@ pub fn monitor_bounds(app: &AppHandle, label: &str) -> Option<MouseTrailMonitorB
     })
 }
 
+fn wake_cursor_loop() {
+    if let Some(handle) = CURSOR_LOOP_THREAD.get() {
+        handle.unpark();
+    }
+}
+
 fn ensure_cursor_loop(app: &AppHandle) {
     if CURSOR_LOOP_STARTED.swap(true, Ordering::Relaxed) {
         return;
@@ -685,32 +689,25 @@ fn ensure_cursor_loop(app: &AppHandle) {
 }
 
 fn cursor_loop(app: AppHandle) {
+    let _ = CURSOR_LOOP_THREAD.set(thread::current());
     let mut last: Option<(i32, i32)> = None;
-    let mut last_raise = Instant::now()
-        .checked_sub(RAISE_INTERVAL)
-        .unwrap_or_else(Instant::now);
     loop {
-        if trail_visually_active() {
-            if let Some((x, y)) = crate::windows::cursor_pos_public() {
-                if last != Some((x, y)) {
-                    last = Some((x, y));
-                    let payload = MouseTrailCursor { x, y };
-                    let _ = app.emit_filter("app://mouse-trail-cursor", payload, is_overlay_target);
-                }
+        if !trail_visually_active() {
+            last = None;
+            while !trail_visually_active() {
+                thread::park();
             }
-            if last_raise.elapsed() >= RAISE_INTERVAL {
-                last_raise = Instant::now();
-                let handle = app.clone();
-                let _ = app.run_on_main_thread(move || {
-                    raise_overlays(&handle);
-                });
-            }
-            // ~60fps for smoother trail continuity across engines.
-            thread::sleep(Duration::from_millis(16));
             continue;
         }
-        last = None;
-        thread::sleep(Duration::from_millis(100));
+        if let Some((x, y)) = crate::windows::cursor_pos_public() {
+            if last != Some((x, y)) {
+                last = Some((x, y));
+                let payload = MouseTrailCursor { x, y };
+                let _ = app.emit_filter("app://mouse-trail-cursor", payload, is_overlay_target);
+            }
+        }
+        // ~60fps for smoother trail continuity across engines.
+        thread::sleep(Duration::from_millis(16));
     }
 }
 

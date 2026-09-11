@@ -34,6 +34,8 @@ const MAX_RIPPLE_ALPHA = 0.22;
 const TROUGH_ALPHA_SCALE = 0.62;
 /** Lower shift → stronger damping (fewer oscillation cycles). */
 const DECAY_SHIFT = 4;
+/** Consecutive quiet frames before stopping the rAF loop. */
+const IDLE_STOP_FRAMES = 45;
 
 function hashNoise(x: number, y: number): number {
   const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
@@ -88,6 +90,7 @@ export class RippleTrail implements MouseTrailEngine {
   private running = false;
   private lastMx = -1;
   private lastMy = -1;
+  private quietFrames = 0;
 
   constructor(host: HTMLElement) {
     this.host = host;
@@ -111,6 +114,8 @@ export class RippleTrail implements MouseTrailEngine {
       this.lastMx = sx;
       this.lastMy = sy;
       this.disturb(sx, sy);
+      this.quietFrames = 0;
+      this.kick();
       return;
     }
 
@@ -129,14 +134,22 @@ export class RippleTrail implements MouseTrailEngine {
     }
     this.lastMx = sx;
     this.lastMy = sy;
+    this.quietFrames = 0;
+    this.kick();
   }
 
   leaveScreen(): void {
     this.lastMx = -1;
     this.lastMy = -1;
+    // Keep decaying until idle stop clears the canvas.
+    this.kick();
   }
 
   start(): void {
+    // Idle until first setMouse.
+  }
+
+  private kick(): void {
     if (this.running) {
       return;
     }
@@ -145,7 +158,17 @@ export class RippleTrail implements MouseTrailEngine {
       if (!this.running) {
         return;
       }
-      this.step();
+      const hasEnergy = this.step();
+      if (!hasEnergy) {
+        this.quietFrames += 1;
+        if (this.quietFrames >= IDLE_STOP_FRAMES) {
+          this.stop();
+          this.ctx.clearRect(0, 0, this.simW, this.simH);
+          return;
+        }
+      } else {
+        this.quietFrames = 0;
+      }
       this.rafId = requestAnimationFrame(loop);
     };
     this.rafId = requestAnimationFrame(loop);
@@ -248,12 +271,12 @@ export class RippleTrail implements MouseTrailEngine {
     }
   }
 
-  private step(): void {
+  private step(): boolean {
     const w = this.simW;
     const h = this.simH;
     const out = this.output;
     if (!out || w <= 0 || h <= 0) {
-      return;
+      return false;
     }
 
     let oldPage = this.oldPage;
@@ -272,6 +295,7 @@ export class RippleTrail implements MouseTrailEngine {
     const halfH = h / 2;
     let pixel = 0;
     let cursor = oldPage;
+    let hasEnergy = false;
 
     for (let y = 0; y < h; y += 1) {
       for (let x = 0; x < w; x += 1) {
@@ -296,6 +320,7 @@ export class RippleTrail implements MouseTrailEngine {
           continue;
         }
 
+        hasEnergy = true;
         let sampleX = ((((x - halfW) * refract) / 1024) | 0) + halfW;
         let sampleY = ((((y - halfH) * refract) / 1024) | 0) + halfH;
         if (sampleX >= w) {
@@ -347,5 +372,6 @@ export class RippleTrail implements MouseTrailEngine {
 
     this.ctx.clearRect(0, 0, w, h);
     this.ctx.putImageData(out, 0, 0);
+    return hasEnergy;
   }
 }

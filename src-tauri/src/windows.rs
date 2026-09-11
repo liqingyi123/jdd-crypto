@@ -103,7 +103,7 @@ pub fn show_feature(app: &AppHandle, label: &str) {
         .build();
 
     if let Ok(win) = result {
-        bind_close_to_hide(&win);
+        bind_interactive_window(&win);
         crate::mouse_trail::schedule_raise_overlays(app);
     }
 }
@@ -116,6 +116,24 @@ pub fn bind_close_to_hide(win: &WebviewWindow) {
         if let tauri::WindowEvent::CloseRequested { api, .. } = event {
             api.prevent_close();
             let _ = hidden.hide();
+        }
+    });
+}
+
+/// Close-to-hide plus re-raise mouse-trail when the window loses focus.
+pub fn bind_interactive_window(win: &WebviewWindow) {
+    let hidden = win.clone();
+    let app = win.app_handle().clone();
+    win.on_window_event(move |event| {
+        match event {
+            tauri::WindowEvent::CloseRequested { api, .. } => {
+                api.prevent_close();
+                let _ = hidden.hide();
+            }
+            tauri::WindowEvent::Focused(false) => {
+                crate::mouse_trail::schedule_raise_overlays(&app);
+            }
+            _ => {}
         }
     });
 }
