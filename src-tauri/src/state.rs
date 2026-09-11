@@ -10,10 +10,14 @@ pub const MIN_BADGE_SIZE: u32 = 38;
 /// Default badge diameter in CSS/logical pixels. Keep in sync with `src/constants/badge.ts`.
 pub const DEFAULT_BADGE_SIZE: u32 = 68;
 pub const DEFAULT_MOUSE_FOLLOW_SHORTCUT: &str = "Ctrl+Alt+G";
-pub const DEFAULT_COMPARE_MODE_SHORTCUT: &str = "Ctrl+Alt+D";
+pub const DEFAULT_COMPARE_MODE_SHORTCUT: &str = "Ctrl+Alt+C";
 pub const DEFAULT_HOSTS_QUICK_SHORTCUT: &str = "Ctrl+Alt+S";
 pub const DEFAULT_BRIGHTNESS_QUICK_SHORTCUT: &str = "Ctrl+Alt+L";
 pub const DEFAULT_SCREENSAVER_SHORTCUT: &str = "Ctrl+Alt+P";
+pub const DEFAULT_SPOTLIGHT_SHORTCUT: &str = "Ctrl+Alt+D";
+pub const DEFAULT_SPOTLIGHT_SIZE: u32 = 200;
+pub const MIN_SPOTLIGHT_SIZE: u32 = 100;
+pub const MAX_SPOTLIGHT_SIZE: u32 = 300;
 
 #[derive(Clone, Serialize)]
 pub struct ClipboardCandidate {
@@ -42,6 +46,11 @@ pub struct AppState {
     pub screensaver_pref_enabled: AtomicBool,
     pub screensaver_shortcut: Mutex<String>,
     pub screensaver_active: AtomicBool,
+    pub spotlight_pref_enabled: AtomicBool,
+    pub spotlight_shake_enabled: AtomicBool,
+    pub spotlight_shortcut: Mutex<String>,
+    pub spotlight_size: AtomicU32,
+    pub spotlight_active: AtomicBool,
     pub pending_update: Mutex<Option<UpdateCheckResult>>,
 }
 
@@ -68,6 +77,11 @@ impl Default for AppState {
             screensaver_pref_enabled: AtomicBool::new(true),
             screensaver_shortcut: Mutex::new(DEFAULT_SCREENSAVER_SHORTCUT.to_string()),
             screensaver_active: AtomicBool::new(false),
+            spotlight_pref_enabled: AtomicBool::new(true),
+            spotlight_shake_enabled: AtomicBool::new(true),
+            spotlight_shortcut: Mutex::new(DEFAULT_SPOTLIGHT_SHORTCUT.to_string()),
+            spotlight_size: AtomicU32::new(DEFAULT_SPOTLIGHT_SIZE),
+            spotlight_active: AtomicBool::new(false),
             pending_update: Mutex::new(None),
         }
     }

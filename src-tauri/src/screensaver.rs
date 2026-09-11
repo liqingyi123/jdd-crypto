@@ -239,6 +239,9 @@ pub fn toggle(app: &AppHandle) {
 }
 
 pub fn show(app: &AppHandle) {
+    if crate::spotlight::is_active() {
+        crate::spotlight::hide(app);
+    }
     crate::mouse_trail::pause_for_screensaver(app);
     ACTIVE.store(true, Ordering::Relaxed);
     let state = app.state::<AppState>();

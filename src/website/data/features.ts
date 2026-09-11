@@ -32,7 +32,7 @@ export const FEATURE_ITEMS: FeatureItem[] = [
     id: "compare",
     title: "文本对比模式",
     summary:
-      "默认 Ctrl+Alt+D 进入对比模式，跟随提示引导两次框选解密；成功后在中央左右对照展示，并高亮后段差异。快捷键可在设置中自定义。",
+      "默认 Ctrl+Alt+C 进入对比模式，跟随提示引导两次框选解密；成功后在中央左右对照展示，并高亮后段差异。快捷键可在设置中自定义。",
   },
   {
     id: "hosts",

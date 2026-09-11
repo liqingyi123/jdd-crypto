@@ -13,6 +13,7 @@ mod mouse_follow;
 mod mouse_trail;
 mod overlay_toast;
 mod screensaver;
+mod spotlight;
 mod state;
 mod tray;
 mod windows;
@@ -58,6 +59,7 @@ pub fn run() {
                         hosts_quick::handle_shortcut(app, shortcut);
                         brightness_quick::handle_shortcut(app, shortcut);
                         screensaver::handle_shortcut(app, shortcut);
+                        spotlight::handle_shortcut(app, shortcut);
                     }
                 })
                 .build(),
@@ -147,6 +149,16 @@ pub fn run() {
             commands::get_screensaver_effect_pref,
             commands::set_screensaver_background,
             commands::set_screensaver_clock,
+            commands::hide_spotlight,
+            commands::get_spotlight_pref,
+            commands::set_spotlight_pref,
+            commands::get_spotlight_shake_pref,
+            commands::set_spotlight_shake_pref,
+            commands::get_spotlight_shortcut,
+            commands::set_spotlight_shortcut,
+            commands::get_spotlight_size,
+            commands::set_spotlight_size,
+            commands::get_spotlight_monitor_bounds,
             commands::check_app_update,
             commands::download_app_update,
             commands::install_app_update,
@@ -212,6 +224,7 @@ pub fn run() {
             app.state::<AppState>()
                 .screensaver_pref_enabled
                 .store(screensaver_pref, Ordering::Relaxed);
+            spotlight::init_from_store(app.handle());
             mouse_follow::start_follow_loop(app.handle().clone());
             mouse_trail::init_from_store(app.handle());
             let _ = global_shortcuts::register_all(app.handle());

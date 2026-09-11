@@ -507,7 +507,7 @@ pub fn set_enabled(app: &AppHandle, enabled: bool) {
     schedule_sync_overlays(app, trail_visually_active());
 }
 
-fn ensure_display_listener(app: &AppHandle) {
+pub fn ensure_display_listener(app: &AppHandle) {
     let _ = APP_FOR_DISPLAY.set(app.clone());
     if DISPLAY_LISTENER_STARTED.swap(true, Ordering::Relaxed) {
         return;
@@ -537,6 +537,7 @@ fn on_display_changed(app: &AppHandle) {
     let trail_on = trail_visually_active();
     let _ = app.run_on_main_thread(move || {
         crate::windows::relocate_windows_to_visible_monitors(&handle);
+        crate::spotlight::on_display_changed(&handle);
         if !trail_on {
             return;
         }

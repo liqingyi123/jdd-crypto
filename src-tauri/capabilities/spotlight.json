@@ -1,0 +1,26 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "spotlight-overlays",
+  "description": "Per-monitor click-through spotlight overlays",
+  "windows": [
+    "spotlight-0",
+    "spotlight-1",
+    "spotlight-2",
+    "spotlight-3",
+    "spotlight-4",
+    "spotlight-5",
+    "spotlight-6",
+    "spotlight-7"
+  ],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-close",
+    "core:window:allow-set-size",
+    "core:window:allow-set-position",
+    "core:window:allow-set-ignore-cursor-events",
+    "core:window:allow-set-always-on-top"
+  ]
+}

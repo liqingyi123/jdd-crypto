@@ -58,7 +58,7 @@ const {
 } = useShortcutRecorder({
   getCommand: "get_compare_mode_shortcut",
   setCommand: "set_compare_mode_shortcut",
-  defaultShortcut: "Ctrl+Alt+D",
+  defaultShortcut: "Ctrl+Alt+C",
 });
 
 const {
@@ -109,6 +109,22 @@ const {
   defaultShortcut: "Ctrl+Alt+P",
 });
 
+const {
+  recording: spotlightRecording,
+  errorMessage: spotlightErrorMessage,
+  display: spotlightDisplay,
+  previewDisplay: spotlightPreviewDisplay,
+  buttonRef: spotlightButtonRef,
+  startRecording: startSpotlightRecording,
+  cancelRecording: cancelSpotlightRecording,
+  onRecordKey: onSpotlightRecordKey,
+  loadShortcut: loadSpotlightShortcut,
+} = useShortcutRecorder({
+  getCommand: "get_spotlight_shortcut",
+  setCommand: "set_spotlight_shortcut",
+  defaultShortcut: "Ctrl+Alt+D",
+});
+
 const themeOptions: Array<{ value: ThemePreference; label: string }> = [
   { value: "system", label: "跟随系统" },
   { value: "light", label: "浅色" },
@@ -121,6 +137,9 @@ const comparePref = shallowRef(true);
 const hostsQuickPref = shallowRef(true);
 const brightnessQuickPref = shallowRef(true);
 const screensaverPref = shallowRef(true);
+const spotlightPref = shallowRef(true);
+const spotlightShakePref = shallowRef(true);
+const spotlightSize = shallowRef(200);
 const screensaverBackground = shallowRef<ScreensaverBackground>(
   DEFAULT_SCREENSAVER_PREF.background,
 );
@@ -269,6 +288,21 @@ onMounted(async () => {
     // browser preview
   }
   try {
+    spotlightPref.value = await invoke<boolean>("get_spotlight_pref");
+  } catch {
+    // browser preview
+  }
+  try {
+    spotlightShakePref.value = await invoke<boolean>("get_spotlight_shake_pref");
+  } catch {
+    // browser preview
+  }
+  try {
+    spotlightSize.value = await invoke<number>("get_spotlight_size");
+  } catch {
+    spotlightSize.value = 200;
+  }
+  try {
     const raw = await invoke<ScreensaverPref>("get_screensaver_effect_pref");
     const normalized = normalizeScreensaverPref(raw);
     screensaverBackground.value = normalized.background;
@@ -298,6 +332,7 @@ onMounted(async () => {
   await loadHostsQuickShortcut();
   await loadBrightnessShortcut();
   await loadScreensaverShortcut();
+  await loadSpotlightShortcut();
   try {
     unlistenTrailPref = await listen<MouseTrailPref>("app://mouse-trail-pref", (event) => {
       applyTrailPref(event.payload);
@@ -309,6 +344,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   clearTrailColorPersistTimer();
+  clearSpotlightSizePersistTimer();
   void unlistenTrailPref?.();
 });
 
@@ -412,6 +448,83 @@ async function onScreensaverPrefChange(value: string | number | boolean) {
     screensaverPref.value = previous;
     ElMessage.error(error instanceof Error ? error.message : String(error));
   }
+}
+
+async function onSpotlightPrefChange(value: string | number | boolean) {
+  const enabled = Boolean(value);
+  const previous = spotlightPref.value;
+  spotlightPref.value = enabled;
+  if (!enabled && spotlightRecording.value) {
+    await cancelSpotlightRecording();
+  }
+  try {
+    await invoke("set_spotlight_pref", { enabled });
+  } catch (error) {
+    spotlightPref.value = previous;
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
+}
+
+async function onSpotlightShakePrefChange(value: string | number | boolean) {
+  const enabled = Boolean(value);
+  const previous = spotlightShakePref.value;
+  spotlightShakePref.value = enabled;
+  try {
+    await invoke("set_spotlight_shake_pref", { enabled });
+  } catch (error) {
+    spotlightShakePref.value = previous;
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
+}
+
+let spotlightSizePersistTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearSpotlightSizePersistTimer() {
+  if (spotlightSizePersistTimer !== null) {
+    clearTimeout(spotlightSizePersistTimer);
+    spotlightSizePersistTimer = null;
+  }
+}
+
+function parseSpotlightSize(value: number | number[]): number | null {
+  const next = Array.isArray(value) ? value[0] : value;
+  if (!Number.isFinite(next)) {
+    return null;
+  }
+  return Math.min(300, Math.max(100, Math.round(next)));
+}
+
+async function persistSpotlightSize(size: number) {
+  const previous = spotlightSize.value;
+  spotlightSize.value = size;
+  try {
+    spotlightSize.value = await invoke<number>("set_spotlight_size", { size });
+  } catch (error) {
+    spotlightSize.value = previous;
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
+}
+
+function onSpotlightSizeInput(value: number | number[]) {
+  const next = parseSpotlightSize(value);
+  if (next === null) {
+    return;
+  }
+  spotlightSize.value = next;
+  clearSpotlightSizePersistTimer();
+  spotlightSizePersistTimer = setTimeout(() => {
+    spotlightSizePersistTimer = null;
+    void persistSpotlightSize(next);
+  }, 60);
+}
+
+async function onSpotlightSizeChange(value: number | number[]) {
+  const next = parseSpotlightSize(value);
+  if (next === null) {
+    return;
+  }
+  clearSpotlightSizePersistTimer();
+  await persistSpotlightSize(next);
 }
 
 async function onScreensaverBackgroundChange(
@@ -592,8 +705,7 @@ async function onThemeChange(value: string | number | boolean | undefined) {
           <section>
             <h2>内网服务器</h2>
             <p>
-              用于检查更新与拉取 Hosts 预置配置。默认
-              <code>{{ DEFAULT_INTRANET_SERVER }}</code>，保存后重启仍生效。
+              用于检查更新与拉取 Hosts 预置配置。
             </p>
             <div class="row intranet-row">
               <ElInput
@@ -638,7 +750,7 @@ async function onThemeChange(value: string | number | boolean | undefined) {
               </label>
             </div>
             <p>
-              按下快捷键开启后会跟随鼠标移动并自动等待鼠标下次的文本选中，按下鼠标选中文本后松开会自动打开加解密页面并代入选中的文本。
+              按下快捷键开启后会跟随鼠标移动并自动等待鼠标下次的文本选中，按下鼠标选中文本后松开会气泡弹出解密结果。
             </p>
             <div class="row">
               <span>快捷键</span>
@@ -764,6 +876,64 @@ async function onThemeChange(value: string | number | boolean | undefined) {
               {{ brightnessErrorMessage }}
             </p>
             <p>最多 4 个键，需包含修饰键。点击按钮后按下新组合，Esc 或点击其他区域取消。</p>
+          </section>
+          <section>
+            <div class="section-head">
+              <h2>聚光灯</h2>
+              <label class="row">
+                <ElSwitch
+                  :model-value="spotlightPref" 
+                  @change="onSpotlightPrefChange"
+                />
+              </label>
+            </div>
+            <p>
+              按下快捷键后在开启聚光灯效果，突出显示鼠标周围区域；按任意键退出。开启期间会暂时关闭鼠标轨迹。屏保开启期间不会触发聚光灯。
+            </p>
+            <div class="row">
+              <span>快捷键</span>
+              <div ref="spotlightButtonRef">
+                <ElButton
+                  :type="spotlightRecording ? 'primary' : 'default'"
+                  :disabled="!spotlightPref"
+                  @click="startSpotlightRecording"
+                  @keydown="onSpotlightRecordKey"
+                >
+                  {{
+                    spotlightRecording
+                      ? spotlightPreviewDisplay
+                      : spotlightDisplay
+                  }}
+                </ElButton>
+              </div>
+            </div>
+            <p v-if="spotlightErrorMessage" class="error">
+              {{ spotlightErrorMessage }}
+            </p>
+            <p>最多 4 个键，需包含修饰键。点击按钮后按下新组合，Esc 或点击其他区域取消。</p>
+            <div class="row spotlight-size-row">
+              <span>光圈大小</span>
+              <ElSlider
+                :model-value="spotlightSize"
+                :min="100"
+                :max="300"
+                :step="10"
+                :disabled="!spotlightPref"
+                @update:model-value="onSpotlightSizeInput"
+                @change="onSpotlightSizeChange"
+              />
+            </div>
+            <div class="section-head">
+              <h3>晃动鼠标唤醒</h3>
+              <label class="row">
+                <ElSwitch
+                  :model-value="spotlightShakePref"
+                  :disabled="!spotlightPref"
+                  @change="onSpotlightShakePrefChange"
+                />
+              </label>
+            </div>
+            <p>水平或垂直快速来回晃动鼠标 2 次亦可开启聚光灯（需总开关开启）。</p>
           </section>
           <section>
             <div class="section-head">
@@ -956,6 +1126,16 @@ h3 {
 
 .trail-color-row {
   margin-top: 8px;
+}
+
+.spotlight-size-row {
+  margin-top: 8px;
+  align-items: center;
+}
+
+.spotlight-size-row :deep(.el-slider) {
+  flex: 1;
+  min-width: 0;
 }
 
 .intranet-row {

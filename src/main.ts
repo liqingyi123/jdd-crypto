@@ -17,6 +17,7 @@ async function bootstrap() {
   const windowLabel = await resolveWindowLabel();
   const isMouseTrail = windowLabel.startsWith("mouse-trail");
   const isScreensaver = windowLabel.startsWith("screensaver");
+  const isSpotlight = windowLabel.startsWith("spotlight");
   const isTransparentChrome =
     windowLabel === "badge" ||
     windowLabel === "clipboard-prompt" ||
@@ -27,8 +28,8 @@ async function bootstrap() {
     windowLabel === "brightness-bubble" ||
     windowLabel === "overlay-toast";
 
-  if (isMouseTrail) {
-    // Keep trail overlays free of theme chrome (transparent only).
+  if (isMouseTrail || isSpotlight) {
+    // Keep trail / spotlight overlays free of theme chrome (transparent only).
     document.documentElement.classList.add("badge-window");
     document.body.style.background = "transparent";
     try {
