@@ -2,6 +2,7 @@
 import { FEATURE_ITEMS } from "../data/features";
 import TrailDemo from "../components/trail-demo.vue";
 import ScreensaverDemo from "../components/screensaver-demo.vue";
+import SpotlightDemo from "../components/spotlight-demo.vue";
 import { detectPlatform } from "../composables/use-website-download";
 
 const isMacos = detectPlatform() === "macos";
@@ -13,7 +14,7 @@ const isMacos = detectPlatform() === "macos";
       <p class="section-kicker">Features</p>
       <h1 class="section-title display-font">功能介绍</h1>
       <p class="section-lead">
-        围绕加解密与日常开发场景打磨：角标、剪贴板气泡、文本对比、Host 管理、亮度调节、多屏屏保与拖尾特效，均可按需开关与自定义快捷键。
+        围绕加解密与日常开发场景打磨：角标、剪贴板气泡、文本对比、Host 管理、亮度调节、多屏屏保、聚光灯与拖尾特效，均可按需开关与自定义快捷键。
       </p>
       <div class="feature-grid">
         <article v-for="item in FEATURE_ITEMS" :key="item.id" class="feature-card">
@@ -44,15 +45,27 @@ const isMacos = detectPlatform() === "macos";
         <ScreensaverDemo />
       </section>
 
+      <section class="spotlight-block">
+        <div class="trail-copy">
+          <p class="section-kicker">Live demo</p>
+          <h2 class="section-title display-font">聚光灯</h2>
+          <p class="section-lead">
+            与桌面端同一套遮罩与双段柔晕。调节光圈后在预览区移动鼠标体验，或点击「全屏体验」；按任意键或点击退出。
+          </p>
+        </div>
+        <SpotlightDemo />
+      </section>
+
       <aside v-if="isMacos" class="macos-tips" aria-label="macOS 使用提示">
         <p class="macos-tips-title">macOS 使用提示</p>
         <ol>
           <li>
             鼠标跟随（macOS）与 Windows 相同，默认快捷键为
             <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>G</kbd>（Mac 键盘上的 Control 即 Ctrl）；文本对比模式默认为
-            <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>D</kbd>；亮度调节
+            <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd>；亮度调节
             <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>L</kbd>；屏保
-            <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>P</kbd>，均可在设置中自定义。首次使用若快捷键无反应、或选中文本后无法自动复制，请在
+            <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>P</kbd>；聚光灯
+            <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>D</kbd>，均可在设置中自定义。首次使用若快捷键无反应、或选中文本后无法自动复制，请在
             <strong>系统设置 → 隐私与安全性 → 辅助功能</strong>
             中为「多多工具箱」开启权限（全局快捷键与模拟 ⌘C 均依赖此项）。
           </li>
@@ -142,13 +155,15 @@ const isMacos = detectPlatform() === "macos";
 }
 
 .trail-block,
-.screensaver-block {
+.screensaver-block,
+.spotlight-block {
   display: flex;
   flex-direction: column;
   gap: 24px;
 }
 
-.screensaver-block {
+.screensaver-block,
+.spotlight-block {
   margin-top: 72px;
 }
 
