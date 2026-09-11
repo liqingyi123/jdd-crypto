@@ -75,10 +75,8 @@ function onKeyDown(event: KeyboardEvent) {
   if (!active.value) {
     return;
   }
-  if (event.key === "Escape" || event.key === "F11") {
-    event.preventDefault();
-    void exitDemo();
-  }
+  event.preventDefault();
+  void exitDemo();
 }
 
 function onPointerDown() {
@@ -166,7 +164,7 @@ onUnmounted(() => {
       <FluorescentClock v-if="clock === 'lcd3d'" />
       <ClassicAnalogClock v-else-if="clock === 'analog'" />
       <TextCompassClock v-else-if="clock === 'compass'" />
-      <p class="ss-exit-hint">按 ESC、F11 或点击鼠标退出</p>
+      <p class="ss-exit-hint">按任意键或点击鼠标退出</p>
     </div>
   </Teleport>
 </template>

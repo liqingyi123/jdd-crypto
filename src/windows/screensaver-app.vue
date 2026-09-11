@@ -27,10 +27,8 @@ async function exitScreensaver() {
 }
 
 function onKeyDown(event: KeyboardEvent) {
-  if (event.key === "Escape") {
-    event.preventDefault();
-    void exitScreensaver();
-  }
+  event.preventDefault();
+  void exitScreensaver();
 }
 
 function onPointerDown() {
@@ -70,7 +68,7 @@ onUnmounted(() => {
     <FluorescentClock v-if="pref.clock === 'lcd3d'" />
     <ClassicAnalogClock v-else-if="pref.clock === 'analog'" />
     <TextCompassClock v-else-if="pref.clock === 'compass'" />
-    <p class="hint">按 ESC 或点击鼠标退出</p>
+    <p class="hint">按任意键或点击鼠标退出</p>
   </div>
 </template>
 
