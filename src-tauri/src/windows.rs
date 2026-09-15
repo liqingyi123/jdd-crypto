@@ -88,6 +88,29 @@ pub fn show_feature(app: &AppHandle, label: &str) {
         return;
     }
 
+    if feature_spec(label).is_none() {
+        return;
+    }
+
+    // Windows WebView2 deadlocks if WebviewWindowBuilder::build runs inside a
+    // sync command or tray/menu event handler. Escape via a worker thread first
+    // (same pattern as overlay_toast::schedule_show).
+    let handle = app.clone();
+    let label = label.to_string();
+    thread::spawn(move || {
+        let app = handle.clone();
+        let _ = handle.run_on_main_thread(move || {
+            create_feature_window(&app, &label);
+        });
+    });
+}
+
+fn create_feature_window(app: &AppHandle, label: &str) {
+    if let Some(win) = app.get_webview_window(label) {
+        focus_window(app, &win);
+        return;
+    }
+
     let Some(spec) = feature_spec(label) else {
         return;
     };
