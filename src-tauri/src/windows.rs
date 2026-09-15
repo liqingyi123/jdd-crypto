@@ -465,29 +465,19 @@ pub fn is_short_bubble_text(text: &str) -> bool {
     text.chars().count() <= SHORT_TEXT_BUBBLE_LIMIT
 }
 
-fn emit_crypto_bubble_hint(app: &AppHandle, win: &WebviewWindow, hint: &CryptoHint) {
-    let _ = win.emit("app://crypto-bubble", hint);
-    // Also broadcast so a ready listener never misses the first show.
+fn emit_crypto_bubble_hint(app: &AppHandle, hint: &CryptoHint) {
+    // Single emit; cold-start uses PENDING + get_crypto_bubble_payload on mount.
     let _ = app.emit("app://crypto-bubble", hint);
-    let handle = app.clone();
-    let delayed = hint.clone();
-    thread::spawn(move || {
-        for wait_ms in [80_u64, 200, 450] {
-            thread::sleep(Duration::from_millis(wait_ms));
-            if let Some(win) = handle.get_webview_window(CRYPTO_BUBBLE_LABEL) {
-                let _ = win.emit("app://crypto-bubble", &delayed);
-            }
-            let _ = handle.emit("app://crypto-bubble", &delayed);
-        }
-    });
 }
 
 /// Show (or create) a near-cursor bubble that displays short crypto results.
+/// `silent_json` only emits the payload; the frontend reveals after decrypt+JSON succeed.
 pub fn show_crypto_bubble(app: &AppHandle, hint: CryptoHint) {
     if let Ok(mut pending) = PENDING_CRYPTO_BUBBLE.lock() {
         *pending = Some(hint.clone());
     }
 
+    let silent = hint.mode == "silent_json";
     let (cursor_x, cursor_y) = cursor_pos().unwrap_or((0, 0));
     let target = clamp_popup_origin(
         app,
@@ -505,11 +495,19 @@ pub fn show_crypto_bubble(app: &AppHandle, hint: CryptoHint) {
         ));
         let _ = win.set_position(PhysicalPosition::new(target.0, target.1));
         let _ = win.set_always_on_top(true);
-        let _ = win.show();
-        let _ = win.set_focus();
-        emit_crypto_bubble_hint(app, &win, &hint);
+        if !silent {
+            let _ = win.show();
+            crate::mouse_trail::schedule_raise_overlays(app);
+        }
+        emit_crypto_bubble_hint(app, &hint);
         hide_clipboard_prompt(app);
-        crate::mouse_trail::schedule_raise_overlays(app);
+        return;
+    }
+
+    // Silent path expects a prebuilt hidden window; do not create+show (would steal focus).
+    if silent {
+        let _ = app.emit("app://crypto-bubble", &hint);
+        hide_clipboard_prompt(app);
         return;
     }
 
@@ -528,7 +526,7 @@ pub fn show_crypto_bubble(app: &AppHandle, hint: CryptoHint) {
     .resizable(false)
     .maximizable(false)
     .minimizable(false)
-    .focused(true)
+    .focused(false)
     .visible(true)
     .inner_size(CRYPTO_BUBBLE_WIDTH, CRYPTO_BUBBLE_HEIGHT)
     .build();
@@ -542,8 +540,7 @@ pub fn show_crypto_bubble(app: &AppHandle, hint: CryptoHint) {
             }
             let _ = win.set_always_on_top(true);
             let _ = win.show();
-            let _ = win.set_focus();
-            emit_crypto_bubble_hint(app, &win, &hint);
+            emit_crypto_bubble_hint(app, &hint);
             hide_clipboard_prompt(app);
             crate::mouse_trail::schedule_raise_overlays(app);
         }
@@ -556,6 +553,33 @@ pub fn show_crypto_bubble(app: &AppHandle, hint: CryptoHint) {
             show_main(app, Some(hint));
         }
     }
+}
+
+/// Show crypto-bubble near cursor without taking keyboard focus (macOS-safe).
+/// Repositions only when revealing from hidden; already-visible windows stay put.
+pub fn reveal_crypto_bubble(app: &AppHandle) {
+    let Some(win) = app.get_webview_window(CRYPTO_BUBBLE_LABEL) else {
+        return;
+    };
+    let was_visible = win.is_visible().unwrap_or(false);
+    if !was_visible {
+        let (cursor_x, cursor_y) = cursor_pos().unwrap_or((0, 0));
+        let target = clamp_popup_origin(
+            app,
+            cursor_x,
+            cursor_y,
+            CRYPTO_BUBBLE_WIDTH,
+            CRYPTO_BUBBLE_HEIGHT,
+        );
+        let _ = win.set_size(tauri::LogicalSize::new(
+            CRYPTO_BUBBLE_WIDTH,
+            CRYPTO_BUBBLE_HEIGHT,
+        ));
+        let _ = win.set_position(PhysicalPosition::new(target.0, target.1));
+    }
+    let _ = win.set_always_on_top(true);
+    let _ = win.show();
+    crate::mouse_trail::schedule_raise_overlays(app);
 }
 
 /// Hide bubble window only; keep pending payload so a concurrent show can still read it.

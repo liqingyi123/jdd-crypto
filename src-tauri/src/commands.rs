@@ -49,9 +49,7 @@ pub fn hide_clipboard_prompt(app: AppHandle, state: State<AppState>) {
 /// Clear clipboard dedup so the same text can trigger the ask prompt again.
 #[tauri::command]
 pub fn clear_clipboard_dedup(state: State<AppState>) {
-    if let Ok(mut last) = state.last_clipboard.lock() {
-        last.clear();
-    }
+    crate::clipboard::clear_clipboard_seen(&state);
 }
 
 /// Write clipboard without triggering the ask prompt (marks text as already seen).
@@ -62,7 +60,9 @@ pub fn copy_text_silent(app: AppHandle, state: State<AppState>, text: String) ->
     }
     app.clipboard()
         .write_text(text)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    crate::clipboard::mark_clipboard_seen(&state);
+    Ok(())
 }
 
 /// Handle 加密/解密 from the clipboard ask prompt on the Rust side.
@@ -124,6 +124,11 @@ pub fn show_crypto_bubble(app: AppHandle, mode: String, text: String) {
 #[tauri::command]
 pub fn hide_crypto_bubble(app: AppHandle) {
     windows::hide_crypto_bubble(&app);
+}
+
+#[tauri::command]
+pub fn reveal_crypto_bubble(app: AppHandle) {
+    windows::reveal_crypto_bubble(&app);
 }
 
 #[tauri::command]
@@ -493,6 +498,11 @@ pub fn open_hosts_window(app: AppHandle) {
 }
 
 #[tauri::command]
+pub fn open_settings_window(app: AppHandle) {
+    windows::show_feature(&app, "settings");
+}
+
+#[tauri::command]
 pub fn hide_hosts_quick(app: AppHandle) {
     crate::hosts_quick::hide(&app);
 }
@@ -728,6 +738,12 @@ pub fn set_spotlight_shortcut(
 #[tauri::command]
 pub fn get_spotlight_size(state: State<AppState>) -> u32 {
     state.spotlight_size.load(Ordering::Relaxed)
+}
+
+#[tauri::command]
+pub fn get_spotlight_cursor() -> Option<crate::spotlight::SpotlightCursor> {
+    crate::windows::cursor_pos_public()
+        .map(|(x, y)| crate::spotlight::SpotlightCursor { x, y })
 }
 
 #[tauri::command]

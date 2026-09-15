@@ -49,7 +49,7 @@ pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let menu = build_app_menu(app)?;
     let version = app.package_info().version.to_string();
     let tooltip = format!(
-        "多多工具箱 v{version}\n左键打开加解密\n中键打开 Host 管理\n右击打开菜单"
+        "多多工具箱 v{version}\n左键打开设置中心\n中键打开加解密\n右击打开菜单"
     );
     let mut builder = TrayIconBuilder::with_id("main-tray")
         .menu(&menu)
@@ -65,14 +65,14 @@ pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
                     button_state: MouseButtonState::Up,
                     ..
                 } => {
-                    windows::show_main(tray.app_handle(), None);
+                    windows::show_feature(tray.app_handle(), "settings");
                 }
                 TrayIconEvent::Click {
                     button: MouseButton::Middle,
                     button_state: MouseButtonState::Up,
                     ..
                 } => {
-                    windows::show_feature(tray.app_handle(), "hosts");
+                    windows::show_main(tray.app_handle(), None);
                 }
                 _ => {}
             }

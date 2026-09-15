@@ -32,8 +32,8 @@ const INNER_START_ALPHA = MASK_ALPHA * 0.1;
 /** Outer ring starts near full mask. */
 const OUTER_START_ALPHA = MASK_ALPHA * 0.75;
 
-const holeX = shallowRef("50%");
-const holeY = shallowRef("50%");
+const holeX = shallowRef("-9999px");
+const holeY = shallowRef("-9999px");
 const radiusPx = shallowRef(DEFAULT_SIZE);
 
 let bounds: MonitorBounds | null = null;
@@ -107,6 +107,10 @@ onMounted(async () => {
     unlistenCursor = await listen<CursorPayload>("app://spotlight-cursor", (event) => {
       onCursor(event.payload);
     });
+    const initial = await invoke<CursorPayload | null>("get_spotlight_cursor");
+    if (initial) {
+      onCursor(initial);
+    }
   } catch {
     // browser preview
   }

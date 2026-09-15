@@ -346,6 +346,7 @@ fn open_main_with_capture(app: &AppHandle, text: String) {
     if let Ok(mut last) = app.state::<AppState>().last_clipboard.lock() {
         *last = text.clone();
     }
+    crate::clipboard::mark_clipboard_seen(&app.state::<AppState>());
 
     // Prefer decrypt first; frontend falls back to encrypt on failure.
     // Always use result bubble (no 1100-char main-window split).
@@ -360,37 +361,37 @@ fn open_main_with_capture(app: &AppHandle, text: String) {
 }
 
 #[cfg(windows)]
-fn clipboard_sequence() -> u32 {
-    use windows_sys::Win32::System::DataExchange::GetClipboardSequenceNumber;
-
-    // SAFETY: GetClipboardSequenceNumber is a parameterless system query.
-    unsafe { GetClipboardSequenceNumber() }
-}
-
-#[cfg(windows)]
 fn capture_selection_text(app: &AppHandle) -> Option<String> {
-    // Slightly longer wait so double-click word selection can settle.
+    // Sentinel detects a new copy even when selection text equals current clipboard.
     thread::sleep(Duration::from_millis(70));
     let before = app.clipboard().read_text().unwrap_or_default();
-    let seq_before = clipboard_sequence();
+    let sentinel = format!(
+        "__jdd_crypto_sel_{}__",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
+    );
+    if app.clipboard().write_text(&sentinel).is_err() {
+        let _ = app.clipboard().write_text(&before);
+        return None;
+    }
     send_copy_shortcut();
 
     let deadline = Instant::now() + Duration::from_millis(450);
     while Instant::now() < deadline {
         thread::sleep(Duration::from_millis(30));
-        if clipboard_sequence() == seq_before {
-            continue;
-        }
         let Ok(current) = app.clipboard().read_text() else {
             continue;
         };
-        if current.trim().is_empty() {
+        if current.trim().is_empty() || current == sentinel {
             continue;
         }
         // Restore prior clipboard so synthetic Ctrl+C does not overwrite user data.
         let _ = app.clipboard().write_text(&before);
         return Some(current);
     }
+    let _ = app.clipboard().write_text(&before);
     None
 }
 

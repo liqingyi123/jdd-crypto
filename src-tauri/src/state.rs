@@ -28,6 +28,8 @@ pub struct ClipboardCandidate {
 pub struct AppState {
     pub clipboard_watch_enabled: AtomicBool,
     pub last_clipboard: Mutex<String>,
+    /// Platform clipboard change id (sequence / changeCount). Watcher dedupes on this, not text.
+    pub last_clipboard_seq: AtomicU32,
     pub last_candidate: Mutex<Option<ClipboardCandidate>>,
     pub badge_size: AtomicU32,
     pub badge_expanded: AtomicBool,
@@ -59,6 +61,7 @@ impl Default for AppState {
         Self {
             clipboard_watch_enabled: AtomicBool::new(true),
             last_clipboard: Mutex::new(String::new()),
+            last_clipboard_seq: AtomicU32::new(0),
             last_candidate: Mutex::new(None),
             badge_size: AtomicU32::new(DEFAULT_BADGE_SIZE),
             badge_expanded: AtomicBool::new(false),

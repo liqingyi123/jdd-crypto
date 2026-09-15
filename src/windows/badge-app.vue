@@ -32,8 +32,8 @@ const badgeTip = computed(() => {
     : "多多工具箱";
   return [
     title,
-    "左键：打开加解密",
-    "中键：打开 Host 管理",
+    "左键：打开设置中心",
+    "中键：打开加解密",
     "右键：打开菜单",
     "可拖动",
   ].join("\n");
@@ -65,11 +65,11 @@ onUnmounted(() => {
   unlistenSize?.();
 });
 
-async function openMain() {
+async function openSettings() {
   if (didDrag.value) {
     return;
   }
-  await invoke("navigate_main", { route: "/" });
+  await invoke("open_settings_window").catch(() => undefined);
 }
 
 async function openMenu(event: MouseEvent) {
@@ -77,12 +77,12 @@ async function openMenu(event: MouseEvent) {
   await invoke("popup_app_menu").catch(() => undefined);
 }
 
-async function openHosts(event: MouseEvent) {
+async function openMain(event: MouseEvent) {
   if (event.button !== 1) {
     return;
   }
   event.preventDefault();
-  await invoke("open_hosts_window").catch(() => undefined);
+  await invoke("navigate_main", { route: "/" }).catch(() => undefined);
 }
 
 function onPointerDown(event: PointerEvent) {
@@ -125,8 +125,8 @@ function onPointerUp() {
       class="orb"
       type="button"
       :title="badgeTip"
-      @click="openMain"
-      @auxclick="openHosts"
+      @click="openSettings"
+      @auxclick="openMain"
       @contextmenu="openMenu"
       @pointerdown="onPointerDown"
       @pointermove="onPointerMove"

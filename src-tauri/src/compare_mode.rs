@@ -169,6 +169,7 @@ pub fn handle_captured_cipher(app: &AppHandle, text: String) {
     if let Ok(mut last) = app.state::<AppState>().last_clipboard.lock() {
         *last = text.clone();
     }
+    crate::clipboard::mark_clipboard_seen(&app.state::<AppState>());
     // Tip window decrypts; keep phase as-is until report_plain / fail UI.
     let _ = app.emit("app://compare-selection", &text);
     if let Some(win) = app.get_webview_window(COMPARE_TIP_LABEL) {

@@ -95,18 +95,40 @@ export const useCryptoWorkspaceStore = defineStore("crypto-workspace", () => {
   const customKey = ref(initial.customKey);
   const customIv = ref(initial.customIv);
   const history = ref<CryptoHistoryItem[]>(initial.history);
+  let persisting = false;
 
   function persist() {
-    const payload: PersistedWorkspace = {
-      aesCode: aesCode.value,
-      customKey: customKey.value,
-      customIv: customIv.value,
-      history: history.value.slice(0, HISTORY_LIMIT),
-    };
+    if (persisting) {
+      return;
+    }
+    let list = history.value.slice(0, HISTORY_LIMIT);
+
+    persisting = true;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-    } catch {
-      // quota / private mode
+      for (;;) {
+        const payload: PersistedWorkspace = {
+          aesCode: aesCode.value,
+          customKey: customKey.value,
+          customIv: customIv.value,
+          history: list,
+        };
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+          // Dropped oldest entries to fit quota — keep memory in sync.
+          if (list.length !== history.value.length) {
+            history.value = list;
+          }
+          return;
+        } catch {
+          // quota / private mode: drop oldest (tail) and retry
+          if (list.length === 0) {
+            return;
+          }
+          list = list.slice(0, -1);
+        }
+      }
+    } finally {
+      persisting = false;
     }
   }
 
@@ -159,6 +181,20 @@ export const useCryptoWorkspaceStore = defineStore("crypto-workspace", () => {
     history.value = history.value.filter((_, i) => i !== index);
   }
 
+  /** Reload history only (keep aesCode/key/iv editing state). */
+  function reloadHistoryFromStorage() {
+    const loaded = loadPersisted();
+    history.value = loaded.history;
+  }
+
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", (event) => {
+      if (event.key === STORAGE_KEY) {
+        reloadHistoryFromStorage();
+      }
+    });
+  }
+
   return {
     aesCode,
     customKey,
@@ -171,5 +207,6 @@ export const useCryptoWorkspaceStore = defineStore("crypto-workspace", () => {
     pushHistory,
     clearHistory,
     removeHistoryAt,
+    reloadHistoryFromStorage,
   };
 });

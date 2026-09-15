@@ -3,9 +3,11 @@ import { nextTick, onMounted, onUnmounted, shallowRef, useTemplateRef } from "vu
 import { invoke } from "@tauri-apps/api/core";
 import { runAes, runAesPreferDecrypt } from "@/services/aes-ops";
 import { useSystemTheme } from "@/composables/use-system-theme";
+import { useCryptoWorkspaceStore } from "@/stores/crypto-workspace";
 import { beautifyJsonDisplay } from "@/utils/json-display";
 
 useSystemTheme();
+const workspace = useCryptoWorkspaceStore();
 
 interface BubblePayload {
   text: string;
@@ -71,6 +73,10 @@ async function runBubble(payload: BubblePayload) {
     return;
   }
   const silentJson = payload.mode === "silent_json";
+  // Already showing this silent decrypt — skip re-decrypt/reveal/history.
+  if (silentJson && visible.value && sourceText.value === payload.text) {
+    return;
+  }
   const preferDecrypt = payload.mode === "auto";
   const mode = payload.mode === "encrypt" ? "encrypt" : "decrypt";
   const token = ++runToken;
@@ -100,7 +106,17 @@ async function runBubble(payload: BubblePayload) {
         return;
       }
       lastMode.value = "decrypt";
-      resultText.value = beautifyJsonDisplay(result.content);
+      const display = beautifyJsonDisplay(result.content);
+      workspace.pushHistory({
+        type: "decrypt",
+        text: payload.text,
+        aesCode: result.usedCode ?? "auto",
+        key: result.usedKey ?? "",
+        iv: result.usedIv ?? "",
+        result: display,
+      });
+      resultText.value = display;
+      await invoke("reveal_crypto_bubble").catch(() => undefined);
       visible.value = true;
       loading.value = false;
       await scrollBodyToBottom();
@@ -135,7 +151,18 @@ async function runBubble(payload: BubblePayload) {
           : "自动加密失败";
       return;
     }
-    resultText.value = beautifyJsonDisplay(result.content);
+    const display = beautifyJsonDisplay(result.content);
+    if (preferDecrypt) {
+      workspace.pushHistory({
+        type: resolvedMode,
+        text: payload.text,
+        aesCode: result.usedCode ?? "auto",
+        key: result.usedKey ?? "",
+        iv: result.usedIv ?? "",
+        result: display,
+      });
+    }
+    resultText.value = display;
   } catch {
     if (token !== runToken) {
       return;
