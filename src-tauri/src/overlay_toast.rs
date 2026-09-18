@@ -158,7 +158,6 @@ fn show_on_main(app: &AppHandle, message: String) {
             let _ = win.set_position(PhysicalPosition::new(target.0, target.1));
             let _ = win.set_always_on_top(true);
             let _ = win.set_ignore_cursor_events(true);
-            windows::bind_close_to_hide(&win);
             crate::mouse_trail::schedule_raise_overlays(app);
             let handle = app.clone();
             let msg = message.clone();
@@ -186,7 +185,7 @@ fn schedule_hide(app: &AppHandle, seq: u64, wait_ms: u64) {
         let app = handle.clone();
         let _ = handle.run_on_main_thread(move || {
             if let Some(win) = app.get_webview_window(OVERLAY_TOAST_LABEL) {
-                let _ = win.hide();
+                let _ = win.close();
             }
         });
     });

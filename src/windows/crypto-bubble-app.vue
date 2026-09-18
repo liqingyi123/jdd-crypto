@@ -191,8 +191,10 @@ async function onCopy() {
     return;
   }
   try {
+    const resultLabel = lastMode.value === "encrypt" ? "加密" : "解密";
+    const text = `【原文】：\n${sourceText.value}\n【${resultLabel}】：\n${resultText.value}`;
     // 静默写入，避免再次弹出剪贴板询问框
-    await invoke("copy_text_silent", { text: resultText.value });
+    await invoke("copy_text_silent", { text });
     await closeBubble();
   } catch {
     copyHint.value = "复制失败";

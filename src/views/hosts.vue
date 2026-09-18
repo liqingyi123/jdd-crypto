@@ -162,7 +162,16 @@ function schemeUrl(scheme: HostsScheme): string {
 }
 
 function schemeLastRefresh(scheme: HostsScheme): string {
-  return normalizeScheme(scheme).last_refresh ?? "";
+  const normalized = normalizeScheme(scheme);
+  const ms = normalized.last_refresh_ms ?? 0;
+  if (ms > 0) {
+    const d = new Date(ms);
+    if (!Number.isNaN(d.getTime())) {
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+  }
+  return normalized.last_refresh ?? "";
 }
 
 async function selectScheme(scheme: HostsScheme) {

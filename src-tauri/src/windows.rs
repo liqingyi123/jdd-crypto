@@ -82,7 +82,8 @@ pub fn show_main(app: &AppHandle, hint: Option<CryptoHint>) {
 
 pub fn show_feature(app: &AppHandle, label: &str) {
     // Feature windows are created lazily (not declared in tauri.conf.json) so
-    // cold start only pays for badge + main. Re-open reuses the existing webview.
+    // cold start only pays for badge + main. Closing destroys the webview to
+    // reclaim the process; re-open creates a fresh one.
     if let Some(win) = app.get_webview_window(label) {
         focus_window(app, &win);
         return;
@@ -126,13 +127,14 @@ fn create_feature_window(app: &AppHandle, label: &str) {
         .build();
 
     if let Ok(win) = result {
-        bind_interactive_window(&win);
+        // Allow real close() so WebView process is reclaimed; only raise trail on blur.
+        bind_raise_on_blur(&win);
         crate::mouse_trail::schedule_raise_overlays(app);
     }
 }
 
 /// Map the window close button to hide instead of destroy.
-/// Keeps tray/badge workflows snappy and avoids recreating webviews on every open.
+/// Used for prebuilt windows (crypto-bubble / compare-*) that must stay warm.
 pub fn bind_close_to_hide(win: &WebviewWindow) {
     let hidden = win.clone();
     win.on_window_event(move |event| {
@@ -143,7 +145,19 @@ pub fn bind_close_to_hide(win: &WebviewWindow) {
     });
 }
 
+/// Re-raise mouse-trail overlays when the window loses focus.
+/// Does not intercept close — the webview is destroyed and the process reclaimed.
+pub fn bind_raise_on_blur(win: &WebviewWindow) {
+    let app = win.app_handle().clone();
+    win.on_window_event(move |event| {
+        if let tauri::WindowEvent::Focused(false) = event {
+            crate::mouse_trail::schedule_raise_overlays(&app);
+        }
+    });
+}
+
 /// Close-to-hide plus re-raise mouse-trail when the window loses focus.
+/// Kept for `main` so tray / single-instance reopen stays snappy.
 pub fn bind_interactive_window(win: &WebviewWindow) {
     let hidden = win.clone();
     let app = win.app_handle().clone();
