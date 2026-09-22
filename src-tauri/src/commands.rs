@@ -330,6 +330,14 @@ pub fn set_mouse_trail_effect(
 }
 
 #[tauri::command]
+pub fn set_mouse_trail_performance_mode(
+    app: AppHandle,
+    mode: String,
+) -> Result<crate::mouse_trail::MouseTrailPref, String> {
+    crate::mouse_trail::set_performance_mode_pref(app, mode)
+}
+
+#[tauri::command]
 pub fn set_mouse_trail_color(
     app: AppHandle,
     effect: String,
@@ -552,6 +560,78 @@ pub fn set_hosts_quick_shortcut(
         *current = normalized.clone();
     }
     crate::hosts_quick::save_shortcut(&app, &normalized);
+    crate::global_shortcuts::register_all(&app)?;
+    Ok(normalized)
+}
+
+#[tauri::command]
+pub fn hide_hosts_search(app: AppHandle) {
+    crate::hosts_search::hide(&app);
+}
+
+#[tauri::command]
+pub fn hosts_search_recenter(app: AppHandle) {
+    crate::hosts_search::recenter(&app);
+}
+
+#[tauri::command]
+pub fn hosts_search_begin_drag() {
+    crate::hosts_search::begin_drag();
+}
+
+#[tauri::command]
+pub fn open_hosts_scheme(app: AppHandle, scheme_id: String, line: Option<String>) {
+    crate::hosts_search::open_hosts_scheme(&app, &scheme_id, line.as_deref());
+}
+
+#[tauri::command]
+pub fn take_pending_hosts_focus() -> Option<crate::hosts_search::FocusSchemePayload> {
+    crate::hosts_search::take_pending_focus()
+}
+
+#[tauri::command]
+pub fn hosts_search(
+    app: AppHandle,
+    query: String,
+) -> Vec<crate::hosts_manager::HostsSearchHit> {
+    crate::hosts_manager::search_schemes(&app, &query)
+}
+
+#[tauri::command]
+pub fn get_hosts_search_pref(state: State<AppState>) -> bool {
+    state.hosts_search_pref_enabled.load(Ordering::Relaxed)
+}
+
+#[tauri::command]
+pub fn set_hosts_search_pref(app: AppHandle, enabled: bool) {
+    crate::hosts_search::apply_pref(&app, enabled);
+}
+
+#[tauri::command]
+pub fn get_hosts_search_shortcut(state: State<AppState>) -> String {
+    state
+        .hosts_search_shortcut
+        .lock()
+        .map(|guard| guard.clone())
+        .unwrap_or_else(|_| crate::state::DEFAULT_HOSTS_SEARCH_SHORTCUT.to_string())
+}
+
+#[tauri::command]
+pub fn set_hosts_search_shortcut(
+    app: AppHandle,
+    state: State<AppState>,
+    shortcut: String,
+) -> Result<String, String> {
+    let normalized = crate::mouse_follow::validate_shortcut(&shortcut)?;
+    crate::global_shortcuts::ensure_no_conflict(
+        &app,
+        &normalized,
+        crate::global_shortcuts::ShortcutOwner::HostsSearch,
+    )?;
+    if let Ok(mut current) = state.hosts_search_shortcut.lock() {
+        *current = normalized.clone();
+    }
+    crate::hosts_search::save_shortcut(&app, &normalized);
     crate::global_shortcuts::register_all(&app)?;
     Ok(normalized)
 }

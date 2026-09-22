@@ -26,9 +26,12 @@ export interface MouseTrailColors {
   ripple: string;
 }
 
+export type MouseTrailPerformanceMode = "eco" | "balanced" | "perf";
+
 export interface MouseTrailPref {
   enabled: boolean;
   effect: MouseTrailEffect;
+  performanceMode: MouseTrailPerformanceMode;
   colors: MouseTrailColors;
 }
 
@@ -42,6 +45,7 @@ export const DEFAULT_MOUSE_TRAIL_COLORS: MouseTrailColors = {
 export const DEFAULT_MOUSE_TRAIL_PREF: MouseTrailPref = {
   enabled: false,
   effect: "ribbon",
+  performanceMode: "balanced",
   colors: { ...DEFAULT_MOUSE_TRAIL_COLORS },
 };
 
@@ -62,6 +66,15 @@ export function normalizeMouseTrailEffect(raw: string): MouseTrailEffect {
     return "ripple";
   }
   return "ribbon";
+}
+
+export function normalizeMouseTrailPerformanceMode(
+  raw: string | undefined,
+): MouseTrailPerformanceMode {
+  if (raw === "eco" || raw === "perf" || raw === "balanced") {
+    return raw;
+  }
+  return "balanced";
 }
 
 export function isColorableTrailEffect(

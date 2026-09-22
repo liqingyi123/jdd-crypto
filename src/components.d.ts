@@ -28,6 +28,7 @@ declare module 'vue' {
     ElTabPane: typeof import('element-plus/es')['ElTabPane']
     ElTabs: typeof import('element-plus/es')['ElTabs']
     ElTag: typeof import('element-plus/es')['ElTag']
+    ElTooltip: typeof import('element-plus/es')['ElTooltip']
     MonacoEditor: typeof import('./components/monaco-editor.vue')['default']
     OverlayToast: typeof import('./components/overlay-toast.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']

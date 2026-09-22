@@ -25,6 +25,7 @@ async function bootstrap() {
     windowLabel === "compare-tip" ||
     windowLabel === "compare-bubble" ||
     windowLabel === "hosts-quick" ||
+    windowLabel === "hosts-search" ||
     windowLabel === "brightness-bubble" ||
     windowLabel === "overlay-toast";
 

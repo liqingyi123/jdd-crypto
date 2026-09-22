@@ -14,9 +14,11 @@ import {
   isColorableTrailEffect,
   normalizeMouseTrailColors,
   normalizeMouseTrailEffect,
+  normalizeMouseTrailPerformanceMode,
   type ColorableTrailEffect,
   type MouseTrailColors,
   type MouseTrailEffect,
+  type MouseTrailPerformanceMode,
   type MouseTrailPref,
 } from "@/effects/mouse-trail-types";
 import {
@@ -78,6 +80,22 @@ const {
 });
 
 const {
+  recording: hostsSearchRecording,
+  errorMessage: hostsSearchErrorMessage,
+  display: hostsSearchDisplay,
+  previewDisplay: hostsSearchPreviewDisplay,
+  buttonRef: hostsSearchButtonRef,
+  startRecording: startHostsSearchRecording,
+  cancelRecording: cancelHostsSearchRecording,
+  onRecordKey: onHostsSearchRecordKey,
+  loadShortcut: loadHostsSearchShortcut,
+} = useShortcutRecorder({
+  getCommand: "get_hosts_search_shortcut",
+  setCommand: "set_hosts_search_shortcut",
+  defaultShortcut: "Ctrl+Alt+F",
+});
+
+const {
   recording: brightnessRecording,
   errorMessage: brightnessErrorMessage,
   display: brightnessDisplay,
@@ -135,6 +153,7 @@ const badgeSize = shallowRef(DEFAULT_BADGE_SIZE);
 const followPref = shallowRef(true);
 const comparePref = shallowRef(true);
 const hostsQuickPref = shallowRef(true);
+const hostsSearchPref = shallowRef(true);
 const brightnessQuickPref = shallowRef(true);
 const screensaverPref = shallowRef(true);
 const spotlightPref = shallowRef(true);
@@ -150,6 +169,9 @@ const intranetServerSaving = shallowRef(false);
 const DEFAULT_INTRANET_SERVER = "http://172.20.2.169:7101/";
 const trailEnabled = shallowRef(DEFAULT_MOUSE_TRAIL_PREF.enabled);
 const trailEffect = shallowRef<MouseTrailEffect>(DEFAULT_MOUSE_TRAIL_PREF.effect);
+const trailPerformanceMode = shallowRef<MouseTrailPerformanceMode>(
+  DEFAULT_MOUSE_TRAIL_PREF.performanceMode,
+);
 const trailColors = shallowRef<MouseTrailColors>({ ...DEFAULT_MOUSE_TRAIL_COLORS });
 const committedTrailColors = shallowRef<MouseTrailColors>({ ...DEFAULT_MOUSE_TRAIL_COLORS });
 const trailColorsResetting = shallowRef(false);
@@ -171,6 +193,18 @@ const badgeSizeOptions: Array<{ value: number; label: string }> = [
   { value: BADGE_HIDDEN_SIZE, label: "隐藏" },
 ];
 
+const trailPerformanceModeOptions: Array<{
+  value: MouseTrailPerformanceMode;
+  label: string;
+}> = [
+  { value: "eco", label: "节能" },
+  { value: "balanced", label: "均衡" },
+  { value: "perf", label: "性能" },
+];
+
+const SHORTCUT_RECORD_TIP =
+  "快捷键最多设置 4 个键，需包含修饰键。\n点击按钮后按下新组合，Esc 或点击其他区域取消。";
+
 const trailEffectOptions: Array<{ value: MouseTrailEffect; label: string; shortcutKey: string }> = [
   { value: "ribbon", label: "躁动线条", shortcutKey: "1" },
   { value: "meteor", label: "星痕漫衍", shortcutKey: "2" },
@@ -187,6 +221,7 @@ let trailColorPersistToken = 0;
 function applyTrailPref(pref: MouseTrailPref) {
   trailEnabled.value = pref.enabled;
   trailEffect.value = normalizeMouseTrailEffect(pref.effect);
+  trailPerformanceMode.value = normalizeMouseTrailPerformanceMode(pref.performanceMode);
   const colors = normalizeMouseTrailColors(pref.colors);
   trailColors.value = colors;
   committedTrailColors.value = { ...colors };
@@ -278,6 +313,11 @@ onMounted(async () => {
     // browser preview
   }
   try {
+    hostsSearchPref.value = await invoke<boolean>("get_hosts_search_pref");
+  } catch {
+    // browser preview
+  }
+  try {
     brightnessQuickPref.value = await invoke<boolean>("get_brightness_quick_pref");
   } catch {
     // browser preview
@@ -330,6 +370,7 @@ onMounted(async () => {
   await loadShortcut();
   await loadCompareShortcut();
   await loadHostsQuickShortcut();
+  await loadHostsSearchShortcut();
   await loadBrightnessShortcut();
   await loadScreensaverShortcut();
   await loadSpotlightShortcut();
@@ -416,6 +457,21 @@ async function onHostsQuickPrefChange(value: string | number | boolean) {
     await invoke("set_hosts_quick_pref", { enabled });
   } catch (error) {
     hostsQuickPref.value = previous;
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
+}
+
+async function onHostsSearchPrefChange(value: string | number | boolean) {
+  const enabled = Boolean(value);
+  const previous = hostsSearchPref.value;
+  hostsSearchPref.value = enabled;
+  if (!enabled && hostsSearchRecording.value) {
+    await cancelHostsSearchRecording();
+  }
+  try {
+    await invoke("set_hosts_search_pref", { enabled });
+  } catch (error) {
+    hostsSearchPref.value = previous;
     ElMessage.error(error instanceof Error ? error.message : String(error));
   }
 }
@@ -632,6 +688,23 @@ async function onTrailEffectChange(value: string | number | boolean | undefined)
   }
 }
 
+async function onTrailPerformanceModeChange(value: string | number | boolean | undefined) {
+  if (value !== "eco" && value !== "balanced" && value !== "perf") {
+    return;
+  }
+  const previous = trailPerformanceMode.value;
+  trailPerformanceMode.value = value;
+  try {
+    const pref = await invoke<MouseTrailPref>("set_mouse_trail_performance_mode", {
+      mode: value,
+    });
+    applyTrailPref(pref);
+  } catch (error) {
+    trailPerformanceMode.value = previous;
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
+}
+
 async function onTrailColorReset() {
   const effect = activeColorEffect.value;
   if (!effect) {
@@ -744,7 +817,7 @@ async function onThemeChange(value: string | number | boolean | undefined) {
           </section>
           <section>
             <div class="section-head">
-              <h2>鼠标跟随</h2>
+              <h2>跟随选文</h2>
               <label class="row">
                 <ElSwitch :model-value="followPref" @change="onFollowPrefChange" />
               </label>
@@ -752,25 +825,32 @@ async function onThemeChange(value: string | number | boolean | undefined) {
             <p>
               按下快捷键开启后会跟随鼠标移动并自动等待鼠标下次的文本选中，按下鼠标选中文本后松开会气泡弹出解密结果。
             </p>
-            <div class="row">
+            <div class="row shortcut-row">
               <span>快捷键</span>
               <div ref="buttonRef">
-                <ElButton
-                  :type="recording ? 'primary' : 'default'"
-                  :disabled="!followPref"
-                  @click="startRecording"
-                  @keydown="onRecordKey"
+                <ElTooltip
+                  placement="top"
+                  :content="SHORTCUT_RECORD_TIP"
+                  popper-class="shortcut-record-tip-popper"
                 >
-                  {{ recording ? previewDisplay : display }}
-                </ElButton>
+                  <span class="shortcut-record-trigger">
+                    <ElButton
+                      :type="recording ? 'primary' : 'default'"
+                      :disabled="!followPref"
+                      @click="startRecording"
+                      @keydown="onRecordKey"
+                    >
+                      {{ recording ? previewDisplay : display }}
+                    </ElButton>
+                  </span>
+                </ElTooltip>
               </div>
             </div>
             <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
-            <p>最多 4 个键，需包含修饰键。点击按钮后按下新组合，Esc 或点击其他区域取消。</p>
           </section>
           <section>
             <div class="section-head">
-              <h2>文本对比模式</h2>
+              <h2>对比解密</h2>
               <label class="row">
                 <ElSwitch :model-value="comparePref" @change="onComparePrefChange" />
               </label>
@@ -778,21 +858,28 @@ async function onThemeChange(value: string | number | boolean | undefined) {
             <p>
               开启后可用快捷键进入对比模式：框选并解密两段文本，在中央气泡中左右对比并高亮后段差异。再次按下同一快捷键退出。
             </p>
-            <div class="row">
+            <div class="row shortcut-row">
               <span>快捷键</span>
               <div ref="compareButtonRef">
-                <ElButton
-                  :type="compareRecording ? 'primary' : 'default'"
-                  :disabled="!comparePref"
-                  @click="startCompareRecording"
-                  @keydown="onCompareRecordKey"
+                <ElTooltip
+                  placement="top"
+                  :content="SHORTCUT_RECORD_TIP"
+                  popper-class="shortcut-record-tip-popper"
                 >
-                  {{ compareRecording ? comparePreviewDisplay : compareDisplay }}
-                </ElButton>
+                  <span class="shortcut-record-trigger">
+                    <ElButton
+                      :type="compareRecording ? 'primary' : 'default'"
+                      :disabled="!comparePref"
+                      @click="startCompareRecording"
+                      @keydown="onCompareRecordKey"
+                    >
+                      {{ compareRecording ? comparePreviewDisplay : compareDisplay }}
+                    </ElButton>
+                  </span>
+                </ElTooltip>
               </div>
             </div>
             <p v-if="compareErrorMessage" class="error">{{ compareErrorMessage }}</p>
-            <p>最多 4 个键，需包含修饰键。点击按钮后按下新组合，Esc 或点击其他区域取消。</p>
           </section>
         </div>
       </ElTabPane>
@@ -807,11 +894,23 @@ async function onThemeChange(value: string | number | boolean | undefined) {
               </label>
             </div>
             <p>
-              我的鼠标指针哪去啦？？！！<br />在所有显示器工作区跟随鼠标绘制炫酷好玩的拖尾特效以帮助更好的寻找鼠标位置。
+              在所有显示器工作区跟随鼠标绘制炫酷好玩的拖尾特效以帮助更好的寻找鼠标位置。
             </p>
-            <p class="trail-shortcut-hint">
-              快捷键：按住 Ctrl，依次按下 T 与数字键 1–6（Ctrl+T+数字）切换特效；松开 Ctrl 后需重新按下 T。
-            </p>
+            <h3>采样频率</h3>
+            <ElRadioGroup
+              :model-value="trailPerformanceMode"
+              :disabled="!trailEnabled"
+              @change="onTrailPerformanceModeChange"
+            >
+              <ElRadio
+                v-for="item in trailPerformanceModeOptions"
+                :key="item.value"
+                :value="item.value"
+              >
+                {{ item.label }}
+              </ElRadio>
+            </ElRadioGroup>
+            <h3>特效样式</h3>
             <ElRadioGroup
               :model-value="trailEffect"
               :disabled="!trailEnabled"
@@ -855,27 +954,34 @@ async function onThemeChange(value: string | number | boolean | undefined) {
             <p>
               按下快捷键后在鼠标旁打开亮度气泡，为每个显示器显示进度条，拖动即可调节该屏物理亮度。
             </p>
-            <div class="row">
+            <div class="row shortcut-row">
               <span>快捷键</span>
               <div ref="brightnessButtonRef">
-                <ElButton
-                  :type="brightnessRecording ? 'primary' : 'default'"
-                  :disabled="!brightnessQuickPref"
-                  @click="startBrightnessRecording"
-                  @keydown="onBrightnessRecordKey"
+                <ElTooltip
+                  placement="top"
+                  :content="SHORTCUT_RECORD_TIP"
+                  popper-class="shortcut-record-tip-popper"
                 >
-                  {{
-                    brightnessRecording
-                      ? brightnessPreviewDisplay
-                      : brightnessDisplay
-                  }}
-                </ElButton>
+                  <span class="shortcut-record-trigger">
+                    <ElButton
+                      :type="brightnessRecording ? 'primary' : 'default'"
+                      :disabled="!brightnessQuickPref"
+                      @click="startBrightnessRecording"
+                      @keydown="onBrightnessRecordKey"
+                    >
+                      {{
+                        brightnessRecording
+                          ? brightnessPreviewDisplay
+                          : brightnessDisplay
+                      }}
+                    </ElButton>
+                  </span>
+                </ElTooltip>
               </div>
             </div>
             <p v-if="brightnessErrorMessage" class="error">
               {{ brightnessErrorMessage }}
             </p>
-            <p>最多 4 个键，需包含修饰键。点击按钮后按下新组合，Esc 或点击其他区域取消。</p>
           </section>
           <section>
             <div class="section-head">
@@ -888,29 +994,36 @@ async function onThemeChange(value: string | number | boolean | undefined) {
               </label>
             </div>
             <p>
-              按下快捷键后在开启聚光灯效果，突出显示鼠标周围区域；按任意键退出。开启期间会暂时关闭鼠标轨迹。屏保开启期间不会触发聚光灯。
+              按下快捷键后在开启聚光灯效果，突出显示鼠标周围区域；按任意键退出。开启期间会暂时关闭鼠标轨迹。屏保开启期间不会触发聚光灯。<br />水平或垂直快速来回晃动鼠标 2 次亦可开启聚光灯（需总开关开启）。
             </p>
-            <div class="row">
+            <div class="row shortcut-row">
               <span>快捷键</span>
               <div ref="spotlightButtonRef">
-                <ElButton
-                  :type="spotlightRecording ? 'primary' : 'default'"
-                  :disabled="!spotlightPref"
-                  @click="startSpotlightRecording"
-                  @keydown="onSpotlightRecordKey"
+                <ElTooltip
+                  placement="top"
+                  :content="SHORTCUT_RECORD_TIP"
+                  popper-class="shortcut-record-tip-popper"
                 >
-                  {{
-                    spotlightRecording
-                      ? spotlightPreviewDisplay
-                      : spotlightDisplay
-                  }}
-                </ElButton>
+                  <span class="shortcut-record-trigger">
+                    <ElButton
+                      :type="spotlightRecording ? 'primary' : 'default'"
+                      :disabled="!spotlightPref"
+                      @click="startSpotlightRecording"
+                      @keydown="onSpotlightRecordKey"
+                    >
+                      {{
+                        spotlightRecording
+                          ? spotlightPreviewDisplay
+                          : spotlightDisplay
+                      }}
+                    </ElButton>
+                  </span>
+                </ElTooltip>
               </div>
             </div>
             <p v-if="spotlightErrorMessage" class="error">
               {{ spotlightErrorMessage }}
             </p>
-            <p>最多 4 个键，需包含修饰键。点击按钮后按下新组合，Esc 或点击其他区域取消。</p>
             <div class="row spotlight-size-row">
               <span>光圈大小</span>
               <ElSlider
@@ -933,7 +1046,6 @@ async function onThemeChange(value: string | number | boolean | undefined) {
                 />
               </label>
             </div>
-            <p>水平或垂直快速来回晃动鼠标 2 次亦可开启聚光灯（需总开关开启）。</p>
           </section>
           <section>
             <div class="section-head">
@@ -948,27 +1060,34 @@ async function onThemeChange(value: string | number | boolean | undefined) {
             <p>
               按下快捷键后在所有显示器全屏显示屏幕保护特效；按任意键、点击鼠标或再次快捷键退出。开启期间会暂时关闭鼠标轨迹。
             </p>
-            <div class="row">
+            <div class="row shortcut-row">
               <span>快捷键</span>
               <div ref="screensaverButtonRef">
-                <ElButton
-                  :type="screensaverRecording ? 'primary' : 'default'"
-                  :disabled="!screensaverPref"
-                  @click="startScreensaverRecording"
-                  @keydown="onScreensaverRecordKey"
+                <ElTooltip
+                  placement="top"
+                  :content="SHORTCUT_RECORD_TIP"
+                  popper-class="shortcut-record-tip-popper"
                 >
-                  {{
-                    screensaverRecording
-                      ? screensaverPreviewDisplay
-                      : screensaverDisplay
-                  }}
-                </ElButton>
+                  <span class="shortcut-record-trigger">
+                    <ElButton
+                      :type="screensaverRecording ? 'primary' : 'default'"
+                      :disabled="!screensaverPref"
+                      @click="startScreensaverRecording"
+                      @keydown="onScreensaverRecordKey"
+                    >
+                      {{
+                        screensaverRecording
+                          ? screensaverPreviewDisplay
+                          : screensaverDisplay
+                      }}
+                    </ElButton>
+                  </span>
+                </ElTooltip>
               </div>
             </div>
             <p v-if="screensaverErrorMessage" class="error">
               {{ screensaverErrorMessage }}
             </p>
-            <p>最多 4 个键，需包含修饰键。点击按钮后按下新组合，Esc 或点击其他区域取消。</p>
             <h3>背景特效</h3>
             <ElRadioGroup
               :model-value="screensaverBackground"
@@ -1006,27 +1125,74 @@ async function onThemeChange(value: string | number | boolean | undefined) {
             <p>
               按下快捷键后在鼠标旁打开 Host 方案列表，切换开关后窗口自动关闭。
             </p>
-            <div class="row">
+            <div class="row shortcut-row">
               <span>快捷键</span>
               <div ref="hostsQuickButtonRef">
-                <ElButton
-                  :type="hostsQuickRecording ? 'primary' : 'default'"
-                  :disabled="!hostsQuickPref"
-                  @click="startHostsQuickRecording"
-                  @keydown="onHostsQuickRecordKey"
+                <ElTooltip
+                  placement="top"
+                  :content="SHORTCUT_RECORD_TIP"
+                  popper-class="shortcut-record-tip-popper"
                 >
-                  {{
-                    hostsQuickRecording
-                      ? hostsQuickPreviewDisplay
-                      : hostsQuickDisplay
-                  }}
-                </ElButton>
+                  <span class="shortcut-record-trigger">
+                    <ElButton
+                      :type="hostsQuickRecording ? 'primary' : 'default'"
+                      :disabled="!hostsQuickPref"
+                      @click="startHostsQuickRecording"
+                      @keydown="onHostsQuickRecordKey"
+                    >
+                      {{
+                        hostsQuickRecording
+                          ? hostsQuickPreviewDisplay
+                          : hostsQuickDisplay
+                      }}
+                    </ElButton>
+                  </span>
+                </ElTooltip>
               </div>
             </div>
             <p v-if="hostsQuickErrorMessage" class="error">
               {{ hostsQuickErrorMessage }}
             </p>
-            <p>最多 4 个键，需包含修饰键。点击按钮后按下新组合，Esc 或点击其他区域取消。</p>
+          </section>
+
+          <section>
+            <div class="section-head">
+              <h2>Host 检索</h2>
+              <label class="row">
+                <ElSwitch :model-value="hostsSearchPref" @change="onHostsSearchPrefChange" />
+              </label>
+            </div>
+            <p>
+              按下快捷键后在屏幕中央打开检索气泡，按域名或 IP 查找 Host 方案；失焦或 Esc 关闭。
+            </p>
+            <div class="row shortcut-row">
+              <span>快捷键</span>
+              <div ref="hostsSearchButtonRef">
+                <ElTooltip
+                  placement="top"
+                  :content="SHORTCUT_RECORD_TIP"
+                  popper-class="shortcut-record-tip-popper"
+                >
+                  <span class="shortcut-record-trigger">
+                    <ElButton
+                      :type="hostsSearchRecording ? 'primary' : 'default'"
+                      :disabled="!hostsSearchPref"
+                      @click="startHostsSearchRecording"
+                      @keydown="onHostsSearchRecordKey"
+                    >
+                      {{
+                        hostsSearchRecording
+                          ? hostsSearchPreviewDisplay
+                          : hostsSearchDisplay
+                      }}
+                    </ElButton>
+                  </span>
+                </ElTooltip>
+              </div>
+            </div>
+            <p v-if="hostsSearchErrorMessage" class="error">
+              {{ hostsSearchErrorMessage }}
+            </p>
           </section>
         </div>
       </ElTabPane>
@@ -1098,7 +1264,6 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
 }
 
 .section-head h2 {
@@ -1106,7 +1271,7 @@ h2 {
 }
 
 h3 {
-  margin: 16px 0 12px;
+  margin: 10px 0 0px;
   font-size: 14px;
   font-weight: 600;
 }
@@ -1115,6 +1280,10 @@ h3 {
   display: flex;
   gap: 16px;
   align-items: center;
+}
+
+.shortcut-row {
+  margin-top: 16px;
 }
 
 .actions {
@@ -1129,7 +1298,7 @@ h3 {
 }
 
 .spotlight-size-row {
-  margin-top: 8px;
+  margin-top: 16px;
   align-items: center;
 }
 
@@ -1173,6 +1342,10 @@ p {
 .error {
   color: var(--danger, #c0392b);
 }
+
+.shortcut-record-trigger {
+  display: inline-flex;
+}
 </style>
 
 <!-- ColorPicker 面板 teleport 到 body；EP 2.x 确认按钮类名为 el-color-footer__btn -->
@@ -1180,5 +1353,10 @@ p {
 .trail-color-picker .el-color-footer__btn,
 .trail-color-picker .el-color-footer__link-btn {
   display: none !important;
+}
+
+.shortcut-record-tip-popper {
+  white-space: pre-line;
+  max-width: 280px;
 }
 </style>

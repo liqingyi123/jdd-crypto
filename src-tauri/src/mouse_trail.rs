@@ -16,6 +16,10 @@ const MAX_OVERLAYS: usize = 8;
 const SETTINGS_STORE: &str = "settings.json";
 const PREF_KEY: &str = "mouseTrail";
 const DEFAULT_EFFECT: &str = "ribbon";
+const DEFAULT_PERFORMANCE_MODE: &str = "balanced";
+const INTERVAL_ECO_MS: u64 = 33;
+const INTERVAL_BALANCED_MS: u64 = 22;
+const INTERVAL_PERF_MS: u64 = 16;
 const DEFAULT_METEOR_COLOR: &str = "#F8EC85";
 const DEFAULT_DOTS_COLOR: &str = "#00D1CE";
 const DEFAULT_HEART_COLOR: &str = "#FF2EC8";
@@ -46,6 +50,7 @@ static TRAIL_SHORTCUT_IDS: OnceLock<(u32, [u32; 6])> = OnceLock::new();
 
 static CURSOR_LOOP_STARTED: AtomicBool = AtomicBool::new(false);
 static CURSOR_LOOP_THREAD: OnceLock<thread::Thread> = OnceLock::new();
+static CURSOR_INTERVAL_MS: AtomicU64 = AtomicU64::new(INTERVAL_BALANCED_MS);
 static TRAIL_ENABLED: AtomicBool = AtomicBool::new(false);
 /// Runtime suppress while screensaver is active (does not change user pref).
 static TRAIL_SUPPRESSED: AtomicBool = AtomicBool::new(false);
@@ -115,8 +120,14 @@ fn default_ripple_color() -> String {
 pub struct MouseTrailPref {
     pub enabled: bool,
     pub effect: String,
+    #[serde(default = "default_performance_mode")]
+    pub performance_mode: String,
     #[serde(default)]
     pub colors: MouseTrailColors,
+}
+
+fn default_performance_mode() -> String {
+    DEFAULT_PERFORMANCE_MODE.to_string()
 }
 
 impl Default for MouseTrailPref {
@@ -124,6 +135,7 @@ impl Default for MouseTrailPref {
         Self {
             enabled: false,
             effect: DEFAULT_EFFECT.to_string(),
+            performance_mode: default_performance_mode(),
             colors: MouseTrailColors::default(),
         }
     }
@@ -182,6 +194,27 @@ fn normalize_effect(raw: &str) -> String {
     }
 }
 
+fn normalize_performance_mode(raw: &str) -> String {
+    match raw {
+        "eco" => "eco".to_string(),
+        "perf" => "perf".to_string(),
+        "balanced" => "balanced".to_string(),
+        _ => DEFAULT_PERFORMANCE_MODE.to_string(),
+    }
+}
+
+fn interval_ms_for_mode(mode: &str) -> u64 {
+    match mode {
+        "eco" => INTERVAL_ECO_MS,
+        "perf" => INTERVAL_PERF_MS,
+        _ => INTERVAL_BALANCED_MS,
+    }
+}
+
+fn apply_cursor_interval(mode: &str) {
+    CURSOR_INTERVAL_MS.store(interval_ms_for_mode(mode), Ordering::Relaxed);
+}
+
 fn normalize_color(raw: &str, fallback: &str) -> String {
     let cleaned = raw.trim().trim_start_matches('#').to_ascii_lowercase();
     if cleaned.len() == 6 && cleaned.chars().all(|c| c.is_ascii_hexdigit()) {
@@ -203,6 +236,7 @@ fn normalize_colors(colors: &mut MouseTrailColors) {
 
 fn normalize_pref(pref: &mut MouseTrailPref) {
     pref.effect = normalize_effect(&pref.effect);
+    pref.performance_mode = normalize_performance_mode(&pref.performance_mode);
     normalize_colors(&mut pref.colors);
 }
 
@@ -259,6 +293,18 @@ pub fn set_effect_pref(app: AppHandle, effect: String) -> Result<MouseTrailPref,
     Ok(pref)
 }
 
+pub fn set_performance_mode_pref(
+    app: AppHandle,
+    mode: String,
+) -> Result<MouseTrailPref, String> {
+    let mut pref = load_pref(&app);
+    pref.performance_mode = normalize_performance_mode(&mode);
+    save_pref(&app, &pref)?;
+    apply_cursor_interval(&pref.performance_mode);
+    emit_pref(&app, &pref);
+    Ok(pref)
+}
+
 pub fn set_color_pref(app: AppHandle, effect: String, color: String) -> Result<MouseTrailPref, String> {
     let normalized_effect = normalize_effect(&effect);
     if normalized_effect != "meteor"
@@ -305,6 +351,7 @@ pub fn reset_color_pref(app: AppHandle, effect: String) -> Result<MouseTrailPref
 pub fn reset_pref(app: AppHandle) -> Result<MouseTrailPref, String> {
     let pref = MouseTrailPref::default();
     save_pref(&app, &pref)?;
+    apply_cursor_interval(&pref.performance_mode);
     set_enabled(&app, false);
     let _ = crate::global_shortcuts::register_all(&app);
     emit_pref(&app, &pref);
@@ -314,6 +361,7 @@ pub fn reset_pref(app: AppHandle) -> Result<MouseTrailPref, String> {
 pub fn init_from_store(app: &AppHandle) {
     ensure_display_listener(app);
     let pref = load_pref(app);
+    apply_cursor_interval(&pref.performance_mode);
     set_enabled(app, pref.enabled);
 }
 
@@ -742,8 +790,9 @@ fn cursor_loop(app: AppHandle) {
                 let _ = app.emit_filter("app://mouse-trail-cursor", payload, is_overlay_target);
             }
         }
-        // ~60fps for smoother trail continuity across engines.
-        thread::sleep(Duration::from_millis(16));
+        // Interval follows performance mode (eco/balanced/perf).
+        let interval = CURSOR_INTERVAL_MS.load(Ordering::Relaxed).max(1);
+        thread::sleep(Duration::from_millis(interval));
     }
 }
 

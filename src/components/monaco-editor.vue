@@ -134,6 +134,51 @@ watch(resolved, (theme) => {
   monaco.editor.setTheme(monacoTheme(theme));
 });
 
+function revealMatchingLine(text: string): boolean {
+  const instance = editor.value;
+  const modelRef = instance?.getModel();
+  if (!instance || !modelRef) {
+    return false;
+  }
+  const needle = text.trim();
+  if (!needle) {
+    return false;
+  }
+  const lineCount = modelRef.getLineCount();
+  let matchLine = 0;
+  for (let i = 1; i <= lineCount; i += 1) {
+    if (modelRef.getLineContent(i).trim() === needle) {
+      matchLine = i;
+      break;
+    }
+  }
+  if (matchLine === 0) {
+    for (let i = 1; i <= lineCount; i += 1) {
+      if (modelRef.getLineContent(i).includes(needle)) {
+        matchLine = i;
+        break;
+      }
+    }
+  }
+  if (matchLine === 0) {
+    return false;
+  }
+  const maxCol = modelRef.getLineMaxColumn(matchLine);
+  instance.revealLineInCenter(matchLine);
+  instance.setSelection({
+    startLineNumber: matchLine,
+    startColumn: 1,
+    endLineNumber: matchLine,
+    endColumn: maxCol,
+  });
+  instance.focus();
+  return true;
+}
+
+defineExpose({
+  revealMatchingLine,
+});
+
 onBeforeUnmount(() => {
   editor.value?.dispose();
   editor.value = null;

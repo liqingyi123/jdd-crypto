@@ -1191,6 +1191,92 @@ fn domains_of_line(line: &str) -> Vec<String> {
         .collect()
 }
 
+fn ip_of_line(line: &str) -> Option<String> {
+    let mut s = line.trim();
+    while s.starts_with('#') {
+        s = s[1..].trim_start();
+    }
+    if s.is_empty() {
+        return None;
+    }
+    let without_inline = s.split('#').next().unwrap_or(s).trim();
+    let parts: Vec<&str> = without_inline.split_whitespace().collect();
+    if parts.is_empty() {
+        return None;
+    }
+    let ip = parts[0];
+    if ip.contains('.') || ip.contains(':') {
+        Some(ip.to_string())
+    } else {
+        None
+    }
+}
+
+fn looks_like_ip_query(query: &str) -> bool {
+    let q = query.trim();
+    if q.is_empty() {
+        return false;
+    }
+    // IPv4-ish or IPv6-ish; no hostname letters (except hex for v6).
+    if q.contains('.') {
+        return q
+            .chars()
+            .all(|c| c.is_ascii_digit() || c == '.' || c == ':');
+    }
+    if q.contains(':') {
+        return q
+            .chars()
+            .all(|c| c.is_ascii_hexdigit() || c == ':' || c == '.');
+    }
+    false
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HostsSearchHit {
+    pub scheme_id: String,
+    pub title: String,
+    pub enabled: bool,
+    pub lines: Vec<String>,
+}
+
+/// Search all scheme contents by domain substring or exact IP.
+pub fn search_schemes(app: &AppHandle, query: &str) -> Vec<HostsSearchHit> {
+    let q = query.trim();
+    if q.is_empty() {
+        return Vec::new();
+    }
+    let q_lower = q.to_ascii_lowercase();
+    let as_ip = looks_like_ip_query(q);
+    let mut hits = Vec::new();
+    for scheme in list_schemes(app) {
+        let mut matched_lines = Vec::new();
+        for line in significant_hosts_lines(&scheme.content) {
+            let hit = if as_ip {
+                ip_of_line(&line)
+                    .map(|ip| ip.eq_ignore_ascii_case(q))
+                    .unwrap_or(false)
+            } else {
+                domains_of_line(&line)
+                    .iter()
+                    .any(|d| d.to_ascii_lowercase().contains(&q_lower))
+            };
+            if hit {
+                matched_lines.push(line);
+            }
+        }
+        if !matched_lines.is_empty() {
+            hits.push(HostsSearchHit {
+                scheme_id: scheme.id,
+                title: scheme.title,
+                enabled: scheme.enabled,
+                lines: matched_lines,
+            });
+        }
+    }
+    hits
+}
+
 fn line_touches_conflict(line: &str, conflict_domains: &std::collections::HashSet<String>) -> bool {
     domains_of_line(line)
         .iter()

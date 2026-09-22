@@ -12,7 +12,6 @@ const base = import.meta.env.BASE_URL;
 const nav = [
   { to: "/", label: "首页" },
   { to: "/features", label: "功能介绍" },
-  { to: "/about", label: "关于" },
   { to: "/changelog", label: "更新日志" },
 ];
 

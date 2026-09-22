@@ -142,6 +142,14 @@ input {
   background: var(--bg-muted);
 }
 
+.btn.disabled,
+.btn[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none;
+  filter: none;
+}
+
 .site-footer {
   padding: 28px 0 40px;
   border-top: 1px solid var(--border);

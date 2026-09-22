@@ -8,6 +8,7 @@ mod compare_mode;
 mod global_shortcuts;
 mod hosts_manager;
 mod hosts_quick;
+mod hosts_search;
 mod intranet_server;
 mod mouse_follow;
 mod mouse_trail;
@@ -57,6 +58,7 @@ pub fn run() {
                         mouse_follow::handle_follow_shortcut(app, shortcut);
                         compare_mode::handle_shortcut(app, shortcut);
                         hosts_quick::handle_shortcut(app, shortcut);
+                        hosts_search::handle_shortcut(app, shortcut);
                         brightness_quick::handle_shortcut(app, shortcut);
                         screensaver::handle_shortcut(app, shortcut);
                         spotlight::handle_shortcut(app, shortcut);
@@ -103,6 +105,7 @@ pub fn run() {
             commands::get_mouse_trail_pref,
             commands::set_mouse_trail_enabled,
             commands::set_mouse_trail_effect,
+            commands::set_mouse_trail_performance_mode,
             commands::set_mouse_trail_color,
             commands::reset_mouse_trail_colors,
             commands::reset_mouse_trail_pref,
@@ -128,6 +131,8 @@ pub fn run() {
             commands::hosts_reset_system,
             commands::open_hosts_window,
             commands::open_settings_window,
+            commands::open_hosts_scheme,
+            commands::take_pending_hosts_focus,
             commands::hide_hosts_quick,
             commands::show_overlay_toast,
             commands::take_pending_overlay_toast,
@@ -135,6 +140,14 @@ pub fn run() {
             commands::set_hosts_quick_shortcut,
             commands::get_hosts_quick_pref,
             commands::set_hosts_quick_pref,
+            commands::hide_hosts_search,
+            commands::hosts_search_recenter,
+            commands::hosts_search_begin_drag,
+            commands::hosts_search,
+            commands::get_hosts_search_shortcut,
+            commands::set_hosts_search_shortcut,
+            commands::get_hosts_search_pref,
+            commands::set_hosts_search_pref,
             commands::list_display_brightness,
             commands::set_display_brightness,
             commands::hide_brightness_bubble,
@@ -211,6 +224,14 @@ pub fn run() {
             app.state::<AppState>()
                 .hosts_quick_pref_enabled
                 .store(hosts_quick_pref, Ordering::Relaxed);
+            let hosts_search_shortcut = hosts_search::load_shortcut(app.handle());
+            if let Ok(mut current) = app.state::<AppState>().hosts_search_shortcut.lock() {
+                *current = hosts_search_shortcut;
+            }
+            let hosts_search_pref = hosts_search::load_pref(app.handle());
+            app.state::<AppState>()
+                .hosts_search_pref_enabled
+                .store(hosts_search_pref, Ordering::Relaxed);
             let brightness_quick_shortcut = brightness_quick::load_shortcut(app.handle());
             if let Ok(mut current) = app.state::<AppState>().brightness_quick_shortcut.lock() {
                 *current = brightness_quick_shortcut;

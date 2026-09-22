@@ -22,6 +22,9 @@ const CompareBubbleApp = defineAsyncComponent(
 const HostsQuickApp = defineAsyncComponent(
   () => import("@/windows/hosts-quick-app.vue"),
 );
+const HostsSearchApp = defineAsyncComponent(
+  () => import("@/windows/hosts-search-app.vue"),
+);
 const BrightnessBubbleApp = defineAsyncComponent(
   () => import("@/windows/brightness-bubble-app.vue"),
 );
@@ -52,6 +55,7 @@ const isSpotlight = computed(() => props.windowLabel.startsWith("spotlight"));
   <CompareTipApp v-else-if="windowLabel === 'compare-tip'" />
   <CompareBubbleApp v-else-if="windowLabel === 'compare-bubble'" />
   <HostsQuickApp v-else-if="windowLabel === 'hosts-quick'" />
+  <HostsSearchApp v-else-if="windowLabel === 'hosts-search'" />
   <BrightnessBubbleApp v-else-if="windowLabel === 'brightness-bubble'" />
   <OverlayToastApp v-else-if="windowLabel === 'overlay-toast'" />
   <ScreensaverApp v-else-if="isScreensaver" />

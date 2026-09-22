@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -13,6 +13,15 @@ import {
 } from "@/utils/hosts-scheme";
 
 const SYSTEM_ID = "__system__";
+
+type MonacoEditorExpose = {
+  revealMatchingLine: (text: string) => boolean;
+};
+
+interface FocusSchemePayload {
+  schemeId: string;
+  line?: string | null;
+}
 
 const REFRESH_OPTIONS: Array<{ label: string; value: number }> = [
   { label: "永不", value: 0 },
@@ -44,6 +53,7 @@ const schemes = ref<HostsScheme[]>([]);
 const selectedId = shallowRef<string | null>(null);
 const draftTitle = shallowRef("");
 const draftContent = shallowRef("");
+const contentEditorRef = useTemplateRef<MonacoEditorExpose>("contentEditorRef");
 const dirty = shallowRef(false);
 const syncing = shallowRef(false);
 const fileInput = ref<HTMLInputElement | null>(null);
@@ -174,8 +184,12 @@ function schemeLastRefresh(scheme: HostsScheme): string {
   return normalized.last_refresh ?? "";
 }
 
-async function selectScheme(scheme: HostsScheme) {
+async function selectScheme(
+  scheme: HostsScheme,
+  options?: { force?: boolean },
+) {
   if (
+    !options?.force &&
     dirty.value &&
     selectedId.value &&
     selectedId.value !== scheme.id &&
@@ -194,6 +208,34 @@ async function selectScheme(scheme: HostsScheme) {
   dirty.value = false;
   await nextTick();
   syncing.value = false;
+}
+
+async function focusSchemeById(schemeId: string, line?: string | null) {
+  let scheme = schemes.value.find((s) => s.id === schemeId);
+  if (!scheme) {
+    await refresh();
+    scheme = schemes.value.find((s) => s.id === schemeId);
+  }
+  if (!scheme) {
+    ElMessage.warning("未找到对应的 Host 方案");
+    return;
+  }
+  await selectScheme(scheme, { force: true });
+  await nextTick();
+  const el = document.querySelector(
+    `[data-scheme-id="${CSS.escape(schemeId)}"]`,
+  ) as HTMLElement | null;
+  el?.scrollIntoView({ block: "nearest" });
+  const targetLine = line?.trim();
+  if (!targetLine) {
+    return;
+  }
+  await nextTick();
+  // Wait a frame so Monaco has applied the new model value after selectScheme.
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => resolve());
+  });
+  contentEditorRef.value?.revealMatchingLine(targetLine);
 }
 
 async function selectSystemHosts() {
@@ -634,10 +676,24 @@ async function resetSystemHosts() {
 }
 
 let unlistenHostsSwitched: UnlistenFn | undefined;
+let unlistenFocusScheme: UnlistenFn | undefined;
 
 onMounted(() => {
-  void refresh();
-  void refreshHostsPermission();
+  void (async () => {
+    await refresh();
+    void refreshHostsPermission();
+    try {
+      const pending = await invoke<FocusSchemePayload | null>(
+        "take_pending_hosts_focus",
+      );
+      const schemeId = pending?.schemeId?.trim() ?? "";
+      if (schemeId) {
+        await focusSchemeById(schemeId, pending?.line);
+      }
+    } catch {
+      // browser preview
+    }
+  })();
   void listen<{
     schemes?: HostsScheme[];
   }>("app://hosts-switched", (event) => {
@@ -670,10 +726,30 @@ onMounted(() => {
   }).then((unlisten) => {
     unlistenHostsSwitched = unlisten;
   });
+  void listen<FocusSchemePayload | string>("hosts://focus-scheme", (event) => {
+    const payload = event.payload;
+    let schemeId = "";
+    let line: string | null | undefined;
+    if (typeof payload === "string") {
+      schemeId = payload.trim();
+    } else if (payload && typeof payload === "object") {
+      schemeId = String(payload.schemeId ?? "").trim();
+      line = payload.line;
+    }
+    if (!schemeId) {
+      return;
+    }
+    // Clear pending so mount take does not double-apply after live emit.
+    void invoke("take_pending_hosts_focus").catch(() => undefined);
+    void focusSchemeById(schemeId, line);
+  }).then((unlisten) => {
+    unlistenFocusScheme = unlisten;
+  });
 });
 
 onBeforeUnmount(() => {
   unlistenHostsSwitched?.();
+  unlistenFocusScheme?.();
 });
 
 /** Toolbar 新建/导入/导出暂关；保留入口便于恢复。 */
@@ -756,6 +832,7 @@ defineExpose({ openCreateDialog, triggerImport, exportSwitchhosts });
           v-for="scheme in schemes"
           :key="scheme.id"
           class="item"
+          :data-scheme-id="scheme.id"
           :class="{ active: scheme.id === selectedId }"
           @click="selectScheme(scheme)"
         >
@@ -896,6 +973,7 @@ defineExpose({ openCreateDialog, triggerImport, exportSwitchhosts });
           </p>
           <div class="editor-body">
             <MonacoEditor
+              ref="contentEditorRef"
               v-model="draftContent"
               language="hosts"
               :read-only="contentReadOnly"

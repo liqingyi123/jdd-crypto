@@ -21,6 +21,7 @@ pub enum ShortcutOwner {
     MouseFollow,
     Compare,
     HostsQuick,
+    HostsSearch,
     BrightnessQuick,
     Screensaver,
     Spotlight,
@@ -65,6 +66,11 @@ pub fn ensure_no_conflict(
         .lock()
         .map(|guard| guard.clone())
         .unwrap_or_else(|_| crate::state::DEFAULT_HOSTS_QUICK_SHORTCUT.to_string());
+    let hosts_search = state
+        .hosts_search_shortcut
+        .lock()
+        .map(|guard| guard.clone())
+        .unwrap_or_else(|_| crate::state::DEFAULT_HOSTS_SEARCH_SHORTCUT.to_string());
     let brightness_quick = state
         .brightness_quick_shortcut
         .lock()
@@ -93,6 +99,11 @@ pub fn ensure_no_conflict(
         && shortcut_id(&hosts_quick)? == candidate_id
     {
         return Err(format!("与 Hosts 快捷切换快捷键 {hosts_quick} 冲突"));
+    }
+    if !matches!(owner, ShortcutOwner::HostsSearch)
+        && shortcut_id(&hosts_search)? == candidate_id
+    {
+        return Err(format!("与 Host 检索快捷键 {hosts_search} 冲突"));
     }
     if !matches!(owner, ShortcutOwner::BrightnessQuick)
         && shortcut_id(&brightness_quick)? == candidate_id
@@ -157,6 +168,18 @@ pub fn register_all(app: &AppHandle) -> Result<(), String> {
         let hosts_quick = Shortcut::from_str(&hosts_quick).map_err(|err| err.to_string())?;
         global
             .register(hosts_quick)
+            .map_err(|err| err.to_string())?;
+    }
+
+    if state.hosts_search_pref_enabled.load(Ordering::Relaxed) {
+        let hosts_search = state
+            .hosts_search_shortcut
+            .lock()
+            .map(|guard| guard.clone())
+            .unwrap_or_else(|_| crate::state::DEFAULT_HOSTS_SEARCH_SHORTCUT.to_string());
+        let hosts_search = Shortcut::from_str(&hosts_search).map_err(|err| err.to_string())?;
+        global
+            .register(hosts_search)
             .map_err(|err| err.to_string())?;
     }
 

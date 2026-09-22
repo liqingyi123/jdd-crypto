@@ -1,9 +1,16 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
+import { useWebsiteDownload } from "../composables/use-website-download";
 
 const base = import.meta.env.BASE_URL;
 const heroRef = ref<HTMLElement | null>(null);
+const {
+  href: downloadHref,
+  label: downloadLabel,
+  title: downloadTitle,
+  ready: downloadReady,
+} = useWebsiteDownload();
 
 let targetX = 0;
 let targetY = 0;
@@ -58,6 +65,12 @@ function onPointerLeave() {
   startTick();
 }
 
+function onDownloadClick(event: MouseEvent) {
+  if (!downloadReady.value) {
+    event.preventDefault();
+  }
+}
+
 onMounted(() => {
   reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const el = heroRef.value;
@@ -92,7 +105,17 @@ onUnmounted(() => {
         快捷切换、屏幕亮度调节、多屏屏保、聚光灯，以及可玩的鼠标拖尾特效。
       </p>
       <div class="hero-actions">
-        <RouterLink class="btn btn-primary" to="/features">了解功能</RouterLink>
+        <a
+          class="btn btn-primary"
+          :class="{ disabled: !downloadReady }"
+          :href="downloadHref"
+          :title="downloadTitle"
+          :aria-disabled="!downloadReady"
+          @click="onDownloadClick"
+        >
+          {{ downloadLabel }}
+        </a>
+        <RouterLink class="btn btn-ghost" to="/features">了解功能</RouterLink>
         <RouterLink class="btn btn-ghost" to="/changelog">更新日志</RouterLink>
       </div>
     </div>

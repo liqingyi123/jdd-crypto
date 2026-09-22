@@ -3,8 +3,7 @@ import { onMounted, reactive, watch } from "vue";
 import { useChangelog } from "../composables/use-changelog";
 import {
   detectPlatform,
-  installerUrl,
-  probeInstallerAvailable,
+  resolveInstallerUrl,
 } from "../composables/use-website-download";
 
 type ProbeState = "checking" | "available" | "missing";
@@ -13,25 +12,26 @@ const { entries, status, errorMessage, latestVersion, ensureLoaded } = useChange
 const platform = detectPlatform();
 const platformLabel = platform === "macos" ? "macOS" : "Windows";
 const availability = reactive<Record<string, ProbeState>>({});
-
-function hrefFor(version: string) {
-  return installerUrl(platform, version);
-}
+const hrefByVersion = reactive<Record<string, string>>({});
 
 function isLatest(version: string) {
   return version === latestVersion.value;
 }
 
 async function probeVersions(versions: string[]) {
-  const targets = versions.filter((version) => !isLatest(version));
   await Promise.all(
-    targets.map(async (version) => {
+    versions.map(async (version) => {
       if (availability[version] === "available" || availability[version] === "missing") {
         return;
       }
       availability[version] = "checking";
-      const ok = await probeInstallerAvailable(hrefFor(version));
-      availability[version] = ok ? "available" : "missing";
+      const url = await resolveInstallerUrl(platform, version);
+      if (url) {
+        hrefByVersion[version] = url;
+        availability[version] = "available";
+      } else {
+        availability[version] = "missing";
+      }
     }),
   );
 }
@@ -70,9 +70,9 @@ onMounted(() => {
             <div class="version display-font">{{ entry.version }}</div>
             <span v-if="isLatest(entry.version)" class="dl-latest">当前最新版本</span>
             <a
-              v-else-if="availability[entry.version] === 'available'"
+              v-if="availability[entry.version] === 'available'"
               class="dl-btn"
-              :href="hrefFor(entry.version)"
+              :href="hrefByVersion[entry.version]"
               :title="`下载 ${platformLabel} 安装包（v${entry.version}）`"
             >
               下载{{ platformLabel }}安装包
