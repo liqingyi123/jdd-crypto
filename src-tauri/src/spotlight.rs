@@ -4,7 +4,7 @@ use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use serde::Serialize;
 use tauri::{
@@ -26,15 +26,10 @@ const SHORTCUT_KEY: &str = "spotlightShortcut";
 const PREF_KEY: &str = "spotlightEnabled";
 const SHAKE_KEY: &str = "spotlightShakeEnabled";
 const SIZE_KEY: &str = "spotlightSize";
-const CURSOR_INTERVAL: Duration = Duration::from_millis(16);
 const KEY_ARM_DELAY: Duration = Duration::from_millis(350);
-const SHAKE_WINDOW: Duration = Duration::from_millis(800);
-const SHAKE_MIN_DELTA: i32 = 80;
-const SHAKE_REVERSALS_NEEDED: u8 = 4;
 
 static ACTIVE: AtomicBool = AtomicBool::new(false);
 static KEY_EXIT_ARMED: AtomicBool = AtomicBool::new(false);
-static LOOP_STARTED: AtomicBool = AtomicBool::new(false);
 static APP_FOR_SPOTLIGHT: OnceLock<AppHandle> = OnceLock::new();
 
 #[cfg(windows)]
@@ -222,7 +217,8 @@ pub fn apply_pref(app: &AppHandle, enabled: bool) {
     if !enabled {
         hide(app);
     }
-    ensure_loop(app);
+    crate::cursor_hub::ensure_started(app);
+    crate::cursor_hub::wake();
     let _ = global_shortcuts::register_all(app);
 }
 
@@ -232,7 +228,8 @@ pub fn apply_shake_pref(app: &AppHandle, enabled: bool) {
         .spotlight_shake_enabled
         .store(enabled, Ordering::Relaxed);
     save_shake_pref(app, enabled);
-    ensure_loop(app);
+    crate::cursor_hub::ensure_started(app);
+    crate::cursor_hub::wake();
 }
 
 pub fn handle_shortcut(app: &AppHandle, shortcut: &Shortcut) {
@@ -277,7 +274,8 @@ pub fn show(app: &AppHandle) {
     KEY_EXIT_ARMED.store(false, Ordering::Relaxed);
     let state = app.state::<AppState>();
     state.spotlight_active.store(true, Ordering::Relaxed);
-    ensure_loop(app);
+    crate::cursor_hub::ensure_started(app);
+    crate::cursor_hub::wake();
     sync_overlays(app, true);
     emit_pref(app);
     arm_key_exit_later(app);
@@ -298,6 +296,7 @@ pub fn hide(app: &AppHandle) {
     state.spotlight_active.store(false, Ordering::Relaxed);
     sync_overlays(app, false);
     crate::mouse_trail::resume_after_screensaver(app);
+    crate::cursor_hub::wake();
 }
 
 pub fn on_display_changed(app: &AppHandle) {
@@ -340,16 +339,7 @@ pub fn init_from_store(app: &AppHandle) {
         *current = shortcut;
     }
     crate::mouse_trail::ensure_display_listener(app);
-    ensure_loop(app);
-}
-
-fn ensure_loop(app: &AppHandle) {
-    let _ = APP_FOR_SPOTLIGHT.set(app.clone());
-    if LOOP_STARTED.swap(true, Ordering::Relaxed) {
-        return;
-    }
-    let handle = app.clone();
-    thread::spawn(move || cursor_and_shake_loop(handle));
+    crate::cursor_hub::ensure_started(app);
 }
 
 fn arm_key_exit_later(app: &AppHandle) {
@@ -366,6 +356,18 @@ fn arm_key_exit_later(app: &AppHandle) {
         }
         let _ = handle;
     });
+}
+
+pub fn key_exit_armed() -> bool {
+    KEY_EXIT_ARMED.load(Ordering::Relaxed)
+}
+
+pub fn any_physical_key_down_public() -> bool {
+    any_physical_key_down()
+}
+
+pub fn request_hide_from_hook_public() {
+    request_hide_from_hook();
 }
 
 #[cfg(windows)]
@@ -472,177 +474,6 @@ fn sync_overlays(app: &AppHandle, visible: bool) {
             let _ = win.show();
         }
     }
-}
-
-fn cursor_and_shake_loop(app: AppHandle) {
-    let mut last_emit: Option<(i32, i32)> = None;
-    let mut last_pos: Option<(i32, i32)> = None;
-    let mut axis: i8 = 0; // 1 = horizontal, 2 = vertical
-    let mut direction: i8 = 0;
-    let mut reversals: u8 = 0;
-    let mut window_start: Option<Instant> = None;
-    let mut accum: i32 = 0;
-    let mut prev_any_key = false;
-
-    loop {
-        let state = app.state::<AppState>();
-        let pref = state.spotlight_pref_enabled.load(Ordering::Relaxed);
-        let shake = state.spotlight_shake_enabled.load(Ordering::Relaxed);
-        let active = is_active();
-
-        if !pref {
-            last_emit = None;
-            prev_any_key = false;
-            reset_shake(
-                &mut last_pos,
-                &mut axis,
-                &mut direction,
-                &mut reversals,
-                &mut window_start,
-                &mut accum,
-            );
-            thread::sleep(Duration::from_millis(200));
-            continue;
-        }
-
-        if active {
-            reset_shake(
-                &mut last_pos,
-                &mut axis,
-                &mut direction,
-                &mut reversals,
-                &mut window_start,
-                &mut accum,
-            );
-            if let Some((x, y)) = crate::windows::cursor_pos_public() {
-                if last_emit != Some((x, y)) {
-                    last_emit = Some((x, y));
-                    let payload = SpotlightCursor { x, y };
-                    let _ = app.emit_filter("app://spotlight-cursor", payload, is_overlay_target);
-                }
-            }
-            // Fallback when LL hook is dead: rising edge of any key while armed.
-            if KEY_EXIT_ARMED.load(Ordering::Relaxed) {
-                let down = any_physical_key_down();
-                if down && !prev_any_key {
-                    request_hide_from_hook();
-                }
-                prev_any_key = down;
-            } else {
-                prev_any_key = any_physical_key_down();
-            }
-            thread::sleep(CURSOR_INTERVAL);
-            continue;
-        }
-
-        last_emit = None;
-        prev_any_key = false;
-        if !shake || crate::screensaver::is_active() {
-            reset_shake(
-                &mut last_pos,
-                &mut axis,
-                &mut direction,
-                &mut reversals,
-                &mut window_start,
-                &mut accum,
-            );
-            thread::sleep(Duration::from_millis(100));
-            continue;
-        }
-
-        if let Some((x, y)) = crate::windows::cursor_pos_public() {
-            if let Some((px, py)) = last_pos {
-                let dx = x - px;
-                let dy = y - py;
-                if dx.abs() >= 2 || dy.abs() >= 2 {
-                    let use_x = dx.abs() >= dy.abs();
-                    let next_axis: i8 = if use_x { 1 } else { 2 };
-                    let delta = if use_x { dx } else { dy };
-                    let next_dir: i8 = if delta > 0 { 1 } else { -1 };
-
-                    if axis != 0 && next_axis != axis {
-                        // Dominant axis changed — restart stroke accum on new axis.
-                        axis = next_axis;
-                        direction = next_dir;
-                        accum = delta;
-                        if window_start.is_none() {
-                            window_start = Some(Instant::now());
-                        }
-                    } else {
-                        axis = next_axis;
-                        accum += delta;
-                        if direction == 0 {
-                            direction = next_dir;
-                            window_start = Some(Instant::now());
-                            accum = delta;
-                        } else if next_dir != direction {
-                            if accum.abs() >= SHAKE_MIN_DELTA {
-                                reversals = reversals.saturating_add(1);
-                                direction = next_dir;
-                                accum = delta;
-                                let expired = window_start
-                                    .map(|start| start.elapsed() > SHAKE_WINDOW)
-                                    .unwrap_or(true);
-                                if expired {
-                                    reversals = 1;
-                                    window_start = Some(Instant::now());
-                                } else if reversals >= SHAKE_REVERSALS_NEEDED {
-                                    reset_shake(
-                                        &mut last_pos,
-                                        &mut axis,
-                                        &mut direction,
-                                        &mut reversals,
-                                        &mut window_start,
-                                        &mut accum,
-                                    );
-                                    let handle = app.clone();
-                                    let _ = handle.clone().run_on_main_thread(move || {
-                                        show(&handle);
-                                    });
-                                    thread::sleep(Duration::from_millis(400));
-                                    continue;
-                                }
-                            } else {
-                                direction = next_dir;
-                                accum = delta;
-                            }
-                        }
-                    }
-                }
-            }
-            last_pos = Some((x, y));
-            if let Some(start) = window_start {
-                if start.elapsed() > SHAKE_WINDOW {
-                    reset_shake(
-                        &mut last_pos,
-                        &mut axis,
-                        &mut direction,
-                        &mut reversals,
-                        &mut window_start,
-                        &mut accum,
-                    );
-                    last_pos = Some((x, y));
-                }
-            }
-        }
-        thread::sleep(Duration::from_millis(20));
-    }
-}
-
-fn reset_shake(
-    last_pos: &mut Option<(i32, i32)>,
-    axis: &mut i8,
-    direction: &mut i8,
-    reversals: &mut u8,
-    window_start: &mut Option<Instant>,
-    accum: &mut i32,
-) {
-    *last_pos = None;
-    *axis = 0;
-    *direction = 0;
-    *reversals = 0;
-    *window_start = None;
-    *accum = 0;
 }
 
 #[cfg(windows)]

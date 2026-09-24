@@ -5,6 +5,7 @@ mod brightness_quick;
 mod clipboard;
 mod commands;
 mod compare_mode;
+mod cursor_hub;
 mod global_shortcuts;
 mod hosts_manager;
 mod hosts_quick;
@@ -173,6 +174,7 @@ pub fn run() {
             commands::set_spotlight_shortcut,
             commands::get_spotlight_size,
             commands::get_spotlight_cursor,
+            commands::peek_cursor_hub,
             commands::set_spotlight_size,
             commands::get_spotlight_monitor_bounds,
             commands::check_app_update,

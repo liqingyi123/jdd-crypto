@@ -821,9 +821,17 @@ pub fn get_spotlight_size(state: State<AppState>) -> u32 {
 }
 
 #[tauri::command]
+pub fn peek_cursor_hub() -> crate::cursor_hub::CursorHubSnapshot {
+    crate::cursor_hub::peek()
+}
+
+#[tauri::command]
 pub fn get_spotlight_cursor() -> Option<crate::spotlight::SpotlightCursor> {
-    crate::windows::cursor_pos_public()
-        .map(|(x, y)| crate::spotlight::SpotlightCursor { x, y })
+    let snap = crate::cursor_hub::peek();
+    Some(crate::spotlight::SpotlightCursor {
+        x: snap.x,
+        y: snap.y,
+    })
 }
 
 #[tauri::command]

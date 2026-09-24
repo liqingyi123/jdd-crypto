@@ -2,6 +2,7 @@
 import { nextTick, onMounted, onUnmounted, ref, shallowRef } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import OverlayToast from "@/components/overlay-toast.vue";
+import { useCursorHub } from "@/composables/use-cursor-hub";
 import { useOverlayToast } from "@/composables/use-overlay-toast";
 import { MeteorTrail } from "@/effects/meteor-trail";
 import { RibbonTrail } from "@/effects/ribbon-trail";
@@ -45,7 +46,6 @@ const trail = shallowRef<MouseTrailEngine | null>(null);
 const effect = shallowRef<MouseTrailEffect>(DEFAULT_MOUSE_TRAIL_PREF.effect);
 const colors = shallowRef<MouseTrailColors>({ ...DEFAULT_MOUSE_TRAIL_COLORS });
 const { toastText, showToast } = useOverlayToast();
-let unlistenCursor: (() => void) | undefined;
 let unlistenPref: (() => void) | undefined;
 let unlistenMonitors: (() => void) | undefined;
 let unlistenSwitched: (() => void) | undefined;
@@ -173,6 +173,13 @@ function applyCursor(payload: CursorPayload) {
   }
 }
 
+function leaveMonitor() {
+  if (wasInside) {
+    wasInside = false;
+    trail.value?.leaveScreen();
+  }
+}
+
 function showSwitchToast(payload: TrailSwitchedPayload) {
   const label = payload.label?.trim();
   if (!label) {
@@ -180,6 +187,12 @@ function showSwitchToast(payload: TrailSwitchedPayload) {
   }
   showToast(`鼠标拖尾特效已切换至${label}`);
 }
+
+useCursorHub({
+  labelPrefix: "mouse-trail-",
+  onCursor: applyCursor,
+  onLeaveMonitor: leaveMonitor,
+});
 
 onMounted(async () => {
   try {
@@ -205,9 +218,6 @@ onMounted(async () => {
 
   try {
     const { listen } = await import("@tauri-apps/api/event");
-    unlistenCursor = await listen<CursorPayload>("app://mouse-trail-cursor", (event) => {
-      applyCursor(event.payload);
-    });
     unlistenPref = await listen<MouseTrailPref>("app://mouse-trail-pref", (event) => {
       applyPref(event.payload);
     });
@@ -226,7 +236,6 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  unlistenCursor?.();
   unlistenPref?.();
   unlistenMonitors?.();
   unlistenSwitched?.();

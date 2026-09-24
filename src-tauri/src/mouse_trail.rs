@@ -48,22 +48,12 @@ const TRAIL_EFFECTS: [&str; 6] = [
 static TRAIL_CHORD_ARMED: AtomicBool = AtomicBool::new(false);
 static TRAIL_SHORTCUT_IDS: OnceLock<(u32, [u32; 6])> = OnceLock::new();
 
-static CURSOR_LOOP_STARTED: AtomicBool = AtomicBool::new(false);
-static CURSOR_LOOP_THREAD: OnceLock<thread::Thread> = OnceLock::new();
-static CURSOR_INTERVAL_MS: AtomicU64 = AtomicU64::new(INTERVAL_BALANCED_MS);
 static TRAIL_ENABLED: AtomicBool = AtomicBool::new(false);
 /// Runtime suppress while screensaver is active (does not change user pref).
 static TRAIL_SUPPRESSED: AtomicBool = AtomicBool::new(false);
 static DISPLAY_LISTENER_STARTED: AtomicBool = AtomicBool::new(false);
 static DISPLAY_CHANGE_SEQ: AtomicU64 = AtomicU64::new(0);
 static APP_FOR_DISPLAY: OnceLock<AppHandle> = OnceLock::new();
-
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MouseTrailCursor {
-    pub x: i32,
-    pub y: i32,
-}
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -212,7 +202,7 @@ fn interval_ms_for_mode(mode: &str) -> u64 {
 }
 
 fn apply_cursor_interval(mode: &str) {
-    CURSOR_INTERVAL_MS.store(interval_ms_for_mode(mode), Ordering::Relaxed);
+    crate::cursor_hub::set_paint_interval_ms(interval_ms_for_mode(mode));
 }
 
 fn normalize_color(raw: &str, fallback: &str) -> String {
@@ -528,6 +518,10 @@ fn trail_visually_active() -> bool {
     TRAIL_ENABLED.load(Ordering::Relaxed) && !TRAIL_SUPPRESSED.load(Ordering::Relaxed)
 }
 
+pub fn is_visually_active() -> bool {
+    trail_visually_active()
+}
+
 /// Hide trail overlays while screensaver is on; keeps user `enabled` pref intact.
 pub fn pause_for_screensaver(app: &AppHandle) {
     TRAIL_SUPPRESSED.store(true, Ordering::Relaxed);
@@ -537,7 +531,7 @@ pub fn pause_for_screensaver(app: &AppHandle) {
 /// Restore trail overlays after screensaver if user preference is still enabled.
 pub fn resume_after_screensaver(app: &AppHandle) {
     TRAIL_SUPPRESSED.store(false, Ordering::Relaxed);
-    wake_cursor_loop();
+    crate::cursor_hub::wake();
     if TRAIL_ENABLED.load(Ordering::Relaxed) {
         schedule_set_overlays_hidden(app, false);
     }
@@ -548,10 +542,8 @@ pub fn resume_after_screensaver(app: &AppHandle) {
 pub fn set_enabled(app: &AppHandle, enabled: bool) {
     ensure_display_listener(app);
     TRAIL_ENABLED.store(enabled, Ordering::Relaxed);
-    ensure_cursor_loop(app);
-    if trail_visually_active() {
-        wake_cursor_loop();
-    }
+    crate::cursor_hub::ensure_started(app);
+    crate::cursor_hub::wake();
     schedule_sync_overlays(app, trail_visually_active());
 }
 
@@ -755,45 +747,6 @@ pub fn monitor_bounds(app: &AppHandle, label: &str) -> Option<MouseTrailMonitorB
         height: work.size.height,
         scale_factor: monitor.scale_factor(),
     })
-}
-
-fn wake_cursor_loop() {
-    if let Some(handle) = CURSOR_LOOP_THREAD.get() {
-        handle.unpark();
-    }
-}
-
-fn ensure_cursor_loop(app: &AppHandle) {
-    if CURSOR_LOOP_STARTED.swap(true, Ordering::Relaxed) {
-        return;
-    }
-    let handle = app.clone();
-    thread::spawn(move || cursor_loop(handle));
-}
-
-fn cursor_loop(app: AppHandle) {
-    let _ = CURSOR_LOOP_THREAD.set(thread::current());
-    let mut last: Option<(i32, i32)> = None;
-    loop {
-        if !trail_visually_active() {
-            last = None;
-            while !trail_visually_active() {
-                // Timeout avoids permanent hang if unpark races before park.
-                thread::park_timeout(Duration::from_millis(200));
-            }
-            continue;
-        }
-        if let Some((x, y)) = crate::windows::cursor_pos_public() {
-            if last != Some((x, y)) {
-                last = Some((x, y));
-                let payload = MouseTrailCursor { x, y };
-                let _ = app.emit_filter("app://mouse-trail-cursor", payload, is_overlay_target);
-            }
-        }
-        // Interval follows performance mode (eco/balanced/perf).
-        let interval = CURSOR_INTERVAL_MS.load(Ordering::Relaxed).max(1);
-        thread::sleep(Duration::from_millis(interval));
-    }
 }
 
 #[cfg(windows)]

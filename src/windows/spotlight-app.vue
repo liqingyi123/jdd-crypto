@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted, shallowRef } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { useCursorHub } from "@/composables/use-cursor-hub";
 
 interface MonitorBounds {
   x: number;
@@ -38,7 +39,6 @@ const radiusPx = shallowRef(DEFAULT_SIZE);
 
 let bounds: MonitorBounds | null = null;
 let windowLabel = "";
-let unlistenCursor: UnlistenFn | null = null;
 let unlistenPref: UnlistenFn | null = null;
 
 function clampSize(raw: number): number {
@@ -96,23 +96,23 @@ function onCursor(payload: CursorPayload) {
   holeY.value = `${(payload.y - area.y) / scale}px`;
 }
 
+function leaveMonitor() {
+  holeX.value = "-9999px";
+  holeY.value = "-9999px";
+}
+
+useCursorHub({
+  labelPrefix: "spotlight-",
+  onCursor,
+  onLeaveMonitor: leaveMonitor,
+});
+
 onMounted(async () => {
   await refreshBounds();
   try {
     applySize(await invoke<number>("get_spotlight_size"));
   } catch {
     applySize(DEFAULT_SIZE);
-  }
-  try {
-    unlistenCursor = await listen<CursorPayload>("app://spotlight-cursor", (event) => {
-      onCursor(event.payload);
-    });
-    const initial = await invoke<CursorPayload | null>("get_spotlight_cursor");
-    if (initial) {
-      onCursor(initial);
-    }
-  } catch {
-    // browser preview
   }
   try {
     unlistenPref = await listen<SpotlightPrefPayload>("app://spotlight-pref", (event) => {
@@ -124,14 +124,13 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  void unlistenCursor?.();
   void unlistenPref?.();
 });
 </script>
 
 <template>
   <div
-    class="spotlight-root"
+    class="spotlight"
     :style="{
       '--hole-x': holeX,
       '--hole-y': holeY,
@@ -142,39 +141,28 @@ onUnmounted(() => {
       '--inner-start': String(INNER_START_ALPHA),
       '--outer-start': String(OUTER_START_ALPHA),
     }"
-  >
-    <div class="mask" />
-  </div>
+  />
 </template>
 
 <style scoped>
-.spotlight-root {
+.spotlight {
   position: fixed;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
   pointer-events: none;
-  background: transparent;
-}
-
-.mask {
-  position: absolute;
-  inset: 0;
-  /*
-   * Clear core = --radius (unchanged spotlight hole).
-   * Inner soft: 10px, start alpha midway to mask.
-   * Outer soft: 800px, start alpha near full mask.
-   */
-  background: radial-gradient(
-    circle at var(--hole-x) var(--hole-y),
-    transparent 0,
-    transparent var(--radius),
-    rgba(0, 0, 0, var(--inner-start)) var(--radius),
-    rgba(0, 0, 0, var(--outer-start)) calc(var(--radius) + var(--inner-feather)),
-    rgba(0, 0, 0, var(--mask-alpha))
-      calc(var(--radius) + var(--inner-feather) + var(--outer-feather)),
-    rgba(0, 0, 0, var(--mask-alpha)) 100%
-  );
+  background:
+    radial-gradient(
+      circle at var(--hole-x) var(--hole-y),
+      transparent 0,
+      transparent var(--radius),
+      rgba(0, 0, 0, var(--inner-start)) calc(var(--radius) + var(--inner-feather) * 0.45),
+      rgba(0, 0, 0, var(--mask-alpha)) calc(var(--radius) + var(--inner-feather))
+    ),
+    radial-gradient(
+      circle at var(--hole-x) var(--hole-y),
+      transparent 0,
+      transparent calc(var(--radius) + var(--inner-feather)),
+      rgba(0, 0, 0, var(--outer-start)) calc(var(--radius) + var(--inner-feather) + var(--outer-feather) * 0.35),
+      rgba(0, 0, 0, var(--mask-alpha)) calc(var(--radius) + var(--inner-feather) + var(--outer-feather))
+    );
 }
 </style>

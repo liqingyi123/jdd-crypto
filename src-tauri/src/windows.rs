@@ -63,6 +63,53 @@ fn focus_window(app: &AppHandle, win: &WebviewWindow) {
     crate::mouse_trail::schedule_raise_overlays(app);
 }
 
+/// Center a feature window on the monitor under the cursor (fallback: primary).
+fn center_feature_window(app: &AppHandle, win: &WebviewWindow) {
+    let (cursor_x, cursor_y) = cursor_pos().unwrap_or((0, 0));
+    let monitors = app.available_monitors().unwrap_or_default();
+    let monitor = monitors
+        .iter()
+        .find(|m| {
+            let work = m.work_area();
+            let px = work.position.x;
+            let py = work.position.y;
+            let pw = work.size.width as i32;
+            let ph = work.size.height as i32;
+            cursor_x >= px && cursor_x < px + pw && cursor_y >= py && cursor_y < py + ph
+        })
+        .or_else(|| monitors.first());
+    let Some(monitor) = monitor else {
+        return;
+    };
+    let work = monitor.work_area();
+    let outer = win.outer_size().ok();
+    let (win_w, win_h) = match outer {
+        Some(size) => (size.width as i32, size.height as i32),
+        None => {
+            let scale = monitor.scale_factor();
+            let inner = win.inner_size().ok();
+            match inner {
+                Some(size) => (size.width as i32, size.height as i32),
+                None => (
+                    (720.0 * scale).round() as i32,
+                    (560.0 * scale).round() as i32,
+                ),
+            }
+        }
+    };
+    let max_w = work.size.width as i32;
+    let max_h = work.size.height as i32;
+    let win_w = win_w.min(max_w.saturating_sub(24));
+    let win_h = win_h.min(max_h.saturating_sub(24));
+    let x = work.position.x + (max_w - win_w) / 2;
+    let y = work.position.y + (max_h - win_h) / 2;
+    let _ = win.set_position(PhysicalPosition::new(x, y));
+}
+
+fn should_recenter_on_show(label: &str) -> bool {
+    label == "settings"
+}
+
 pub fn show_main(app: &AppHandle, hint: Option<CryptoHint>) {
     if let Some(win) = app.get_webview_window("main") {
         focus_window(app, &win);
@@ -85,6 +132,9 @@ pub fn show_feature(app: &AppHandle, label: &str) {
     // cold start only pays for badge + main. Closing destroys the webview to
     // reclaim the process; re-open creates a fresh one.
     if let Some(win) = app.get_webview_window(label) {
+        if should_recenter_on_show(label) {
+            center_feature_window(app, &win);
+        }
         focus_window(app, &win);
         return;
     }
@@ -108,6 +158,9 @@ pub fn show_feature(app: &AppHandle, label: &str) {
 
 fn create_feature_window(app: &AppHandle, label: &str) {
     if let Some(win) = app.get_webview_window(label) {
+        if should_recenter_on_show(label) {
+            center_feature_window(app, &win);
+        }
         focus_window(app, &win);
         return;
     }
@@ -127,6 +180,9 @@ fn create_feature_window(app: &AppHandle, label: &str) {
         .build();
 
     if let Ok(win) = result {
+        if should_recenter_on_show(label) {
+            center_feature_window(app, &win);
+        }
         // Allow real close() so WebView process is reclaimed; only raise trail on blur.
         bind_raise_on_blur(&win);
         crate::mouse_trail::schedule_raise_overlays(app);
