@@ -17,6 +17,8 @@ mod overlay_toast;
 mod screensaver;
 mod spotlight;
 mod state;
+mod teamai_cli;
+mod teamai_pref;
 mod tray;
 mod windows;
 
@@ -114,6 +116,16 @@ pub fn run() {
             commands::set_autostart_pref,
             commands::get_intranet_server_base,
             commands::set_intranet_server_base,
+            commands::get_teamai_pref,
+            commands::set_teamai_pref,
+            commands::is_teamai_cli_installed,
+            commands::teamai_cli_version,
+            commands::teamai_cli_upgrade,
+            commands::teamai_cli_pull,
+            commands::teamai_cli_has_push_changes,
+            commands::teamai_cli_push,
+            commands::teamai_cli_deploy,
+            commands::open_teamai_local_dir,
             commands::hosts_list,
             commands::hosts_upsert,
             commands::hosts_refresh,

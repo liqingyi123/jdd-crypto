@@ -34,17 +34,21 @@ const hostRef = ref<HTMLElement | null>(null);
 const editor = shallowRef<monaco.editor.IStandaloneCodeEditor | null>(null);
 const themeStore = useThemeStore();
 const { resolved } = storeToRefs(themeStore);
+let shellLanguageReady = false;
 
 function monacoTheme(theme: string): string {
   return theme === "dark" ? "vs-dark" : "vs";
 }
 
-onMounted(() => {
+onMounted(async () => {
   if (!hostRef.value) {
     return;
   }
   if (props.language === "hosts") {
     registerHostsLanguage(monaco);
+  } else if (props.language === "shell") {
+    await import("monaco-editor/languages/definitions/shell/register");
+    shellLanguageReady = true;
   }
   const instance = monaco.editor.create(hostRef.value, {
     value: model.value,
@@ -101,9 +105,12 @@ watch(model, (value) => {
 
 watch(
   () => props.language,
-  (language) => {
+  async (language) => {
     if (language === "hosts") {
       registerHostsLanguage(monaco);
+    } else if (language === "shell" && !shellLanguageReady) {
+      await import("monaco-editor/languages/definitions/shell/register");
+      shellLanguageReady = true;
     }
     const instance = editor.value;
     const modelRef = instance?.getModel();

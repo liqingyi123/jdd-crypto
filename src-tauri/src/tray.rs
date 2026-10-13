@@ -11,6 +11,7 @@ pub fn build_app_menu<R: Runtime, M: Manager<R>>(app: &M) -> tauri::Result<Menu<
     let settings = MenuItem::with_id(app, "settings", "功能设置", true, None::<&str>)?;
     let show_main = MenuItem::with_id(app, "show_main", "加解密", true, None::<&str>)?;
     let hosts = MenuItem::with_id(app, "hosts", "Host管理", true, None::<&str>)?;
+    let ai = MenuItem::with_id(app, "ai", "AI相关", true, None::<&str>)?;
     let brightness = MenuItem::with_id(app, "brightness", "亮度调节", true, None::<&str>)?;
     let screensaver_item = MenuItem::with_id(app, "screensaver", "屏幕保护", true, None::<&str>)?;
     let about = MenuItem::with_id(app, "about", "关于", true, None::<&str>)?;
@@ -23,6 +24,7 @@ pub fn build_app_menu<R: Runtime, M: Manager<R>>(app: &M) -> tauri::Result<Menu<
             &settings,
             &show_main,
             &hosts,
+            &ai,
             &brightness,
             &screensaver_item,
             &about,
@@ -37,6 +39,7 @@ pub fn handle_menu_id(app: &AppHandle, id: &str) {
         "show_main" => windows::show_main(app, None),
         "settings" => windows::show_feature(app, "settings"),
         "hosts" => windows::show_feature(app, "hosts"),
+        "ai" => windows::show_feature(app, "ai"),
         "brightness" => brightness_quick::show(app),
         "screensaver" => screensaver::show(app),
         "about" => windows::show_feature(app, "about"),

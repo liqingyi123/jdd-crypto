@@ -4,6 +4,7 @@ import { useSystemTheme } from "@/composables/use-system-theme";
 import Settings from "@/views/settings.vue";
 import About from "@/views/about.vue";
 import Hosts from "@/views/hosts.vue";
+import AiRelated from "@/views/ai-related.vue";
 import zhCn from "element-plus/es/locale/lang/zh-cn";
 
 useSystemTheme();
@@ -16,11 +17,15 @@ const pages: Record<string, { title: string; component: Component }> = {
   settings: { title: "功能设置", component: Settings },
   about: { title: "关于", component: About },
   hosts: { title: "Host管理", component: Hosts },
+  ai: { title: "AI相关", component: AiRelated },
 };
 
 const page = computed(() => pages[props.windowLabel]);
 const fillContent = computed(
-  () => props.windowLabel === "hosts" || props.windowLabel === "settings",
+  () =>
+    props.windowLabel === "hosts" ||
+    props.windowLabel === "settings" ||
+    props.windowLabel === "ai",
 );
 </script>
 
