@@ -13,7 +13,6 @@ declare module 'vue' {
   export interface GlobalComponents {
     AppUpdateDialog: typeof import('./components/app-update-dialog.vue')['default']
     AppUpdateHost: typeof import('./components/app-update-host.vue')['default']
-    ElAlert: typeof import('element-plus/es')['ElAlert']
     ElButton: typeof import('element-plus/es')['ElButton']
     ElColorPicker: typeof import('element-plus/es')['ElColorPicker']
     ElConfigProvider: typeof import('element-plus/es')['ElConfigProvider']
