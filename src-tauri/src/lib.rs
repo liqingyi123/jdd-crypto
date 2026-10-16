@@ -6,6 +6,7 @@ mod clipboard;
 mod commands;
 mod compare_mode;
 mod cursor_hub;
+mod essentials;
 mod global_shortcuts;
 mod hosts_manager;
 mod hosts_quick;
@@ -193,6 +194,18 @@ pub fn run() {
             commands::download_app_update,
             commands::install_app_update,
             commands::take_pending_app_update,
+            commands::open_or_download_essential,
+            commands::download_essential_asset,
+            commands::essentials_vpn_doc_url,
+            commands::essentials_cache_dir,
+            commands::open_essentials_cache_dir,
+            commands::essentials_volta_status,
+            commands::essentials_volta_install,
+            commands::essentials_volta_upgrade,
+            commands::essentials_volta_install_base,
+            commands::essentials_volta_enable_pnpm,
+            commands::essentials_volta_list,
+            commands::essentials_volta_install_pkg,
         ])
         .setup(|app| {
             let badge_size = windows::load_badge_size(app.handle());

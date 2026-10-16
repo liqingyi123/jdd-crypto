@@ -61,9 +61,30 @@ pub fn hosts_preset_url(app: &AppHandle) -> String {
     format!("{}/swh_data.json", resource_base(app))
 }
 
+fn encode_relative_path(relative: &str) -> String {
+    let rel = relative.trim().trim_start_matches('/');
+    if rel.is_empty() {
+        return String::new();
+    }
+    rel.split('/')
+        .map(|seg| urlencoding::encode(seg).into_owned())
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
+/// Join intranet server base with a relative path (each segment URL-encoded).
+pub fn join_url(app: &AppHandle, relative: &str) -> String {
+    let base = load_base(app);
+    let encoded = encode_relative_path(relative);
+    if encoded.is_empty() {
+        return base;
+    }
+    format!("{base}{encoded}")
+}
+
 #[cfg(test)]
 mod tests {
-    use super::normalize_base;
+    use super::{encode_relative_path, normalize_base};
 
     #[test]
     fn normalize_adds_trailing_slash() {
@@ -84,5 +105,15 @@ mod tests {
     #[test]
     fn normalize_rejects_non_http() {
         assert!(normalize_base("ftp://example.com").is_err());
+    }
+
+    #[test]
+    fn encode_relative_encodes_cjk_segments() {
+        let encoded = encode_relative_path(
+            "appStore/Software/PC/Windows效率提升、系统重装、系统激活/zr.exe",
+        );
+        assert!(encoded.ends_with("/zr.exe"));
+        assert!(!encoded.contains('效'));
+        assert!(encoded.contains("%"));
     }
 }

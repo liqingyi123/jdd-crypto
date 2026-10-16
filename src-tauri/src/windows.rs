@@ -51,6 +51,14 @@ fn feature_spec(label: &str) -> Option<FeatureSpec> {
             min_width: 560.0,
             min_height: 480.0,
         }),
+        "essentials" => Some(FeatureSpec {
+            label: "essentials",
+            title: "装机必备",
+            width: 880.0,
+            height: 720.0,
+            min_width: 720.0,
+            min_height: 560.0,
+        }),
         "about" => Some(FeatureSpec {
             label: "about",
             title: "关于",
