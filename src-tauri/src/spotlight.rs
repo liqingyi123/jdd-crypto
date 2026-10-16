@@ -8,8 +8,8 @@ use std::time::Duration;
 
 use serde::Serialize;
 use tauri::{
-    AppHandle, Emitter, EventTarget, LogicalSize, Manager, PhysicalPosition, WebviewUrl,
-    WebviewWindowBuilder, window::Color,
+    window::Color, AppHandle, Emitter, EventTarget, LogicalSize, Manager, PhysicalPosition,
+    WebviewUrl, WebviewWindowBuilder,
 };
 use tauri_plugin_global_shortcut::Shortcut;
 use tauri_plugin_store::StoreExt;
@@ -283,7 +283,12 @@ pub fn show(app: &AppHandle) {
 }
 
 pub fn hide(app: &AppHandle) {
-    if !is_active() && !app.state::<AppState>().spotlight_active.load(Ordering::Relaxed) {
+    if !is_active()
+        && !app
+            .state::<AppState>()
+            .spotlight_active
+            .load(Ordering::Relaxed)
+    {
         KEY_EXIT_ARMED.store(false, Ordering::Relaxed);
         stop_keyboard_hook();
         return;
@@ -328,9 +333,7 @@ pub fn init_from_store(app: &AppHandle) {
     let shake = load_shake_pref(app);
     let shortcut = load_shortcut(app);
     let size = load_size(app);
-    state
-        .spotlight_pref_enabled
-        .store(pref, Ordering::Relaxed);
+    state.spotlight_pref_enabled.store(pref, Ordering::Relaxed);
     state
         .spotlight_shake_enabled
         .store(shake, Ordering::Relaxed);
@@ -376,7 +379,8 @@ fn any_physical_key_down() -> bool {
 
     // High bit set => key currently down. Scan common VKs + modifiers.
     const VKS: &[i32] = &[
-        0x08, 0x09, 0x0D, 0x10, 0x11, 0x12, 0x1B, 0x20, // backspace tab enter shift ctrl alt esc space
+        0x08, 0x09, 0x0D, 0x10, 0x11, 0x12, 0x1B,
+        0x20, // backspace tab enter shift ctrl alt esc space
         0x25, 0x26, 0x27, 0x28, // arrows
         0x2D, 0x2E, // insert delete
         0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, // L/R shift ctrl alt
@@ -493,18 +497,12 @@ fn start_keyboard_hook() {
 
         const LLKHF_UP: u32 = 0x80;
 
-        unsafe extern "system" fn hook_proc(
-            code: i32,
-            wparam: WPARAM,
-            lparam: LPARAM,
-        ) -> LRESULT {
+        unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
             if code >= 0 {
                 let msg = wparam as u32;
                 let info = &*(lparam as *const KBDLLHOOKSTRUCT);
                 let vk = (info.vkCode & 0xFF) as usize;
-                let is_up = msg == WM_KEYUP
-                    || msg == WM_SYSKEYUP
-                    || (info.flags & LLKHF_UP) != 0;
+                let is_up = msg == WM_KEYUP || msg == WM_SYSKEYUP || (info.flags & LLKHF_UP) != 0;
                 if let Ok(mut map) = keys_down_map().lock() {
                     if is_up {
                         map[vk] = false;

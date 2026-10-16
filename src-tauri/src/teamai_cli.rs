@@ -253,10 +253,7 @@ pub fn has_push_changes() -> Result<bool, String> {
         &["status", "--porcelain", "--", "rules", "skills", "mcp"],
     )?;
     if !out.ok {
-        return Err(format!(
-            "git status 失败\n{}",
-            out.combined.trim_end()
-        ));
+        return Err(format!("git status 失败\n{}", out.combined.trim_end()));
     }
     Ok(!out.combined.trim().is_empty())
 }
@@ -546,10 +543,7 @@ pub fn resolve_team_repo_dir() -> Result<PathBuf, String> {
         .ok_or_else(|| "未能从 teamai status 解析 local 目录".to_string())?;
     let path = PathBuf::from(path);
     if !is_git_repo_dir(&path) {
-        return Err(format!(
-            "本地目录不是有效的 git 仓库: {}",
-            path.display()
-        ));
+        return Err(format!("本地目录不是有效的 git 仓库: {}", path.display()));
     }
     Ok(path)
 }
@@ -566,8 +560,7 @@ fn open_path_dir(app: &AppHandle, path: &Path) -> Result<(), String> {
 }
 
 fn default_team_repo_dir() -> Option<PathBuf> {
-    let home = std::env::var_os("USERPROFILE")
-        .or_else(|| std::env::var_os("HOME"))?;
+    let home = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME"))?;
     Some(PathBuf::from(home).join(".teamai").join("team-repo"))
 }
 
@@ -850,7 +843,8 @@ impl LogBuf {
 fn paths_equal(a: &Path, b: &Path) -> bool {
     #[cfg(windows)]
     {
-        a.to_string_lossy().eq_ignore_ascii_case(&b.to_string_lossy())
+        a.to_string_lossy()
+            .eq_ignore_ascii_case(&b.to_string_lossy())
     }
     #[cfg(not(windows))]
     {
@@ -1076,7 +1070,9 @@ fn effective_path() -> Option<String> {
             }
         }
         parts.extend(std::env::split_paths(&current));
-        std::env::join_paths(parts).ok().map(|p| p.to_string_lossy().into_owned())
+        std::env::join_paths(parts)
+            .ok()
+            .map(|p| p.to_string_lossy().into_owned())
     }
 }
 
@@ -1168,8 +1164,14 @@ fn read_registry_path(
         let name = windows_sys::core::w!("Path");
         let mut ty = 0u32;
         let mut size = 0u32;
-        let probe =
-            RegQueryValueExW(hkey, name, std::ptr::null_mut(), &mut ty, std::ptr::null_mut(), &mut size);
+        let probe = RegQueryValueExW(
+            hkey,
+            name,
+            std::ptr::null_mut(),
+            &mut ty,
+            std::ptr::null_mut(),
+            &mut size,
+        );
         if probe != ERROR_SUCCESS || size == 0 {
             RegCloseKey(hkey);
             return None;

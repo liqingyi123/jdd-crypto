@@ -7,8 +7,8 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use tauri::{
-    AppHandle, Emitter, EventTarget, LogicalSize, Manager, PhysicalPosition, WebviewUrl,
-    WebviewWindowBuilder, window::Color,
+    window::Color, AppHandle, Emitter, EventTarget, LogicalSize, Manager, PhysicalPosition,
+    WebviewUrl, WebviewWindowBuilder,
 };
 use tauri_plugin_global_shortcut::Shortcut;
 use tauri_plugin_store::StoreExt;

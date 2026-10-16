@@ -96,10 +96,7 @@ mod tests {
 
     #[test]
     fn normalize_empty_uses_default() {
-        assert_eq!(
-            normalize_base("  ").unwrap(),
-            super::DEFAULT_SERVER_BASE
-        );
+        assert_eq!(normalize_base("  ").unwrap(), super::DEFAULT_SERVER_BASE);
     }
 
     #[test]
@@ -109,9 +106,8 @@ mod tests {
 
     #[test]
     fn encode_relative_encodes_cjk_segments() {
-        let encoded = encode_relative_path(
-            "appStore/Software/PC/Windows效率提升、系统重装、系统激活/zr.exe",
-        );
+        let encoded =
+            encode_relative_path("appStore/Software/PC/Windows效率提升、系统重装、系统激活/zr.exe");
         assert!(encoded.ends_with("/zr.exe"));
         assert!(!encoded.contains('效'));
         assert!(encoded.contains("%"));

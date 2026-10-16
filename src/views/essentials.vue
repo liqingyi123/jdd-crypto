@@ -3,6 +3,7 @@ import { computed, onMounted, shallowRef } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { ElMessage, ElMessageBox } from "element-plus";
+import EssentialsDownloadProgress from "@/components/essentials-download-progress.vue";
 import MonacoEditor from "@/components/monaco-editor.vue";
 import { useEssentialsDownload } from "@/composables/use-essentials-download";
 
@@ -67,10 +68,6 @@ const AV_ERROR_MARKERS = [
 
 const {
   activeId,
-  progressPercent,
-  downloadedLabel,
-  totalLabel,
-  totalBytes,
   end: endDownload,
   ensureProgressListener,
 } = useEssentialsDownload();
@@ -453,18 +450,7 @@ onMounted(() => {
           驱动管理程序
         </ElButton>
       </div>
-      <div v-if="showOsProgress" class="download-progress">
-        <p class="progress-hint">{{ progressHint }}</p>
-        <ElProgress
-          :percentage="totalBytes ? progressPercent : undefined"
-          :indeterminate="!totalBytes"
-          :stroke-width="10"
-        />
-        <p class="progress-meta">
-          已下载 {{ downloadedLabel }}
-          <template v-if="totalLabel"> / {{ totalLabel }}</template>
-        </p>
-      </div>
+      <EssentialsDownloadProgress v-if="showOsProgress" :hint="progressHint" />
     </section>
 
     <section class="section">
@@ -481,18 +467,7 @@ onMounted(() => {
           远程办公VPN安装文档
         </ElButton>
       </div>
-      <div v-if="showNetworkProgress" class="download-progress">
-        <p class="progress-hint">{{ progressHint }}</p>
-        <ElProgress
-          :percentage="totalBytes ? progressPercent : undefined"
-          :indeterminate="!totalBytes"
-          :stroke-width="10"
-        />
-        <p class="progress-meta">
-          已下载 {{ downloadedLabel }}
-          <template v-if="totalLabel"> / {{ totalLabel }}</template>
-        </p>
-      </div>
+      <EssentialsDownloadProgress v-if="showNetworkProgress" :hint="progressHint" />
     </section>
 
     <section class="section volta-section">
@@ -564,18 +539,7 @@ onMounted(() => {
         </ElButton>
       </div>
 
-      <div v-if="showVoltaProgress" class="download-progress">
-        <p class="progress-hint">{{ progressHint }}</p>
-        <ElProgress
-          :percentage="totalBytes ? progressPercent : undefined"
-          :indeterminate="!totalBytes"
-          :stroke-width="10"
-        />
-        <p class="progress-meta">
-          已下载 {{ downloadedLabel }}
-          <template v-if="totalLabel"> / {{ totalLabel }}</template>
-        </p>
-      </div>
+      <EssentialsDownloadProgress v-if="showVoltaProgress" :hint="progressHint" />
 
       <template v-if="voltaLogVisible">
         <div class="log-head">
@@ -625,18 +589,7 @@ onMounted(() => {
           {{ item.label }}
         </ElButton>
       </div>
-      <div v-if="showEditorProgress" class="download-progress">
-        <p class="progress-hint">{{ progressHint }}</p>
-        <ElProgress
-          :percentage="totalBytes ? progressPercent : undefined"
-          :indeterminate="!totalBytes"
-          :stroke-width="10"
-        />
-        <p class="progress-meta">
-          已下载 {{ downloadedLabel }}
-          <template v-if="totalLabel"> / {{ totalLabel }}</template>
-        </p>
-      </div>
+      <EssentialsDownloadProgress v-if="showEditorProgress" :hint="progressHint" />
     </section>
 
     <section class="section">
@@ -656,18 +609,7 @@ onMounted(() => {
           {{ item.label }}
         </ElButton>
       </div>
-      <div v-if="showBrowserProgress" class="download-progress">
-        <p class="progress-hint">{{ progressHint }}</p>
-        <ElProgress
-          :percentage="totalBytes ? progressPercent : undefined"
-          :indeterminate="!totalBytes"
-          :stroke-width="10"
-        />
-        <p class="progress-meta">
-          已下载 {{ downloadedLabel }}
-          <template v-if="totalLabel"> / {{ totalLabel }}</template>
-        </p>
-      </div>
+      <EssentialsDownloadProgress v-if="showBrowserProgress" :hint="progressHint" />
     </section>
   </div>
 </template>
@@ -738,22 +680,6 @@ h2 {
 
 .pkg-install-btn {
   flex: 0 0 96px;
-}
-
-.download-progress {
-  margin-top: 12px;
-}
-
-.progress-hint,
-.progress-meta {
-  margin: 0 0 8px;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.progress-meta {
-  margin-top: 8px;
-  margin-bottom: 0;
 }
 
 .log-head {

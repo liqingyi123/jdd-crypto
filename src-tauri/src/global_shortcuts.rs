@@ -7,14 +7,8 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 use crate::state::AppState;
 
 const TRAIL_ARM_SHORTCUT: &str = "Ctrl+T";
-const TRAIL_EFFECT_SHORTCUTS: [&str; 6] = [
-    "Ctrl+1",
-    "Ctrl+2",
-    "Ctrl+3",
-    "Ctrl+4",
-    "Ctrl+5",
-    "Ctrl+6",
-];
+const TRAIL_EFFECT_SHORTCUTS: [&str; 6] =
+    ["Ctrl+1", "Ctrl+2", "Ctrl+3", "Ctrl+4", "Ctrl+5", "Ctrl+6"];
 
 #[derive(Clone, Copy)]
 pub enum ShortcutOwner {
@@ -87,22 +81,16 @@ pub fn ensure_no_conflict(
         .map(|guard| guard.clone())
         .unwrap_or_else(|_| crate::state::DEFAULT_SPOTLIGHT_SHORTCUT.to_string());
 
-    if !matches!(owner, ShortcutOwner::MouseFollow)
-        && shortcut_id(&follow)? == candidate_id
-    {
+    if !matches!(owner, ShortcutOwner::MouseFollow) && shortcut_id(&follow)? == candidate_id {
         return Err(format!("与鼠标跟随快捷键 {follow} 冲突"));
     }
     if !matches!(owner, ShortcutOwner::Compare) && shortcut_id(&compare)? == candidate_id {
         return Err(format!("与对照模式快捷键 {compare} 冲突"));
     }
-    if !matches!(owner, ShortcutOwner::HostsQuick)
-        && shortcut_id(&hosts_quick)? == candidate_id
-    {
+    if !matches!(owner, ShortcutOwner::HostsQuick) && shortcut_id(&hosts_quick)? == candidate_id {
         return Err(format!("与 Hosts 快捷切换快捷键 {hosts_quick} 冲突"));
     }
-    if !matches!(owner, ShortcutOwner::HostsSearch)
-        && shortcut_id(&hosts_search)? == candidate_id
-    {
+    if !matches!(owner, ShortcutOwner::HostsSearch) && shortcut_id(&hosts_search)? == candidate_id {
         return Err(format!("与 Host 检索快捷键 {hosts_search} 冲突"));
     }
     if !matches!(owner, ShortcutOwner::BrightnessQuick)
@@ -110,14 +98,10 @@ pub fn ensure_no_conflict(
     {
         return Err(format!("与屏幕亮度快捷键 {brightness_quick} 冲突"));
     }
-    if !matches!(owner, ShortcutOwner::Screensaver)
-        && shortcut_id(&screensaver)? == candidate_id
-    {
+    if !matches!(owner, ShortcutOwner::Screensaver) && shortcut_id(&screensaver)? == candidate_id {
         return Err(format!("与屏幕保护快捷键 {screensaver} 冲突"));
     }
-    if !matches!(owner, ShortcutOwner::Spotlight)
-        && shortcut_id(&spotlight)? == candidate_id
-    {
+    if !matches!(owner, ShortcutOwner::Spotlight) && shortcut_id(&spotlight)? == candidate_id {
         return Err(format!("与聚光灯快捷键 {spotlight} 冲突"));
     }
 
@@ -215,9 +199,7 @@ pub fn register_all(app: &AppHandle) -> Result<(), String> {
             .map(|guard| guard.clone())
             .unwrap_or_else(|_| crate::state::DEFAULT_SPOTLIGHT_SHORTCUT.to_string());
         let spotlight = Shortcut::from_str(&spotlight).map_err(|err| err.to_string())?;
-        global
-            .register(spotlight)
-            .map_err(|err| err.to_string())?;
+        global.register(spotlight).map_err(|err| err.to_string())?;
     }
 
     Ok(())

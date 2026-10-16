@@ -204,14 +204,7 @@ fn process_shake(
                             *reversals = 1;
                             *window_start = Some(Instant::now());
                         } else if *reversals >= SHAKE_REVERSALS_NEEDED {
-                            reset_shake(
-                                last_pos,
-                                axis,
-                                direction,
-                                reversals,
-                                window_start,
-                                accum,
-                            );
+                            reset_shake(last_pos, axis, direction, reversals, window_start, accum);
                             let handle = app.clone();
                             let _ = handle.clone().run_on_main_thread(move || {
                                 crate::spotlight::show(&handle);

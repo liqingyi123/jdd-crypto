@@ -112,9 +112,7 @@ fn fetch_changelog(app: &AppHandle) -> Result<String, String> {
     if !response.status().is_success() {
         return Err("无法连接更新服务器".to_string());
     }
-    response
-        .text()
-        .map_err(|_| "无法读取更新日志".to_string())
+    response.text().map_err(|_| "无法读取更新日志".to_string())
 }
 
 fn parse_latest_release(text: &str) -> Option<(String, String)> {
@@ -195,10 +193,7 @@ pub fn check_update(app: &AppHandle, manual: bool) -> Result<UpdateCheckResult, 
 }
 
 fn emit_progress(app: &AppHandle, downloaded: u64, total: Option<u64>) {
-    let _ = app.emit(
-        PROGRESS_EVENT,
-        DownloadProgress { downloaded, total },
-    );
+    let _ = app.emit(PROGRESS_EVENT, DownloadProgress { downloaded, total });
 }
 
 pub fn download_installer(app: &AppHandle, version: &str) -> Result<String, String> {
@@ -219,10 +214,7 @@ pub fn download_installer(app: &AppHandle, version: &str) -> Result<String, Stri
     }
 
     let total = response.content_length();
-    let temp_dir = app
-        .path()
-        .temp_dir()
-        .map_err(|error| error.to_string())?;
+    let temp_dir = app.path().temp_dir().map_err(|error| error.to_string())?;
     let dest = temp_dir.join(installer_file_name(version));
     let mut file = File::create(&dest).map_err(|error| error.to_string())?;
 

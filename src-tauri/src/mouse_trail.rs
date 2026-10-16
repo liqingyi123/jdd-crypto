@@ -6,8 +6,8 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use tauri::{
-    AppHandle, Emitter, EventTarget, LogicalSize, Manager, PhysicalPosition, WebviewUrl,
-    WebviewWindowBuilder, window::Color,
+    window::Color, AppHandle, Emitter, EventTarget, LogicalSize, Manager, PhysicalPosition,
+    WebviewUrl, WebviewWindowBuilder,
 };
 use tauri_plugin_global_shortcut::{Shortcut, ShortcutState};
 use tauri_plugin_store::StoreExt;
@@ -27,22 +27,9 @@ const DEFAULT_RIPPLE_COLOR: &str = "#2A2A2E";
 const DISPLAY_CHANGE_DEBOUNCE: Duration = Duration::from_millis(300);
 const RAISE_FOCUS_RETRY: Duration = Duration::from_millis(50);
 const TRAIL_ARM_SHORTCUT: &str = "Ctrl+T";
-const TRAIL_EFFECT_SHORTCUTS: [&str; 6] = [
-    "Ctrl+1",
-    "Ctrl+2",
-    "Ctrl+3",
-    "Ctrl+4",
-    "Ctrl+5",
-    "Ctrl+6",
-];
-const TRAIL_EFFECTS: [&str; 6] = [
-    "ribbon",
-    "meteor",
-    "graffiti",
-    "dots",
-    "heart",
-    "ripple",
-];
+const TRAIL_EFFECT_SHORTCUTS: [&str; 6] =
+    ["Ctrl+1", "Ctrl+2", "Ctrl+3", "Ctrl+4", "Ctrl+5", "Ctrl+6"];
+const TRAIL_EFFECTS: [&str; 6] = ["ribbon", "meteor", "graffiti", "dots", "heart", "ripple"];
 
 /// Ctrl 仍按住时，已按下过 T，等待数字键完成 Ctrl+T+数字 组合。
 static TRAIL_CHORD_ARMED: AtomicBool = AtomicBool::new(false);
@@ -283,10 +270,7 @@ pub fn set_effect_pref(app: AppHandle, effect: String) -> Result<MouseTrailPref,
     Ok(pref)
 }
 
-pub fn set_performance_mode_pref(
-    app: AppHandle,
-    mode: String,
-) -> Result<MouseTrailPref, String> {
+pub fn set_performance_mode_pref(app: AppHandle, mode: String) -> Result<MouseTrailPref, String> {
     let mut pref = load_pref(&app);
     pref.performance_mode = normalize_performance_mode(&mode);
     save_pref(&app, &pref)?;
@@ -295,11 +279,13 @@ pub fn set_performance_mode_pref(
     Ok(pref)
 }
 
-pub fn set_color_pref(app: AppHandle, effect: String, color: String) -> Result<MouseTrailPref, String> {
+pub fn set_color_pref(
+    app: AppHandle,
+    effect: String,
+    color: String,
+) -> Result<MouseTrailPref, String> {
     let normalized_effect = normalize_effect(&effect);
-    if normalized_effect != "meteor"
-        && normalized_effect != "dots"
-        && normalized_effect != "heart"
+    if normalized_effect != "meteor" && normalized_effect != "dots" && normalized_effect != "heart"
     {
         return Err("该特效不支持自定义颜色".into());
     }
@@ -321,9 +307,7 @@ pub fn set_color_pref(app: AppHandle, effect: String, color: String) -> Result<M
 
 pub fn reset_color_pref(app: AppHandle, effect: String) -> Result<MouseTrailPref, String> {
     let normalized_effect = normalize_effect(&effect);
-    if normalized_effect != "meteor"
-        && normalized_effect != "dots"
-        && normalized_effect != "heart"
+    if normalized_effect != "meteor" && normalized_effect != "dots" && normalized_effect != "heart"
     {
         return Err("该特效不支持自定义颜色".into());
     }
@@ -393,10 +377,7 @@ fn control_key_down() -> bool {
         use core_graphics::event_source::CGEventSourceStateID;
 
         extern "C" {
-            fn CGEventSourceKeyState(
-                state_id: CGEventSourceStateID,
-                key: CGKeyCode,
-            ) -> bool;
+            fn CGEventSourceKeyState(state_id: CGEventSourceStateID, key: CGKeyCode) -> bool;
         }
 
         const KEY_CONTROL: CGKeyCode = 59;
@@ -417,11 +398,7 @@ fn control_key_down() -> bool {
 }
 
 /// Ctrl+T+数字：按住 Ctrl，按下 T 后再按 1–5；松开 Ctrl 后组合失效。
-pub fn handle_trail_shortcut(
-    app: &AppHandle,
-    shortcut: &Shortcut,
-    state: ShortcutState,
-) -> bool {
+pub fn handle_trail_shortcut(app: &AppHandle, shortcut: &Shortcut, state: ShortcutState) -> bool {
     let Ok((arm_id, digit_ids)) = trail_shortcut_ids() else {
         return false;
     };
@@ -582,11 +559,7 @@ fn on_display_changed(app: &AppHandle) {
             return;
         }
         sync_overlays(&handle, true);
-        let _ = handle.emit_filter(
-            "app://mouse-trail-monitors-changed",
-            (),
-            is_overlay_target,
-        );
+        let _ = handle.emit_filter("app://mouse-trail-monitors-changed", (), is_overlay_target);
     });
 }
 
@@ -778,9 +751,7 @@ fn start_windows_display_listener() {
 
         // SAFETY: Win32 window class registration and message loop for display broadcasts.
         unsafe {
-            let class_name: Vec<u16> = "jdd_crypto_display_listener\0"
-                .encode_utf16()
-                .collect();
+            let class_name: Vec<u16> = "jdd_crypto_display_listener\0".encode_utf16().collect();
             let hinstance = GetModuleHandleW(ptr::null());
             let class = WNDCLASSW {
                 style: CS_HREDRAW | CS_VREDRAW,

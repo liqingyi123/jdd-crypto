@@ -117,9 +117,7 @@ pub fn start_clipboard_watcher(app: AppHandle) {
         let Some(state) = app.try_state::<AppState>() else {
             continue;
         };
-        if !state.clipboard_watch_enabled.load(Ordering::Relaxed)
-            || state.follow_blocks_resize()
-        {
+        if !state.clipboard_watch_enabled.load(Ordering::Relaxed) || state.follow_blocks_resize() {
             continue;
         }
 

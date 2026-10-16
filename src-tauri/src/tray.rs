@@ -54,9 +54,7 @@ pub fn handle_menu_id(app: &AppHandle, id: &str) {
 pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let menu = build_app_menu(app)?;
     let version = app.package_info().version.to_string();
-    let tooltip = format!(
-        "多多工具箱 v{version}\n左键打开设置中心\n中键打开加解密\n右击打开菜单"
-    );
+    let tooltip = format!("多多工具箱 v{version}\n左键打开设置中心\n中键打开加解密\n右击打开菜单");
     let mut builder = TrayIconBuilder::with_id("main-tray")
         .menu(&menu)
         .show_menu_on_left_click(false)
@@ -64,24 +62,22 @@ pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
         .on_menu_event(|app, event| {
             handle_menu_id(app, event.id.as_ref());
         })
-        .on_tray_icon_event(|tray, event| {
-            match event {
-                TrayIconEvent::Click {
-                    button: MouseButton::Left,
-                    button_state: MouseButtonState::Up,
-                    ..
-                } => {
-                    windows::show_feature(tray.app_handle(), "settings");
-                }
-                TrayIconEvent::Click {
-                    button: MouseButton::Middle,
-                    button_state: MouseButtonState::Up,
-                    ..
-                } => {
-                    windows::show_main(tray.app_handle(), None);
-                }
-                _ => {}
+        .on_tray_icon_event(|tray, event| match event {
+            TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } => {
+                windows::show_feature(tray.app_handle(), "settings");
             }
+            TrayIconEvent::Click {
+                button: MouseButton::Middle,
+                button_state: MouseButtonState::Up,
+                ..
+            } => {
+                windows::show_main(tray.app_handle(), None);
+            }
+            _ => {}
         });
 
     let icon = match app.default_window_icon().cloned() {

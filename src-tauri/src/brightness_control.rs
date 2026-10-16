@@ -51,7 +51,7 @@ mod win {
     use std::sync::Mutex;
     use windows_sys::Win32::Devices::Display::{
         DestroyPhysicalMonitors, GetMonitorBrightness, GetNumberOfPhysicalMonitorsFromHMONITOR,
-        GetPhysicalMonitorsFromHMONITOR, PHYSICAL_MONITOR, SetMonitorBrightness,
+        GetPhysicalMonitorsFromHMONITOR, SetMonitorBrightness, PHYSICAL_MONITOR,
     };
     use windows_sys::Win32::Foundation::{BOOL, LPARAM, RECT};
     use windows_sys::Win32::Graphics::Gdi::{
@@ -194,7 +194,14 @@ mod win {
             "$m = Get-CimInstance -Namespace root/WMI -ClassName WmiMonitorBrightnessMethods | Where-Object {{ $_.InstanceName -eq '{escaped}' }}; if ($null -eq $m) {{ throw 'not found' }}; Invoke-CimMethod -InputObject $m -MethodName WmiSetBrightness -Arguments @{{Timeout=1; Brightness={brightness}}} | Out-Null"
         );
         let output = std::process::Command::new("powershell")
-            .args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &script])
+            .args([
+                "-NoProfile",
+                "-NonInteractive",
+                "-WindowStyle",
+                "Hidden",
+                "-Command",
+                &script,
+            ])
             .output()
             .map_err(|e| format!("调节内建亮度失败: {e}"))?;
         if !output.status.success() {

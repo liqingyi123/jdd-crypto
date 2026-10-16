@@ -6,7 +6,7 @@ use std::thread;
 use std::time::Duration;
 
 use tauri::{
-    AppHandle, Emitter, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder, window::Color,
+    window::Color, AppHandle, Emitter, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder,
 };
 use tauri_plugin_global_shortcut::Shortcut;
 use tauri_plugin_store::StoreExt;
@@ -115,25 +115,22 @@ pub fn show(app: &AppHandle) {
         return;
     }
 
-    let result = WebviewWindowBuilder::new(
-        app,
-        HOSTS_QUICK_LABEL,
-        WebviewUrl::App("index.html".into()),
-    )
-    .title("Host 快速切换")
-    .decorations(false)
-    .transparent(true)
-    .shadow(false)
-    .background_color(Color(0, 0, 0, 0))
-    .always_on_top(true)
-    .skip_taskbar(true)
-    .resizable(false)
-    .maximizable(false)
-    .minimizable(false)
-    .focused(true)
-    .visible(true)
-    .inner_size(HOSTS_QUICK_WIDTH, HOSTS_QUICK_HEIGHT)
-    .build();
+    let result =
+        WebviewWindowBuilder::new(app, HOSTS_QUICK_LABEL, WebviewUrl::App("index.html".into()))
+            .title("Host 快速切换")
+            .decorations(false)
+            .transparent(true)
+            .shadow(false)
+            .background_color(Color(0, 0, 0, 0))
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .resizable(false)
+            .maximizable(false)
+            .minimizable(false)
+            .focused(true)
+            .visible(true)
+            .inner_size(HOSTS_QUICK_WIDTH, HOSTS_QUICK_HEIGHT)
+            .build();
 
     if let Ok(win) = result {
         let _ = win.set_position(PhysicalPosition::new(target.0, target.1));

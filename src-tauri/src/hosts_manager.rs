@@ -49,11 +49,7 @@ pub struct HostsScheme {
     #[serde(default)]
     pub readonly: bool,
     /// "local" | "remote". Import reads SwitchHosts tree `type`; IPC uses schemeType.
-    #[serde(
-        default = "default_scheme_type",
-        alias = "type",
-        alias = "scheme_type"
-    )]
+    #[serde(default = "default_scheme_type", alias = "type", alias = "scheme_type")]
     pub scheme_type: String,
     /// Remote URL. Import reads SwitchHosts `url`.
     #[serde(default)]
@@ -82,9 +78,8 @@ pub const NATURE_EXCLUSIVE: &str = "exclusive";
 pub const TYPE_LOCAL: &str = "local";
 pub const TYPE_REMOTE: &str = "remote";
 
-const ALLOWED_REFRESH_INTERVALS: &[u64] = &[
-    0, 300, 600, 1800, 3600, 7200, 14400, 21600, 43200, 86400,
-];
+const ALLOWED_REFRESH_INTERVALS: &[u64] =
+    &[0, 300, 600, 1800, 3600, 7200, 14400, 21600, 43200, 86400];
 
 fn normalize_nature(raw: &str) -> Result<String, String> {
     match raw.trim() {
@@ -436,7 +431,11 @@ pub fn delete_scheme(app: &AppHandle, id: String) -> Result<Vec<HostsScheme>, St
     Ok(schemes)
 }
 
-pub fn rename_scheme(app: &AppHandle, id: String, title: String) -> Result<Vec<HostsScheme>, String> {
+pub fn rename_scheme(
+    app: &AppHandle,
+    id: String,
+    title: String,
+) -> Result<Vec<HostsScheme>, String> {
     let title = title.trim().to_string();
     if title.is_empty() {
         return Err("方案标题不能为空".to_string());
@@ -622,7 +621,10 @@ fn ensure_blank_line_before_append(buf: &mut String) {
 /// Returns `(before, from_start_to_eof)` where `from_start_to_eof` may be empty.
 fn split_at_switchhosts(raw: &str) -> (String, String) {
     let lines: Vec<&str> = raw.lines().collect();
-    let Some(idx) = lines.iter().position(|line| line.trim() == SWITCHHOSTS_START) else {
+    let Some(idx) = lines
+        .iter()
+        .position(|line| line.trim() == SWITCHHOSTS_START)
+    else {
         let mut all = raw.to_string();
         if !all.is_empty() && !all.ends_with('\n') {
             all.push('\n');
@@ -719,9 +721,7 @@ fn elevate_copy_windows(src: &Path, dest: &Path) -> Result<(), String> {
     let ps1 = std::env::temp_dir().join(format!("jdd-crypto-hosts-copy-{}.ps1", new_id()));
     let src_s = src.to_string_lossy().replace('\'', "''");
     let dest_s = dest.to_string_lossy().replace('\'', "''");
-    let script = format!(
-        "Copy-Item -LiteralPath '{src_s}' -Destination '{dest_s}' -Force\r\n"
-    );
+    let script = format!("Copy-Item -LiteralPath '{src_s}' -Destination '{dest_s}' -Force\r\n");
     fs::write(&ps1, script.as_bytes()).map_err(|e| format!("写入提权脚本失败: {e}"))?;
 
     let ps1_arg = ps1.to_string_lossy().replace('\'', "''");
@@ -743,9 +743,7 @@ fn elevate_copy_windows(src: &Path, dest: &Path) -> Result<(), String> {
     let _ = fs::remove_file(&ps1);
 
     if !status.success() {
-        return Err(
-            "提权写入系统 hosts 失败或被取消，请以管理员身份运行应用后重试".to_string(),
-        );
+        return Err("提权写入系统 hosts 失败或被取消，请以管理员身份运行应用后重试".to_string());
     }
 
     let expect_marker = fs::read_to_string(src)
@@ -753,9 +751,7 @@ fn elevate_copy_windows(src: &Path, dest: &Path) -> Result<(), String> {
         .unwrap_or(false);
     let written = fs::read_to_string(dest).unwrap_or_default();
     if expect_marker && !written.contains(MARKER_BEGIN) {
-        return Err(
-            "提权写入未生效（可能取消了 UAC），请以管理员身份运行应用后重试".to_string(),
-        );
+        return Err("提权写入未生效（可能取消了 UAC），请以管理员身份运行应用后重试".to_string());
     }
     Ok(())
 }
@@ -769,9 +765,8 @@ fn elevate_copy_windows(_src: &Path, _dest: &Path) -> Result<(), String> {
 fn elevate_copy_macos(src: &Path, dest: &Path) -> Result<(), String> {
     let src_s = src.to_string_lossy().replace('"', "\\\"");
     let dest_s = dest.to_string_lossy().replace('"', "\\\"");
-    let script = format!(
-        r#"do shell script "cp \"{src_s}\" \"{dest_s}\"" with administrator privileges"#
-    );
+    let script =
+        format!(r#"do shell script "cp \"{src_s}\" \"{dest_s}\"" with administrator privileges"#);
     let status = Command::new("osascript")
         .arg("-e")
         .arg(&script)
@@ -792,10 +787,21 @@ fn elevate_copy_macos(_src: &Path, _dest: &Path) -> Result<(), String> {
 #[cfg(all(unix, not(target_os = "macos")))]
 fn elevate_copy_linux(src: &Path, dest: &Path) -> Result<(), String> {
     let attempts = [
-        ("pkexec", vec!["cp", src.to_str().unwrap_or(""), dest.to_str().unwrap_or("")]),
+        (
+            "pkexec",
+            vec![
+                "cp",
+                src.to_str().unwrap_or(""),
+                dest.to_str().unwrap_or(""),
+            ],
+        ),
         (
             "sudo",
-            vec!["cp", src.to_str().unwrap_or(""), dest.to_str().unwrap_or("")],
+            vec![
+                "cp",
+                src.to_str().unwrap_or(""),
+                dest.to_str().unwrap_or(""),
+            ],
         ),
     ];
     for (bin, args) in attempts {
@@ -818,7 +824,9 @@ fn flush_dns() {
         let _ = Command::new("ipconfig").arg("/flushdns").status();
     } else if cfg!(target_os = "macos") {
         let _ = Command::new("dscacheutil").args(["-flushcache"]).status();
-        let _ = Command::new("killall").args(["-HUP", "mDNSResponder"]).status();
+        let _ = Command::new("killall")
+            .args(["-HUP", "mDNSResponder"])
+            .status();
     }
     // Linux: no portable flush; skip.
 }
@@ -849,7 +857,13 @@ pub fn import_switchhosts(app: &AppHandle, raw: String) -> Result<ImportResult, 
     let mut schemes = load_schemes(app);
 
     for node in tree {
-        collect_import_nodes(node, &content_by_id, &mut schemes, &mut imported, &mut skipped);
+        collect_import_nodes(
+            node,
+            &content_by_id,
+            &mut schemes,
+            &mut imported,
+            &mut skipped,
+        );
     }
 
     // Imports are exclusive: keep at most one exclusive scheme enabled.
@@ -900,7 +914,10 @@ fn current_system_hosts_base() -> String {
     strip_managed_block(&strip_switchhosts_block(&raw))
 }
 
-fn build_switchhosts_export(schemes: &[HostsScheme], system_content: &str) -> Result<String, String> {
+fn build_switchhosts_export(
+    schemes: &[HostsScheme],
+    system_content: &str,
+) -> Result<String, String> {
     let mut tree = Vec::with_capacity(schemes.len());
     let mut hosts_data = Vec::with_capacity(schemes.len() + 1);
 
@@ -1126,9 +1143,10 @@ fn upsert_imported_scheme(schemes: &mut Vec<HostsScheme>, incoming: HostsScheme)
         return;
     }
     // Legacy rows used random `h-...` ids — update by title so re-import repairs missing url.
-    if let Some(idx) = schemes.iter().position(|s| {
-        s.source == "imported" && s.title == incoming.title
-    }) {
+    if let Some(idx) = schemes
+        .iter()
+        .position(|s| s.source == "imported" && s.title == incoming.title)
+    {
         let kept_nature = schemes[idx].nature.clone();
         let mut next = incoming;
         next.nature = kept_nature;
@@ -1284,7 +1302,8 @@ fn line_touches_conflict(line: &str, conflict_domains: &std::collections::HashSe
 }
 
 fn index_lines_by_domain(lines: &[String]) -> std::collections::BTreeMap<String, Vec<String>> {
-    let mut map: std::collections::BTreeMap<String, Vec<String>> = std::collections::BTreeMap::new();
+    let mut map: std::collections::BTreeMap<String, Vec<String>> =
+        std::collections::BTreeMap::new();
     for line in lines {
         for domain in domains_of_line(line) {
             let entry = map.entry(domain).or_default();
@@ -1416,9 +1435,10 @@ fn upsert_preset_scheme(schemes: &mut Vec<HostsScheme>, incoming: HostsScheme) -
     if let Some(existing) = schemes.iter_mut().find(|s| s.id == incoming.id) {
         return merge_preset_scheme(existing, incoming);
     }
-    if let Some(idx) = schemes.iter().position(|s| {
-        s.source == "imported" && s.title == incoming.title
-    }) {
+    if let Some(idx) = schemes
+        .iter()
+        .position(|s| s.source == "imported" && s.title == incoming.title)
+    {
         return merge_preset_scheme(&mut schemes[idx], incoming);
     }
     // 单开方案默认关闭，仅由用户后续手动开启
@@ -1450,7 +1470,13 @@ fn parse_switchhosts_raw(raw: &str) -> Result<(Vec<HostsScheme>, u32), String> {
     let mut skipped = 0u32;
     let mut schemes = Vec::new();
     for node in tree {
-        collect_import_nodes(node, &content_by_id, &mut schemes, &mut imported, &mut skipped);
+        collect_import_nodes(
+            node,
+            &content_by_id,
+            &mut schemes,
+            &mut imported,
+            &mut skipped,
+        );
     }
     let _ = imported;
     Ok((schemes, skipped))
@@ -1527,9 +1553,7 @@ mod tests {
 
     #[test]
     fn compose_clears_block_when_empty() {
-        let with_block = format!(
-            "127.0.0.1 localhost\n\n{MARKER_BEGIN}\nold\n{MARKER_END}\n"
-        );
+        let with_block = format!("127.0.0.1 localhost\n\n{MARKER_BEGIN}\nold\n{MARKER_END}\n");
         let cleared = compose_hosts_file(&with_block, "");
         assert!(!cleared.contains(MARKER_BEGIN));
         assert!(cleared.contains("127.0.0.1 localhost"));
@@ -1561,7 +1585,10 @@ mod tests {
         assert!(!next.contains("\nmine\n"));
         let managed_pos = next.find(MARKER_BEGIN).expect("managed block");
         let swh_pos = next.find(SWITCHHOSTS_START).expect("switchhosts");
-        assert!(managed_pos < swh_pos, "managed block must sit above SwitchHosts");
+        assert!(
+            managed_pos < swh_pos,
+            "managed block must sit above SwitchHosts"
+        );
     }
 
     #[test]
@@ -1602,10 +1629,7 @@ mod tests {
         let server = "2.2.2.2 only-server.com\n";
         let (merged, conflicts) = merge_hosts_content(local, server);
         assert_eq!(conflicts, 0);
-        assert_eq!(
-            merged,
-            "1.1.1.1 only-local.com\n2.2.2.2 only-server.com\n"
-        );
+        assert_eq!(merged, "1.1.1.1 only-local.com\n2.2.2.2 only-server.com\n");
     }
 
     #[test]
@@ -1679,16 +1703,26 @@ mod tests {
         ];
         let raw = build_switchhosts_export(&schemes, "127.0.0.1 localhost\n").unwrap();
         let value: Value = serde_json::from_str(&raw).unwrap();
-        assert!(value.pointer("/data/list/tree").and_then(|v| v.as_array()).is_some());
+        assert!(value
+            .pointer("/data/list/tree")
+            .and_then(|v| v.as_array())
+            .is_some());
         assert!(value
             .pointer("/data/collection/hosts/data")
             .and_then(|v| v.as_array())
             .is_some());
         assert_eq!(
-            value.pointer("/version").and_then(|v| v.as_array()).map(|a| a.len()),
+            value
+                .pointer("/version")
+                .and_then(|v| v.as_array())
+                .map(|a| a.len()),
             Some(4)
         );
-        let tree = value.pointer("/data/list/tree").unwrap().as_array().unwrap();
+        let tree = value
+            .pointer("/data/list/tree")
+            .unwrap()
+            .as_array()
+            .unwrap();
         assert!(tree[0].get("type").is_none());
         assert_eq!(tree[1].get("type").and_then(|v| v.as_str()), Some("remote"));
         assert_eq!(
@@ -1728,7 +1762,13 @@ mod tests {
         let mut imported = 0u32;
         let mut skipped = 0u32;
         for node in tree {
-            collect_import_nodes(node, &content_by_id, &mut schemes, &mut imported, &mut skipped);
+            collect_import_nodes(
+                node,
+                &content_by_id,
+                &mut schemes,
+                &mut imported,
+                &mut skipped,
+            );
         }
         assert!(imported >= 2);
         assert_eq!(schemes[0].title, "本地");
@@ -1753,7 +1793,10 @@ mod tests {
 
         // IPC/store shape uses camelCase schemeType while SwitchHosts import still reads `type`.
         let json = serde_json::to_value(&schemes[1]).unwrap();
-        assert_eq!(json.get("schemeType").and_then(|v| v.as_str()), Some("remote"));
+        assert_eq!(
+            json.get("schemeType").and_then(|v| v.as_str()),
+            Some("remote")
+        );
         assert!(json.get("url").and_then(|v| v.as_str()).unwrap_or("").len() > 0);
 
         // Re-import merges by id — count must not grow.
@@ -1761,7 +1804,13 @@ mod tests {
         let mut imported2 = 0u32;
         let mut skipped2 = 0u32;
         for node in tree {
-            collect_import_nodes(node, &content_by_id, &mut schemes, &mut imported2, &mut skipped2);
+            collect_import_nodes(
+                node,
+                &content_by_id,
+                &mut schemes,
+                &mut imported2,
+                &mut skipped2,
+            );
         }
         assert_eq!(schemes.len(), before);
         assert_eq!(imported2, imported);

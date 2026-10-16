@@ -4,8 +4,8 @@ use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 use tauri::{
-    AppHandle, Emitter, Manager, PhysicalPosition, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
-    window::Color,
+    window::Color, AppHandle, Emitter, Manager, PhysicalPosition, WebviewUrl, WebviewWindow,
+    WebviewWindowBuilder,
 };
 
 #[derive(Clone, Serialize)]
@@ -233,17 +233,15 @@ pub fn bind_raise_on_blur(win: &WebviewWindow) {
 pub fn bind_interactive_window(win: &WebviewWindow) {
     let hidden = win.clone();
     let app = win.app_handle().clone();
-    win.on_window_event(move |event| {
-        match event {
-            tauri::WindowEvent::CloseRequested { api, .. } => {
-                api.prevent_close();
-                let _ = hidden.hide();
-            }
-            tauri::WindowEvent::Focused(false) => {
-                crate::mouse_trail::schedule_raise_overlays(&app);
-            }
-            _ => {}
+    win.on_window_event(move |event| match event {
+        tauri::WindowEvent::CloseRequested { api, .. } => {
+            api.prevent_close();
+            let _ = hidden.hide();
         }
+        tauri::WindowEvent::Focused(false) => {
+            crate::mouse_trail::schedule_raise_overlays(&app);
+        }
+        _ => {}
     });
 }
 
@@ -459,16 +457,7 @@ struct WorkArea {
     height: i32,
 }
 
-fn rects_intersect(
-    ax: i32,
-    ay: i32,
-    aw: i32,
-    ah: i32,
-    bx: i32,
-    by: i32,
-    bw: i32,
-    bh: i32,
-) -> bool {
+fn rects_intersect(ax: i32, ay: i32, aw: i32, ah: i32, bx: i32, by: i32, bw: i32, bh: i32) -> bool {
     ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by
 }
 

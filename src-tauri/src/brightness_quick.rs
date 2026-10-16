@@ -6,7 +6,7 @@ use std::thread;
 use std::time::Duration;
 
 use tauri::{
-    AppHandle, Emitter, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder, window::Color,
+    window::Color, AppHandle, Emitter, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder,
 };
 use tauri_plugin_global_shortcut::Shortcut;
 use tauri_plugin_store::StoreExt;
@@ -94,7 +94,9 @@ pub fn handle_shortcut(app: &AppHandle, shortcut: &Shortcut) {
 
 fn bubble_height(display_count: usize) -> f64 {
     let rows = display_count.max(1) as f64;
-    (BUBBLE_CHROME + rows * BUBBLE_ROW_HEIGHT).max(120.0).min(800.0)
+    (BUBBLE_CHROME + rows * BUBBLE_ROW_HEIGHT)
+        .max(120.0)
+        .min(800.0)
 }
 
 pub fn show(app: &AppHandle) {

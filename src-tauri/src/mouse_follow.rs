@@ -238,11 +238,7 @@ pub fn start_follow_loop(app: AppHandle) {
                 }
 
                 if returning && !enabled {
-                    let target = state
-                        .saved_badge_pos
-                        .lock()
-                        .ok()
-                        .and_then(|guard| *guard);
+                    let target = state.saved_badge_pos.lock().ok().and_then(|guard| *guard);
                     match target {
                         Some((x, y)) => {
                             let dist = lerp_badge(&app, &mut anim, (f64::from(x), f64::from(y)));
@@ -503,10 +499,7 @@ fn left_button_down() -> bool {
     use core_graphics::event_source::CGEventSourceStateID;
 
     extern "C" {
-        fn CGEventSourceButtonState(
-            state_id: CGEventSourceStateID,
-            button: CGMouseButton,
-        ) -> bool;
+        fn CGEventSourceButtonState(state_id: CGEventSourceStateID, button: CGMouseButton) -> bool;
     }
 
     // SAFETY: 只读查询当前鼠标按键状态，无内存副作用。
@@ -547,7 +540,11 @@ fn send_copy_shortcut() {
     ];
     unsafe {
         // SAFETY: `inputs` is a contiguous array of fully initialized INPUT_KEYBOARD structs.
-        SendInput(inputs.len() as u32, inputs.as_ptr(), size_of::<INPUT>() as i32);
+        SendInput(
+            inputs.len() as u32,
+            inputs.as_ptr(),
+            size_of::<INPUT>() as i32,
+        );
     }
 }
 

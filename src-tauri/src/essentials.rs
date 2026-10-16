@@ -17,19 +17,12 @@ const PROGRESS_EVENT: &str = "app://essentials-download-progress";
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(600);
 const VPN_DOC_URL: &str = "https://docx.jddops.com/#/doc/Kd1s3qBu";
 
-const OS_TOOLS_DIR: &str =
-    "appStore/Software/PC/Windows效率提升、系统重装、系统激活";
+const OS_TOOLS_DIR: &str = "appStore/Software/PC/Windows效率提升、系统重装、系统激活";
 const VOLTA_DIR: &str = "appStore/Software/PC/developer/volta";
 
-const BASE_PACKAGES: &[&str] = &[
-    "node@24.20.0",
-    "pnpm@8.15.9",
-    "http-server",
-    "npkill",
-];
+const BASE_PACKAGES: &[&str] = &["node@24.20.0", "pnpm@8.15.9", "http-server", "npkill"];
 
-static DOWNLOADING: LazyLock<Mutex<HashSet<String>>> =
-    LazyLock::new(|| Mutex::new(HashSet::new()));
+static DOWNLOADING: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ToolId {
@@ -204,10 +197,7 @@ pub struct VoltaRunResult {
 }
 
 fn essentials_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    let root = app
-        .path()
-        .app_local_data_dir()
-        .map_err(|e| e.to_string())?;
+    let root = app.path().app_local_data_dir().map_err(|e| e.to_string())?;
     let dir = root.join("essentials");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir)
@@ -259,8 +249,45 @@ fn end_download(id: &str) {
     }
 }
 
+fn part_path(dest: &Path) -> PathBuf {
+    dest.with_extension(format!(
+        "{}.part",
+        dest.extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("download")
+    ))
+}
+
+/// Replace `dest` with `tmp` without deleting `dest` until the new file is in place.
+fn replace_dest(tmp: &Path, dest: &Path) -> Result<(), String> {
+    match fs::rename(tmp, dest) {
+        Ok(()) => Ok(()),
+        Err(first) => {
+            if !dest.exists() {
+                return Err(first.to_string());
+            }
+            let bak = dest.with_extension(format!(
+                "{}.bak",
+                dest.extension()
+                    .and_then(|e| e.to_str())
+                    .unwrap_or("download")
+            ));
+            let _ = fs::remove_file(&bak);
+            fs::rename(dest, &bak).map_err(|e| e.to_string())?;
+            if let Err(e) = fs::rename(tmp, dest) {
+                let _ = fs::rename(&bak, dest);
+                let _ = fs::remove_file(tmp);
+                return Err(e.to_string());
+            }
+            let _ = fs::remove_file(&bak);
+            Ok(())
+        }
+    }
+}
+
 fn download_file(app: &AppHandle, id: &str, url: &str, dest: &Path) -> Result<(), String> {
     try_begin_download(id)?;
+    let tmp = part_path(dest);
     let result = (|| {
         let client = http_client()?;
         let response = client
@@ -274,12 +301,6 @@ fn download_file(app: &AppHandle, id: &str, url: &str, dest: &Path) -> Result<()
         if let Some(parent) = dest.parent() {
             fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
-        let tmp = dest.with_extension(format!(
-            "{}.part",
-            dest.extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or("download")
-        ));
         let mut file = File::create(&tmp).map_err(|e| e.to_string())?;
         let mut source = response;
         let mut buffer = [0_u8; 8192];
@@ -290,18 +311,19 @@ fn download_file(app: &AppHandle, id: &str, url: &str, dest: &Path) -> Result<()
             if read == 0 {
                 break;
             }
-            file.write_all(&buffer[..read])
-                .map_err(|e| e.to_string())?;
+            file.write_all(&buffer[..read]).map_err(|e| e.to_string())?;
             downloaded += read as u64;
             emit_progress(app, id, downloaded, total);
         }
         drop(file);
-        if dest.exists() {
-            let _ = fs::remove_file(dest);
+        if downloaded == 0 {
+            return Err("下载失败，文件为空".to_string());
         }
-        fs::rename(&tmp, dest).map_err(|e| e.to_string())?;
-        Ok(())
+        replace_dest(&tmp, dest)
     })();
+    if result.is_err() {
+        let _ = fs::remove_file(&tmp);
+    }
     end_download(id);
     result
 }
@@ -345,10 +367,7 @@ pub fn open_or_download(app: &AppHandle, tool_id: &str) -> Result<OpenOrDownload
     let dest = dir.join(tool.file_name());
     let id = tool.as_str();
 
-    let downloaded = if dest.is_file()
-        && fs::metadata(&dest)
-            .map(|m| m.len() > 0)
-            .unwrap_or(false)
+    let downloaded = if dest.is_file() && fs::metadata(&dest).map(|m| m.len() > 0).unwrap_or(false)
     {
         false
     } else {
@@ -365,16 +384,16 @@ pub fn open_or_download(app: &AppHandle, tool_id: &str) -> Result<OpenOrDownload
 }
 
 /// Download editor/browser asset into essentials cache, then open the parent directory.
-pub fn download_and_open_dir(app: &AppHandle, asset_id: &str) -> Result<OpenOrDownloadResult, String> {
+pub fn download_and_open_dir(
+    app: &AppHandle,
+    asset_id: &str,
+) -> Result<OpenOrDownloadResult, String> {
     let asset = AssetId::from_str(asset_id)?;
     let dir = essentials_dir(app)?;
     let dest = dir.join(asset.file_name());
     let id = asset.as_str();
 
-    let downloaded = if dest.is_file()
-        && fs::metadata(&dest)
-            .map(|m| m.len() > 0)
-            .unwrap_or(false)
+    let downloaded = if dest.is_file() && fs::metadata(&dest).map(|m| m.len() > 0).unwrap_or(false)
     {
         false
     } else {
@@ -511,9 +530,7 @@ fn run_volta(args: &[&str]) -> Result<(bool, String), String> {
         }
     }
     apply_no_window(&mut cmd);
-    let out = cmd
-        .output()
-        .map_err(|e| format!("执行 volta 失败: {e}"))?;
+    let out = cmd.output().map_err(|e| format!("执行 volta 失败: {e}"))?;
     let stdout = String::from_utf8_lossy(&out.stdout);
     let stderr = String::from_utf8_lossy(&out.stderr);
     let mut combined = String::new();
@@ -655,8 +672,8 @@ fn run_unix_install_sh(archive: &Path, extract_dir: &Path, log: &mut String) -> 
         let err = String::from_utf8_lossy(&status.stderr);
         return Err(format!("解压失败: {err}"));
     }
-    let script = find_install_sh(extract_dir)
-        .ok_or_else(|| "解压后未找到 install.sh".to_string())?;
+    let script =
+        find_install_sh(extract_dir).ok_or_else(|| "解压后未找到 install.sh".to_string())?;
     log.push_str(&format!("> bash {}\n", script.display()));
     let mut cmd = Command::new("bash");
     cmd.arg(&script)
@@ -750,10 +767,8 @@ fn volta_install_inner(app: &AppHandle, with_base_deps: bool) -> VoltaRunResult 
         }
     };
     let dest = dir.join(&file_name);
-    let need_download = !(dest.is_file()
-        && fs::metadata(&dest)
-            .map(|m| m.len() > 0)
-            .unwrap_or(false));
+    let need_download =
+        !(dest.is_file() && fs::metadata(&dest).map(|m| m.len() > 0).unwrap_or(false));
     if need_download {
         log.push_str("开始下载…\n");
         if let Err(e) = download_file(app, "volta", &url, &dest) {
@@ -785,11 +800,7 @@ fn volta_install_inner(app: &AppHandle, with_base_deps: bool) -> VoltaRunResult 
             log.push_str("检测到已有 Volta，继续安装基础依赖…\n");
             let ok = install_base_deps(&mut log);
             let version = read_volta_version();
-            return VoltaRunResult {
-                ok,
-                log,
-                version,
-            };
+            return VoltaRunResult { ok, log, version };
         }
         if !with_base_deps {
             log.push_str("升级未自动安装基础依赖；如需请点击「基础依赖安装」。\n");
@@ -817,11 +828,7 @@ fn volta_install_inner(app: &AppHandle, with_base_deps: bool) -> VoltaRunResult 
             log.push_str("检测到 Volta，继续安装基础依赖…\n");
             let ok = install_base_deps(&mut log);
             let version = read_volta_version();
-            return VoltaRunResult {
-                ok,
-                log,
-                version,
-            };
+            return VoltaRunResult { ok, log, version };
         }
         if !with_base_deps {
             log.push_str("升级未自动安装基础依赖；如需请点击「基础依赖安装」。\n");
@@ -868,8 +875,7 @@ fn normalize_volta_version(raw: &str) -> String {
 
 fn intranet_target_version() -> Result<String, String> {
     let file = volta_installer_relative()?;
-    parse_version_from_installer_name(file)
-        .ok_or_else(|| format!("无法从安装包名解析版本: {file}"))
+    parse_version_from_installer_name(file).ok_or_else(|| format!("无法从安装包名解析版本: {file}"))
 }
 
 fn already_on_target_version(log: &mut String, target: &str) -> bool {
@@ -1085,10 +1091,7 @@ pub fn volta_upgrade(app: &AppHandle) -> VoltaRunResult {
 
 pub fn volta_install_base() -> VoltaRunResult {
     let mut log = String::from("# 基础依赖安装\n");
-    log.push_str(&format!(
-        "将安装: {}\n",
-        BASE_PACKAGES.join(", ")
-    ));
+    log.push_str(&format!("将安装: {}\n", BASE_PACKAGES.join(", ")));
     if find_volta_bin().is_none() {
         log.push_str("未找到 volta，请先一键部署\n");
         return VoltaRunResult {
@@ -1112,9 +1115,8 @@ const VOLTA_FEATURE_PNPM_VALUE: &str = "1";
 fn persist_user_env_windows(name: &str, value: &str) -> Result<(), String> {
     let name_esc = name.replace('\'', "''");
     let value_esc = value.replace('\'', "''");
-    let script = format!(
-        "[Environment]::SetEnvironmentVariable('{name_esc}', '{value_esc}', 'User')"
-    );
+    let script =
+        format!("[Environment]::SetEnvironmentVariable('{name_esc}', '{value_esc}', 'User')");
     let mut cmd = Command::new("powershell");
     cmd.args([
         "-NoProfile",

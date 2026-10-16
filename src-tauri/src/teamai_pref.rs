@@ -73,11 +73,7 @@ pub fn gitlab_base_url(repo_url: &str) -> Result<String, String> {
         return Err("仓库地址需以 http:// 或 https:// 开头".to_string());
     };
 
-    let authority = rest
-        .split(['/', '?', '#'])
-        .next()
-        .unwrap_or("")
-        .trim();
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or("").trim();
     if authority.is_empty() || authority.starts_with('@') {
         return Err("仓库地址无效".to_string());
     }
@@ -116,9 +112,8 @@ fn persist_user_env_windows(name: &str, value: &str) -> Result<(), String> {
     // Escape for single-quoted PowerShell string.
     let name_esc = name.replace('\'', "''");
     let value_esc = value.replace('\'', "''");
-    let script = format!(
-        "[Environment]::SetEnvironmentVariable('{name_esc}', '{value_esc}', 'User')"
-    );
+    let script =
+        format!("[Environment]::SetEnvironmentVariable('{name_esc}', '{value_esc}', 'User')");
     let mut cmd = Command::new("powershell");
     cmd.args([
         "-NoProfile",

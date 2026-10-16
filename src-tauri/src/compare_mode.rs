@@ -3,8 +3,8 @@ use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 
 use serde::Serialize;
+use tauri::{window::Color, PhysicalPosition};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
-use tauri::{PhysicalPosition, window::Color};
 use tauri_plugin_global_shortcut::Shortcut;
 use tauri_plugin_store::StoreExt;
 
@@ -100,9 +100,7 @@ pub fn save_pref(app: &AppHandle, enabled: bool) {
 
 pub fn apply_pref(app: &AppHandle, enabled: bool) {
     let state = app.state::<AppState>();
-    state
-        .compare_pref_enabled
-        .store(enabled, Ordering::Relaxed);
+    state.compare_pref_enabled.store(enabled, Ordering::Relaxed);
     save_pref(app, enabled);
     if !enabled && state.compare_active.load(Ordering::Relaxed) {
         stop(app);
@@ -211,10 +209,7 @@ pub fn report_plain(app: &AppHandle, plain: String) {
         }
         Some(("bubble", Some((left, right)))) => {
             hide_tip(app);
-            show_compare_bubble(
-                app,
-                CompareBubblePayload { left, right },
-            );
+            show_compare_bubble(app, CompareBubblePayload { left, right });
         }
         _ => {}
     }
@@ -358,10 +353,7 @@ pub fn show_compare_bubble(app: &AppHandle, payload: CompareBubblePayload) {
 }
 
 pub fn get_pending_compare_bubble() -> Option<CompareBubblePayload> {
-    PENDING_BUBBLE
-        .lock()
-        .ok()
-        .and_then(|guard| guard.clone())
+    PENDING_BUBBLE.lock().ok().and_then(|guard| guard.clone())
 }
 
 pub fn hide_compare_bubble(app: &AppHandle) {
