@@ -45,7 +45,7 @@ class GraffitiFollower {
     this.line = document.createElementNS(SVG_NS, "path");
     this.line.style.fill = color;
     stage.appendChild(this.line);
-    this.tick();
+    this.tick(performance.now());
   }
 
   add(position: Vec2) {
