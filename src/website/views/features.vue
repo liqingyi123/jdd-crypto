@@ -14,7 +14,7 @@ const isMacos = detectPlatform() === "macos";
       <p class="section-kicker">Features</p>
       <h1 class="section-title display-font">功能介绍</h1>
       <p class="section-lead">
-        围绕加解密与日常开发场景打磨：角标、剪贴板气泡、文本对比、Host 管理、AI 相关、装机必备、亮度调节、多屏屏保、聚光灯与拖尾特效，均可按需开关与自定义快捷键。
+        围绕加解密与日常开发场景打磨：角标、剪贴板气泡、文本对比、Host 管理、AI 相关、装机必备、迷你窗、亮度调节、多屏屏保、聚光灯与拖尾特效，均可按需开关与自定义快捷键。
       </p>
       <div class="feature-grid">
         <article v-for="item in FEATURE_ITEMS" :key="item.id" class="feature-card">
@@ -62,7 +62,8 @@ const isMacos = detectPlatform() === "macos";
           <li>
             鼠标跟随（macOS）与 Windows 相同，默认快捷键为
             <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>G</kbd>（Mac 键盘上的 Control 即 Ctrl）；文本对比模式默认为
-            <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd>；亮度调节
+            <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd>；迷你窗
+            <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd>；亮度调节
             <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>L</kbd>；屏保
             <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>P</kbd>；聚光灯
             <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>D</kbd>，均可在设置中自定义。首次使用若快捷键无反应、或选中文本后无法自动复制，请在

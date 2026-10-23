@@ -53,6 +53,12 @@ export const FEATURE_ITEMS: FeatureItem[] = [
       "托盘打开装机页。操作系统工具与认证助手下载到本地缓存后打开；Volta 可一键部署、开启 pnpm、升级并安装基础依赖；日常软件打开官网下载页；编辑器插件与浏览器插件下载后打开所在目录。",
   },
   {
+    id: "mini-window",
+    title: "迷你窗",
+    summary:
+      "默认 Ctrl+Alt+M（亦可托盘右键）打开迷你窗，窗内可打开番茄小说、QQ阅读、微信读书或任意网页；支持透明度、置顶与鼠标移出隐藏到任务栏。快捷键可在设置中自定义。",
+  },
+  {
     id: "brightness",
     title: "屏幕亮度调节",
     summary:
