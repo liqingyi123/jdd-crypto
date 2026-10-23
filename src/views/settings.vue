@@ -934,7 +934,7 @@ async function onThemeChange(value: string | number | boolean | undefined) {
             <p>
               在所有显示器工作区跟随鼠标绘制炫酷好玩的拖尾特效以帮助更好的寻找鼠标位置。
             </p>
-            <h3>采样频率</h3>
+            <h3>丝滑程度</h3>
             <ElRadioGroup
               :model-value="trailPerformanceMode"
               :disabled="!trailEnabled"

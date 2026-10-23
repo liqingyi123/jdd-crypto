@@ -6,6 +6,8 @@ export interface MouseTrailEngine {
   destroy(): void;
   resize(): void;
   setColor?(color: string): void;
+  /** 0 = uncapped (follow display refresh). */
+  setTargetFps?(fps: number): void;
 }
 
 export type MouseTrailEffect =

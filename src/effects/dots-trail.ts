@@ -1,4 +1,5 @@
 import type { MouseTrailEngine } from "./mouse-trail-types";
+import { createFrameGate } from "./trail-frame-budget";
 
 export interface DotsTrailOptions {
   color?: string;
@@ -45,6 +46,7 @@ export class DotsTrail implements MouseTrailEngine {
   private readonly mouse: MouseAnchor;
   private rafId = 0;
   private running = false;
+  private readonly frameGate = createFrameGate();
 
   constructor(host: HTMLElement, options: DotsTrailOptions = {}) {
     this.color = options.color ?? "#00D1CE";
@@ -123,12 +125,16 @@ export class DotsTrail implements MouseTrailEngine {
     // Idle until first setMouse.
   }
 
+  setTargetFps(fps: number) {
+    this.frameGate.setTargetFps(fps);
+  }
+
   private kick() {
     if (this.running) {
       return;
     }
     this.running = true;
-    const tick = () => {
+    const tick = (now: number) => {
       if (!this.running) {
         return;
       }
@@ -136,7 +142,9 @@ export class DotsTrail implements MouseTrailEngine {
         this.stop();
         return;
       }
-      this.render();
+      if (this.frameGate.shouldRun(now)) {
+        this.render();
+      }
       this.rafId = window.requestAnimationFrame(tick);
     };
     this.rafId = window.requestAnimationFrame(tick);

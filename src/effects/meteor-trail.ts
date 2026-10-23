@@ -1,4 +1,5 @@
 import type { MouseTrailEngine } from "./mouse-trail-types";
+import { createFrameGate } from "./trail-frame-budget";
 
 export interface MeteorTrailOptions {
   color?: string;
@@ -89,6 +90,7 @@ export class MeteorTrail implements MouseTrailEngine {
   private onScreen = false;
   private spawning = false;
   private lastMoveAt = 0;
+  private readonly frameGate = createFrameGate();
 
   constructor(host: HTMLElement, options: MeteorTrailOptions = {}) {
     this.color = options.color ?? "#F8EC85";
@@ -172,20 +174,26 @@ export class MeteorTrail implements MouseTrailEngine {
     // Idle until first setMouse; kick starts the loop.
   }
 
+  setTargetFps(fps: number) {
+    this.frameGate.setTargetFps(fps);
+  }
+
   private kick() {
     if (this.running) {
       return;
     }
     this.running = true;
-    const tick = () => {
+    const tick = (now: number) => {
       if (!this.running) {
         return;
       }
-      const keepGoing = this.render();
-      if (!keepGoing) {
-        this.running = false;
-        this.rafId = 0;
-        return;
+      if (this.frameGate.shouldRun(now)) {
+        const keepGoing = this.render();
+        if (!keepGoing) {
+          this.running = false;
+          this.rafId = 0;
+          return;
+        }
       }
       this.rafId = window.requestAnimationFrame(tick);
     };

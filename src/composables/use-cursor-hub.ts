@@ -1,6 +1,7 @@
 import { onMounted, onUnmounted, shallowRef } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { createFrameGate } from "@/effects/trail-frame-budget";
 
 export interface CursorHubSnapshot {
   x: number;
@@ -26,6 +27,8 @@ export function useCursorHub(options: {
   labelPrefix: "mouse-trail-" | "spotlight-";
   onCursor: (payload: CursorPayload) => void;
   onLeaveMonitor?: () => void;
+  /** 0 = uncapped. Omit for spotlight (full refresh). */
+  getTargetFps?: () => number;
 }) {
   const activeMonitor = shallowRef<number | null>(null);
   let myIndex: number | null = null;
@@ -34,6 +37,8 @@ export function useCursorHub(options: {
   let peeking = false;
   let unlistenMonitor: UnlistenFn | undefined;
   let stopped = false;
+  const frameGate = createFrameGate();
+  let appliedFps = 0;
 
   function stopRaf() {
     if (rafId) {
@@ -52,7 +57,16 @@ export function useCursorHub(options: {
     return activeMonitor.value === myIndex;
   }
 
-  async function tick() {
+  function syncGateFps() {
+    const next = options.getTargetFps?.() ?? 0;
+    if (next === appliedFps) {
+      return;
+    }
+    appliedFps = next;
+    frameGate.setTargetFps(next);
+  }
+
+  async function tick(now: number) {
     if (stopped) {
       return;
     }
@@ -61,7 +75,8 @@ export function useCursorHub(options: {
       options.onLeaveMonitor?.();
       return;
     }
-    if (!peeking) {
+    syncGateFps();
+    if (frameGate.shouldRun(now) && !peeking) {
       peeking = true;
       try {
         const snap = await invoke<CursorHubSnapshot>("peek_cursor_hub");
@@ -88,8 +103,8 @@ export function useCursorHub(options: {
         peeking = false;
       }
     }
-    rafId = requestAnimationFrame(() => {
-      void tick();
+    rafId = requestAnimationFrame((t) => {
+      void tick(t);
     });
   }
 
@@ -99,8 +114,9 @@ export function useCursorHub(options: {
     }
     // Force one paint even if cursor hasn't moved (e.g. spotlight first show / re-enter monitor).
     lastSeq = -1;
-    rafId = requestAnimationFrame(() => {
-      void tick();
+    syncGateFps();
+    rafId = requestAnimationFrame((t) => {
+      void tick(t);
     });
   }
 

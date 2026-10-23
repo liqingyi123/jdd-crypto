@@ -16,11 +16,13 @@ import {
   isColorableTrailEffect,
   normalizeMouseTrailColors,
   normalizeMouseTrailEffect,
+  normalizeMouseTrailPerformanceMode,
   type MouseTrailColors,
   type MouseTrailEngine,
   type MouseTrailEffect,
   type MouseTrailPref,
 } from "@/effects/mouse-trail-types";
+import { peekFpsForMode, targetFpsForMode } from "@/effects/trail-frame-budget";
 
 interface MonitorBounds {
   x: number;
@@ -45,6 +47,11 @@ const bounds = shallowRef<MonitorBounds | null>(null);
 const trail = shallowRef<MouseTrailEngine | null>(null);
 const effect = shallowRef<MouseTrailEffect>(DEFAULT_MOUSE_TRAIL_PREF.effect);
 const colors = shallowRef<MouseTrailColors>({ ...DEFAULT_MOUSE_TRAIL_COLORS });
+const defaultMode = normalizeMouseTrailPerformanceMode(
+  DEFAULT_MOUSE_TRAIL_PREF.performanceMode,
+);
+const peekFps = shallowRef(peekFpsForMode(defaultMode));
+const renderFps = shallowRef(targetFpsForMode(defaultMode));
 const { toastText, showToast } = useOverlayToast();
 let unlistenPref: (() => void) | undefined;
 let unlistenMonitors: (() => void) | undefined;
@@ -116,6 +123,7 @@ function rebuildEngine(next: MouseTrailEffect, trailColors: MouseTrailColors) {
     return;
   }
   trail.value = engine;
+  engine.setTargetFps?.(renderFps.value);
   engine.start();
   requestAnimationFrame(() => {
     trail.value?.resize();
@@ -133,6 +141,13 @@ function applyColorToEngine(next: MouseTrailEffect, trailColors: MouseTrailColor
 function applyPref(pref: MouseTrailPref) {
   const normalized = normalizeMouseTrailEffect(pref.effect);
   const normalizedColors = normalizeMouseTrailColors(pref.colors);
+  const mode = normalizeMouseTrailPerformanceMode(pref.performanceMode);
+  const nextPeek = peekFpsForMode(mode);
+  const nextRender = targetFpsForMode(mode);
+  peekFps.value = nextPeek;
+  const renderChanged = renderFps.value !== nextRender;
+  renderFps.value = nextRender;
+
   const effectChanged = effect.value !== normalized;
   const colorsChanged =
     colors.value.meteor !== normalizedColors.meteor ||
@@ -145,6 +160,9 @@ function applyPref(pref: MouseTrailPref) {
   if (!trail.value || effectChanged) {
     rebuildEngine(normalized, normalizedColors);
     return;
+  }
+  if (renderChanged) {
+    trail.value.setTargetFps?.(nextRender);
   }
   colors.value = { ...normalizedColors };
   if (colorsChanged) {
@@ -192,6 +210,7 @@ useCursorHub({
   labelPrefix: "mouse-trail-",
   onCursor: applyCursor,
   onLeaveMonitor: leaveMonitor,
+  getTargetFps: () => peekFps.value,
 });
 
 onMounted(async () => {

@@ -1,4 +1,5 @@
 import type { MouseTrailEngine } from "./mouse-trail-types";
+import { createFrameGate } from "./trail-frame-budget";
 
 export interface RibbonTrailOptions {
   showTime?: number;
@@ -35,6 +36,7 @@ export class RibbonTrail implements MouseTrailEngine {
   private readonly bodyLength: number;
   private readonly lineMax: number;
   private readonly lineMin: number;
+  private readonly frameGate = createFrameGate();
 
   constructor(host: HTMLElement, options: RibbonTrailOptions = {}) {
     this.bodyLength = Math.max(8, options.showTime ?? 20);
@@ -110,12 +112,16 @@ export class RibbonTrail implements MouseTrailEngine {
     // Idle until first setMouse.
   }
 
+  setTargetFps(fps: number) {
+    this.frameGate.setTargetFps(fps);
+  }
+
   private kick() {
     if (this.running) {
       return;
     }
     this.running = true;
-    const tick = () => {
+    const tick = (now: number) => {
       if (!this.running) {
         return;
       }
@@ -123,7 +129,9 @@ export class RibbonTrail implements MouseTrailEngine {
         this.stopDrawing(true);
         return;
       }
-      this.render();
+      if (this.frameGate.shouldRun(now)) {
+        this.render();
+      }
       this.rafId = window.requestAnimationFrame(tick);
     };
     this.rafId = window.requestAnimationFrame(tick);

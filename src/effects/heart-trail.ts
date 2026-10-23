@@ -1,4 +1,5 @@
 import type { MouseTrailEngine } from "./mouse-trail-types";
+import { createFrameGate } from "./trail-frame-budget";
 
 export interface HeartTrailOptions {
   color?: string;
@@ -110,6 +111,7 @@ export class HeartTrail implements MouseTrailEngine {
   private heartCarry = 0;
   private running = false;
   private rafId = 0;
+  private readonly frameGate = createFrameGate();
 
   constructor(host: HTMLElement, options: HeartTrailOptions = {}) {
     const color = options.color ?? DEFAULT_COLOR;
@@ -222,6 +224,10 @@ export class HeartTrail implements MouseTrailEngine {
     // Idle until moving.
   }
 
+  setTargetFps(fps: number) {
+    this.frameGate.setTargetFps(fps);
+  }
+
   stop() {
     this.hasLast = false;
     this.glowCarry = 0;
@@ -273,14 +279,16 @@ export class HeartTrail implements MouseTrailEngine {
       return;
     }
     this.running = true;
-    const tick = () => {
+    const tick = (now: number) => {
       if (!this.running) {
         return;
       }
-      if (!this.render()) {
-        this.running = false;
-        this.rafId = 0;
-        return;
+      if (this.frameGate.shouldRun(now)) {
+        if (!this.render()) {
+          this.running = false;
+          this.rafId = 0;
+          return;
+        }
       }
       this.rafId = window.requestAnimationFrame(tick);
     };

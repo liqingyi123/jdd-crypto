@@ -1,4 +1,5 @@
 import type { MouseTrailEngine } from "./mouse-trail-types";
+import { createFrameGate, type FrameGate } from "./trail-frame-budget";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const COLORS = ["red", "blue", "green", "yellow", "white"] as const;
@@ -33,12 +34,14 @@ class GraffitiFollower {
   private readonly line: SVGPathElement;
   private readonly points: TrailPoint[] = [];
   private readonly shapeAnims = new Set<ShapeAnim>();
+  private readonly frameGate: FrameGate;
   private rafId = 0;
   private alive = true;
 
-  constructor(stage: SVGSVGElement, color: string) {
+  constructor(stage: SVGSVGElement, color: string, frameGate: FrameGate) {
     this.stage = stage;
     this.color = color;
+    this.frameGate = frameGate;
     this.line = document.createElementNS(SVG_NS, "path");
     this.line.style.fill = color;
     stage.appendChild(this.line);
@@ -135,17 +138,19 @@ class GraffitiFollower {
     return path.join(" ");
   }
 
-  private tick = () => {
+  private tick = (now: number) => {
     if (!this.alive) {
       return;
     }
-    if (this.points.length > 0) {
-      const last = this.points[this.points.length - 1];
-      if (last.time < Date.now() - REMOVE_DELAY_MS) {
-        this.points.pop();
+    if (this.frameGate.shouldRun(now)) {
+      if (this.points.length > 0) {
+        const last = this.points[this.points.length - 1];
+        if (last.time < Date.now() - REMOVE_DELAY_MS) {
+          this.points.pop();
+        }
       }
+      this.line.setAttribute("d", this.createLine(this.points));
     }
-    this.line.setAttribute("d", this.createLine(this.points));
     this.rafId = window.requestAnimationFrame(this.tick);
   };
 
@@ -213,6 +218,10 @@ class GraffitiFollower {
         anim.rafId = window.requestAnimationFrame(step);
         return;
       }
+      if (!this.frameGate.shouldRun(now)) {
+        anim.rafId = window.requestAnimationFrame(step);
+        return;
+      }
       const t = Math.min(1, (now - startTime) / durationMs);
       // Power4.easeOut-ish
       const eased = 1 - (1 - t) ** 4;
@@ -242,6 +251,7 @@ export class GraffitiTrail implements MouseTrailEngine {
   private readonly host: HTMLElement;
   private readonly svg: SVGSVGElement;
   private readonly followers: GraffitiFollower[] = [];
+  private readonly frameGate = createFrameGate();
   private onScreen = false;
   private lastPos: Vec2 | null = null;
 
@@ -253,10 +263,14 @@ export class GraffitiTrail implements MouseTrailEngine {
       "position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;";
     host.appendChild(this.svg);
     for (const color of COLORS) {
-      this.followers.push(new GraffitiFollower(this.svg, color));
+      this.followers.push(new GraffitiFollower(this.svg, color, this.frameGate));
     }
     this.resize();
     window.addEventListener("resize", this.onResize);
+  }
+
+  setTargetFps(fps: number) {
+    this.frameGate.setTargetFps(fps);
   }
 
   private onResize = () => {

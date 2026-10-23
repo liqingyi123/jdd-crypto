@@ -15,7 +15,7 @@ use tauri::{AppHandle, Emitter, EventTarget, Manager};
 const INTERVAL_IDLE_MS: u64 = 200;
 const INTERVAL_SHAKE_MS: u64 = 50;
 const INTERVAL_SPOTLIGHT_PAINT_MS: u64 = 16;
-const DEFAULT_PAINT_MS: u64 = 22;
+const DEFAULT_PAINT_MS: u64 = 16;
 const SHAKE_WINDOW: Duration = Duration::from_millis(800);
 const SHAKE_MIN_DELTA: i32 = 80;
 const SHAKE_REVERSALS_NEEDED: u8 = 4;

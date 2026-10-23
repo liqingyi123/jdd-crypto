@@ -9,6 +9,7 @@
  * readable on dark desktops without staining white ones. Not user-customizable.
  */
 import type { MouseTrailEngine } from "./mouse-trail-types";
+import { createFrameGate } from "./trail-frame-budget";
 
 /** Mid caustic base (refracted for texture). */
 const BASE_RGB: [number, number, number] = [168, 172, 178];
@@ -91,6 +92,7 @@ export class RippleTrail implements MouseTrailEngine {
   private lastMx = -1;
   private lastMy = -1;
   private quietFrames = 0;
+  private readonly frameGate = createFrameGate();
 
   constructor(host: HTMLElement) {
     this.host = host;
@@ -149,25 +151,31 @@ export class RippleTrail implements MouseTrailEngine {
     // Idle until first setMouse.
   }
 
+  setTargetFps(fps: number): void {
+    this.frameGate.setTargetFps(fps);
+  }
+
   private kick(): void {
     if (this.running) {
       return;
     }
     this.running = true;
-    const loop = () => {
+    const loop = (now: number) => {
       if (!this.running) {
         return;
       }
-      const hasEnergy = this.step();
-      if (!hasEnergy) {
-        this.quietFrames += 1;
-        if (this.quietFrames >= IDLE_STOP_FRAMES) {
-          this.stop();
-          this.ctx.clearRect(0, 0, this.simW, this.simH);
-          return;
+      if (this.frameGate.shouldRun(now)) {
+        const hasEnergy = this.step();
+        if (!hasEnergy) {
+          this.quietFrames += 1;
+          if (this.quietFrames >= IDLE_STOP_FRAMES) {
+            this.stop();
+            this.ctx.clearRect(0, 0, this.simW, this.simH);
+            return;
+          }
+        } else {
+          this.quietFrames = 0;
         }
-      } else {
-        this.quietFrames = 0;
       }
       this.rafId = requestAnimationFrame(loop);
     };
