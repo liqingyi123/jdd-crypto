@@ -139,13 +139,15 @@ pub fn show(app: &AppHandle) {
     .maximizable(false)
     .minimizable(false)
     .focused(true)
-    .visible(true)
+    .visible(false)
     .inner_size(BUBBLE_WIDTH, height)
     .build();
 
     if let Ok(win) = result {
         let _ = win.set_position(PhysicalPosition::new(target.0, target.1));
         let _ = win.set_always_on_top(true);
+        let _ = win.show();
+        let _ = win.set_focus();
         crate::mouse_trail::schedule_raise_overlays(app);
         let handle = app.clone();
         let payload = displays;

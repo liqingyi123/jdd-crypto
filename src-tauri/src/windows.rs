@@ -15,6 +15,8 @@ pub struct CryptoHint {
 }
 
 static PENDING_CRYPTO_BUBBLE: Mutex<Option<CryptoHint>> = Mutex::new(None);
+/// Center `main` only on the first show in this process; later reopen keeps user position.
+static MAIN_CENTERED_ONCE: AtomicBool = AtomicBool::new(false);
 
 struct FeatureSpec {
     label: &'static str,
@@ -79,8 +81,8 @@ fn focus_window(app: &AppHandle, win: &WebviewWindow) {
     crate::mouse_trail::schedule_raise_overlays(app);
 }
 
-/// Center a feature window on the monitor under the cursor (fallback: primary).
-fn center_feature_window(app: &AppHandle, win: &WebviewWindow) {
+/// Center a window on the monitor under the cursor (fallback: primary).
+pub fn center_on_cursor_monitor(app: &AppHandle, win: &WebviewWindow) {
     let (cursor_x, cursor_y) = cursor_pos().unwrap_or((0, 0));
     let monitors = app.available_monitors().unwrap_or_default();
     let monitor = monitors
@@ -123,11 +125,14 @@ fn center_feature_window(app: &AppHandle, win: &WebviewWindow) {
 }
 
 fn should_recenter_on_show(label: &str) -> bool {
-    label == "settings"
+    feature_spec(label).is_some()
 }
 
 pub fn show_main(app: &AppHandle, hint: Option<CryptoHint>) {
     if let Some(win) = app.get_webview_window("main") {
+        if !MAIN_CENTERED_ONCE.swap(true, Ordering::Relaxed) {
+            center_on_cursor_monitor(app, &win);
+        }
         focus_window(app, &win);
         if let Some(hint) = hint {
             let _ = win.emit("app://crypto-payload", &hint);
@@ -149,7 +154,7 @@ pub fn show_feature(app: &AppHandle, label: &str) {
     // reclaim the process; re-open creates a fresh one.
     if let Some(win) = app.get_webview_window(label) {
         if should_recenter_on_show(label) {
-            center_feature_window(app, &win);
+            center_on_cursor_monitor(app, &win);
         }
         focus_window(app, &win);
         return;
@@ -175,7 +180,7 @@ pub fn show_feature(app: &AppHandle, label: &str) {
 fn create_feature_window(app: &AppHandle, label: &str) {
     if let Some(win) = app.get_webview_window(label) {
         if should_recenter_on_show(label) {
-            center_feature_window(app, &win);
+            center_on_cursor_monitor(app, &win);
         }
         focus_window(app, &win);
         return;
@@ -192,13 +197,15 @@ fn create_feature_window(app: &AppHandle, label: &str) {
         .resizable(false)
         .minimizable(false)
         .maximizable(false)
-        .visible(true)
+        .visible(false)
         .build();
 
     if let Ok(win) = result {
         if should_recenter_on_show(label) {
-            center_feature_window(app, &win);
+            center_on_cursor_monitor(app, &win);
         }
+        let _ = win.show();
+        let _ = win.set_focus();
         // Allow real close() so WebView process is reclaimed; only raise trail on blur.
         bind_raise_on_blur(&win);
         crate::mouse_trail::schedule_raise_overlays(app);
@@ -625,7 +632,7 @@ pub fn show_crypto_bubble(app: &AppHandle, hint: CryptoHint) {
     .maximizable(false)
     .minimizable(false)
     .focused(false)
-    .visible(true)
+    .visible(false)
     .inner_size(CRYPTO_BUBBLE_WIDTH, CRYPTO_BUBBLE_HEIGHT)
     .build();
 
@@ -909,7 +916,32 @@ fn cursor_pos() -> Option<(i32, i32)> {
     ))
 }
 
-#[cfg(not(any(windows, target_os = "macos")))]
+#[cfg(target_os = "linux")]
+fn cursor_pos() -> Option<(i32, i32)> {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use x11rb::connection::Connection;
+
+    static WAYLAND_CURSOR_WARNED: AtomicBool = AtomicBool::new(false);
+
+    let Ok((conn, screen_num)) = x11rb::connect(None) else {
+        if !WAYLAND_CURSOR_WARNED.swap(true, Ordering::Relaxed) {
+            eprintln!(
+                "[cursor] global pointer unavailable (pure Wayland?); mini-window leave-to-hide may not work"
+            );
+        }
+        return None;
+    };
+    let root = conn.setup().roots.get(screen_num)?.root;
+    let Ok(cookie) = conn.query_pointer(root) else {
+        return None;
+    };
+    let Ok(reply) = cookie.reply() else {
+        return None;
+    };
+    Some((i32::from(reply.root_x), i32::from(reply.root_y)))
+}
+
+#[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
 fn cursor_pos() -> Option<(i32, i32)> {
     None
 }

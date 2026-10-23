@@ -19,6 +19,7 @@ pub enum ShortcutOwner {
     BrightnessQuick,
     Screensaver,
     Spotlight,
+    MiniWindow,
 }
 
 fn shortcut_id(raw: &str) -> Result<u32, String> {
@@ -80,6 +81,11 @@ pub fn ensure_no_conflict(
         .lock()
         .map(|guard| guard.clone())
         .unwrap_or_else(|_| crate::state::DEFAULT_SPOTLIGHT_SHORTCUT.to_string());
+    let mini_window = state
+        .mini_window_shortcut
+        .lock()
+        .map(|guard| guard.clone())
+        .unwrap_or_else(|_| crate::state::DEFAULT_MINI_WINDOW_SHORTCUT.to_string());
 
     if !matches!(owner, ShortcutOwner::MouseFollow) && shortcut_id(&follow)? == candidate_id {
         return Err(format!("与鼠标跟随快捷键 {follow} 冲突"));
@@ -103,6 +109,9 @@ pub fn ensure_no_conflict(
     }
     if !matches!(owner, ShortcutOwner::Spotlight) && shortcut_id(&spotlight)? == candidate_id {
         return Err(format!("与聚光灯快捷键 {spotlight} 冲突"));
+    }
+    if !matches!(owner, ShortcutOwner::MiniWindow) && shortcut_id(&mini_window)? == candidate_id {
+        return Err(format!("与迷你窗快捷键 {mini_window} 冲突"));
     }
 
     Ok(())
@@ -200,6 +209,18 @@ pub fn register_all(app: &AppHandle) -> Result<(), String> {
             .unwrap_or_else(|_| crate::state::DEFAULT_SPOTLIGHT_SHORTCUT.to_string());
         let spotlight = Shortcut::from_str(&spotlight).map_err(|err| err.to_string())?;
         global.register(spotlight).map_err(|err| err.to_string())?;
+    }
+
+    if state.mini_window_pref_enabled.load(Ordering::Relaxed) {
+        let mini_window = state
+            .mini_window_shortcut
+            .lock()
+            .map(|guard| guard.clone())
+            .unwrap_or_else(|_| crate::state::DEFAULT_MINI_WINDOW_SHORTCUT.to_string());
+        let mini_window = Shortcut::from_str(&mini_window).map_err(|err| err.to_string())?;
+        global
+            .register(mini_window)
+            .map_err(|err| err.to_string())?;
     }
 
     Ok(())

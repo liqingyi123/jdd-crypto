@@ -4,6 +4,7 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Manager, Runtime};
 
 use crate::brightness_quick;
+use crate::mini_window;
 use crate::screensaver;
 use crate::windows;
 
@@ -15,6 +16,7 @@ pub fn build_app_menu<R: Runtime, M: Manager<R>>(app: &M) -> tauri::Result<Menu<
     let essentials = MenuItem::with_id(app, "essentials", "装机必备", true, None::<&str>)?;
     let brightness = MenuItem::with_id(app, "brightness", "亮度调节", true, None::<&str>)?;
     let screensaver_item = MenuItem::with_id(app, "screensaver", "屏幕保护", true, None::<&str>)?;
+    let mini = MenuItem::with_id(app, "mini_window", "迷你窗", true, None::<&str>)?;
     let about = MenuItem::with_id(app, "about", "关于", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
     let sep = PredefinedMenuItem::separator(app)?;
@@ -29,6 +31,7 @@ pub fn build_app_menu<R: Runtime, M: Manager<R>>(app: &M) -> tauri::Result<Menu<
             &essentials,
             &brightness,
             &screensaver_item,
+            &mini,
             &about,
             &sep,
             &quit,
@@ -45,6 +48,7 @@ pub fn handle_menu_id(app: &AppHandle, id: &str) {
         "essentials" => windows::show_feature(app, "essentials"),
         "brightness" => brightness_quick::show(app),
         "screensaver" => screensaver::show(app),
+        "mini_window" => mini_window::toggle(app),
         "about" => windows::show_feature(app, "about"),
         "quit" => app.exit(0),
         _ => {}

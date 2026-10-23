@@ -330,7 +330,7 @@ pub fn show_compare_bubble(app: &AppHandle, payload: CompareBubblePayload) {
     .maximizable(false)
     .minimizable(false)
     .focused(true)
-    .visible(true)
+    .visible(false)
     .inner_size(COMPARE_BUBBLE_WIDTH, COMPARE_BUBBLE_HEIGHT)
     .build();
 
@@ -338,6 +338,8 @@ pub fn show_compare_bubble(app: &AppHandle, payload: CompareBubblePayload) {
         windows::bind_close_to_hide(&win);
         let _ = win.set_position(PhysicalPosition::new(x, y));
         let _ = win.set_always_on_top(true);
+        let _ = win.show();
+        let _ = win.set_focus();
         crate::mouse_trail::schedule_raise_overlays(app);
         let _ = win.emit("app://compare-bubble", &payload);
         let handle = app.clone();

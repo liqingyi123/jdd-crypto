@@ -24,14 +24,14 @@ interface SpotlightPrefPayload {
 const DEFAULT_SIZE = 200;
 const MIN_SIZE = 100;
 const MAX_SIZE = 300;
-/** Clear core stays at --radius; dual soft rings outside it. */
+/** Clear core stays at --radius; single soft falloff outside it. */
 const INNER_FEATHER_PX = 10;
 const OUTER_FEATHER_PX = 800;
-const MASK_ALPHA = 0.78;
-/** Inner ring starts midway between clear and full mask. */
+const MASK_ALPHA = 0.55;
+/** Inner feather starts just above clear. */
 const INNER_START_ALPHA = MASK_ALPHA * 0.1;
-/** Outer ring starts near full mask. */
-const OUTER_START_ALPHA = MASK_ALPHA * 0.75;
+/** Mid stop between inner feather and far field (monotonic deepen). */
+const MID_ALPHA = MASK_ALPHA * 0.85;
 
 const holeX = shallowRef("-9999px");
 const holeY = shallowRef("-9999px");
@@ -110,6 +110,12 @@ useCursorHub({
 onMounted(async () => {
   await refreshBounds();
   try {
+    const snap = await invoke<{ x: number; y: number }>("peek_cursor_hub");
+    onCursor(snap);
+  } catch {
+    // browser preview / ACL
+  }
+  try {
     applySize(await invoke<number>("get_spotlight_size"));
   } catch {
     applySize(DEFAULT_SIZE);
@@ -139,7 +145,7 @@ onUnmounted(() => {
       '--outer-feather': `${OUTER_FEATHER_PX}px`,
       '--mask-alpha': String(MASK_ALPHA),
       '--inner-start': String(INNER_START_ALPHA),
-      '--outer-start': String(OUTER_START_ALPHA),
+      '--mid-alpha': String(MID_ALPHA),
     }"
   />
 </template>
@@ -149,20 +155,16 @@ onUnmounted(() => {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background:
-    radial-gradient(
-      circle at var(--hole-x) var(--hole-y),
-      transparent 0,
-      transparent var(--radius),
-      rgba(0, 0, 0, var(--inner-start)) calc(var(--radius) + var(--inner-feather) * 0.45),
-      rgba(0, 0, 0, var(--mask-alpha)) calc(var(--radius) + var(--inner-feather))
-    ),
-    radial-gradient(
-      circle at var(--hole-x) var(--hole-y),
-      transparent 0,
-      transparent calc(var(--radius) + var(--inner-feather)),
-      rgba(0, 0, 0, var(--outer-start)) calc(var(--radius) + var(--inner-feather) + var(--outer-feather) * 0.35),
-      rgba(0, 0, 0, var(--mask-alpha)) calc(var(--radius) + var(--inner-feather) + var(--outer-feather))
-    );
+  background: radial-gradient(
+    circle at var(--hole-x) var(--hole-y),
+    transparent 0,
+    transparent var(--radius),
+    rgba(0, 0, 0, var(--inner-start)) calc(var(--radius) + var(--inner-feather) * 0.45),
+    rgba(0, 0, 0, var(--mid-alpha)) calc(var(--radius) + var(--inner-feather)),
+    rgba(0, 0, 0, var(--mask-alpha))
+      calc(var(--radius) + var(--inner-feather) + var(--outer-feather) * 0.35),
+    rgba(0, 0, 0, var(--mask-alpha))
+      calc(var(--radius) + var(--inner-feather) + var(--outer-feather))
+  );
 }
 </style>

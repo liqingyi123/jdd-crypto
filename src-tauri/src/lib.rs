@@ -12,6 +12,7 @@ mod hosts_manager;
 mod hosts_quick;
 mod hosts_search;
 mod intranet_server;
+mod mini_window;
 mod mouse_follow;
 mod mouse_trail;
 mod overlay_toast;
@@ -66,6 +67,7 @@ pub fn run() {
                         brightness_quick::handle_shortcut(app, shortcut);
                         screensaver::handle_shortcut(app, shortcut);
                         spotlight::handle_shortcut(app, shortcut);
+                        mini_window::handle_shortcut(app, shortcut);
                     }
                 })
                 .build(),
@@ -190,6 +192,24 @@ pub fn run() {
             commands::peek_cursor_hub,
             commands::set_spotlight_size,
             commands::get_spotlight_monitor_bounds,
+            commands::get_mini_window_prefs,
+            commands::mini_window_navigate,
+            commands::mini_window_show_home,
+            commands::mini_window_go_back,
+            commands::mini_window_go_forward,
+            commands::mini_window_minimize,
+            commands::mini_window_close,
+            commands::mini_window_set_dragging,
+            commands::set_mini_window_auto_hide,
+            commands::set_mini_window_always_on_top,
+            commands::set_mini_window_content_opacity,
+            commands::set_mini_window_background_opacity,
+            commands::show_mini_opacity_bubble,
+            commands::hide_mini_opacity_bubble,
+            commands::get_mini_window_pref,
+            commands::set_mini_window_pref,
+            commands::get_mini_window_shortcut,
+            commands::set_mini_window_shortcut,
             commands::check_app_update,
             commands::download_app_update,
             commands::install_app_update,
@@ -276,6 +296,15 @@ pub fn run() {
                 .screensaver_pref_enabled
                 .store(screensaver_pref, Ordering::Relaxed);
             spotlight::init_from_store(app.handle());
+            let mini_window_shortcut = mini_window::load_shortcut(app.handle());
+            if let Ok(mut current) = app.state::<AppState>().mini_window_shortcut.lock() {
+                *current = mini_window_shortcut;
+            }
+            let mini_window_pref = mini_window::load_pref(app.handle());
+            app.state::<AppState>()
+                .mini_window_pref_enabled
+                .store(mini_window_pref, Ordering::Relaxed);
+            mini_window::init_from_store(app.handle());
             mouse_follow::start_follow_loop(app.handle().clone());
             mouse_trail::init_from_store(app.handle());
             let _ = global_shortcuts::register_all(app.handle());

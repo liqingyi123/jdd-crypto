@@ -149,7 +149,7 @@ fn show_on_main(app: &AppHandle, message: String) {
     .maximizable(false)
     .minimizable(false)
     .focused(false)
-    .visible(true)
+    .visible(false)
     .inner_size(width, OVERLAY_TOAST_HEIGHT)
     .build();
 
@@ -158,6 +158,7 @@ fn show_on_main(app: &AppHandle, message: String) {
             let _ = win.set_position(PhysicalPosition::new(target.0, target.1));
             let _ = win.set_always_on_top(true);
             let _ = win.set_ignore_cursor_events(true);
+            let _ = win.show();
             crate::mouse_trail::schedule_raise_overlays(app);
             let handle = app.clone();
             let msg = message.clone();

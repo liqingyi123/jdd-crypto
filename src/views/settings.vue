@@ -143,6 +143,22 @@ const {
   defaultShortcut: "Ctrl+Alt+D",
 });
 
+const {
+  recording: miniWindowRecording,
+  errorMessage: miniWindowErrorMessage,
+  display: miniWindowDisplay,
+  previewDisplay: miniWindowPreviewDisplay,
+  buttonRef: miniWindowButtonRef,
+  startRecording: startMiniWindowRecording,
+  cancelRecording: cancelMiniWindowRecording,
+  onRecordKey: onMiniWindowRecordKey,
+  loadShortcut: loadMiniWindowShortcut,
+} = useShortcutRecorder({
+  getCommand: "get_mini_window_shortcut",
+  setCommand: "set_mini_window_shortcut",
+  defaultShortcut: "Ctrl+Alt+M",
+});
+
 const themeOptions: Array<{ value: ThemePreference; label: string }> = [
   { value: "system", label: "跟随系统" },
   { value: "light", label: "浅色" },
@@ -157,6 +173,7 @@ const hostsSearchPref = shallowRef(true);
 const brightnessQuickPref = shallowRef(true);
 const screensaverPref = shallowRef(true);
 const spotlightPref = shallowRef(true);
+const miniWindowPref = shallowRef(true);
 const spotlightShakePref = shallowRef(true);
 const spotlightSize = shallowRef(200);
 const screensaverBackground = shallowRef<ScreensaverBackground>(
@@ -333,6 +350,11 @@ onMounted(async () => {
     // browser preview
   }
   try {
+    miniWindowPref.value = await invoke<boolean>("get_mini_window_pref");
+  } catch {
+    // browser preview
+  }
+  try {
     spotlightShakePref.value = await invoke<boolean>("get_spotlight_shake_pref");
   } catch {
     // browser preview
@@ -374,6 +396,7 @@ onMounted(async () => {
   await loadBrightnessShortcut();
   await loadScreensaverShortcut();
   await loadSpotlightShortcut();
+  await loadMiniWindowShortcut();
   try {
     unlistenTrailPref = await listen<MouseTrailPref>("app://mouse-trail-pref", (event) => {
       applyTrailPref(event.payload);
@@ -502,6 +525,21 @@ async function onScreensaverPrefChange(value: string | number | boolean) {
     await invoke("set_screensaver_pref", { enabled });
   } catch (error) {
     screensaverPref.value = previous;
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
+}
+
+async function onMiniWindowPrefChange(value: string | number | boolean) {
+  const enabled = Boolean(value);
+  const previous = miniWindowPref.value;
+  miniWindowPref.value = enabled;
+  if (!enabled && miniWindowRecording.value) {
+    await cancelMiniWindowRecording();
+  }
+  try {
+    await invoke("set_mini_window_pref", { enabled });
+  } catch (error) {
+    miniWindowPref.value = previous;
     ElMessage.error(error instanceof Error ? error.message : String(error));
   }
 }
@@ -940,6 +978,48 @@ async function onThemeChange(value: string | number | boolean | undefined) {
                 </ElButton>
               </div>
             </template>
+          </section>
+          <section>
+            <div class="section-head">
+              <h2>迷你窗</h2>
+              <label class="row">
+                <ElSwitch
+                  :model-value="miniWindowPref"
+                  @change="onMiniWindowPrefChange"
+                />
+              </label>
+            </div>
+            <p>
+              按下快捷键或托盘右键菜单打开迷你窗，可在窗内打开番茄小说、QQ阅读或任意网页；支持透明度、置顶与鼠标移出隐藏到任务栏。
+            </p>
+            <div class="row shortcut-row">
+              <span>快捷键</span>
+              <div ref="miniWindowButtonRef">
+                <ElTooltip
+                  placement="top"
+                  :content="SHORTCUT_RECORD_TIP"
+                  popper-class="shortcut-record-tip-popper"
+                >
+                  <span class="shortcut-record-trigger">
+                    <ElButton
+                      :type="miniWindowRecording ? 'primary' : 'default'"
+                      :disabled="!miniWindowPref"
+                      @click="startMiniWindowRecording"
+                      @keydown="onMiniWindowRecordKey"
+                    >
+                      {{
+                        miniWindowRecording
+                          ? miniWindowPreviewDisplay
+                          : miniWindowDisplay
+                      }}
+                    </ElButton>
+                  </span>
+                </ElTooltip>
+              </div>
+            </div>
+            <p v-if="miniWindowErrorMessage" class="error">
+              {{ miniWindowErrorMessage }}
+            </p>
           </section>
           <section>
             <div class="section-head">

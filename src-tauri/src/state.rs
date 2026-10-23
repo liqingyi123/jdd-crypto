@@ -16,6 +16,7 @@ pub const DEFAULT_HOSTS_SEARCH_SHORTCUT: &str = "Ctrl+Alt+F";
 pub const DEFAULT_BRIGHTNESS_QUICK_SHORTCUT: &str = "Ctrl+Alt+L";
 pub const DEFAULT_SCREENSAVER_SHORTCUT: &str = "Ctrl+Alt+P";
 pub const DEFAULT_SPOTLIGHT_SHORTCUT: &str = "Ctrl+Alt+D";
+pub const DEFAULT_MINI_WINDOW_SHORTCUT: &str = "Ctrl+Alt+M";
 pub const DEFAULT_SPOTLIGHT_SIZE: u32 = 200;
 pub const MIN_SPOTLIGHT_SIZE: u32 = 100;
 pub const MAX_SPOTLIGHT_SIZE: u32 = 300;
@@ -56,6 +57,9 @@ pub struct AppState {
     pub spotlight_shortcut: Mutex<String>,
     pub spotlight_size: AtomicU32,
     pub spotlight_active: AtomicBool,
+    pub mini_window_pref_enabled: AtomicBool,
+    pub mini_window_shortcut: Mutex<String>,
+    pub mini_window_auto_hide: AtomicBool,
     pub pending_update: Mutex<Option<UpdateCheckResult>>,
 }
 
@@ -90,6 +94,9 @@ impl Default for AppState {
             spotlight_shortcut: Mutex::new(DEFAULT_SPOTLIGHT_SHORTCUT.to_string()),
             spotlight_size: AtomicU32::new(DEFAULT_SPOTLIGHT_SIZE),
             spotlight_active: AtomicBool::new(false),
+            mini_window_pref_enabled: AtomicBool::new(true),
+            mini_window_shortcut: Mutex::new(DEFAULT_MINI_WINDOW_SHORTCUT.to_string()),
+            mini_window_auto_hide: AtomicBool::new(false),
             pending_update: Mutex::new(None),
         }
     }

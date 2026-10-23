@@ -97,6 +97,8 @@ export function useCursorHub(options: {
     if (stopped || rafId) {
       return;
     }
+    // Force one paint even if cursor hasn't moved (e.g. spotlight first show / re-enter monitor).
+    lastSeq = -1;
     rafId = requestAnimationFrame(() => {
       void tick();
     });

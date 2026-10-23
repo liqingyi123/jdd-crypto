@@ -27,7 +27,9 @@ async function bootstrap() {
     windowLabel === "hosts-quick" ||
     windowLabel === "hosts-search" ||
     windowLabel === "brightness-bubble" ||
-    windowLabel === "overlay-toast";
+    windowLabel === "overlay-toast" ||
+    windowLabel === "mini-window" ||
+    windowLabel === "mini-opacity";
 
   if (isMouseTrail || isSpotlight) {
     // Keep trail / spotlight overlays free of theme chrome (transparent only).

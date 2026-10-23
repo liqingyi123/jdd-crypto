@@ -37,6 +37,12 @@ const ScreensaverApp = defineAsyncComponent(
 const SpotlightApp = defineAsyncComponent(
   () => import("@/windows/spotlight-app.vue"),
 );
+const MiniWindowApp = defineAsyncComponent(
+  () => import("@/windows/mini-window-app.vue"),
+);
+const MiniOpacityApp = defineAsyncComponent(
+  () => import("@/windows/mini-opacity-app.vue"),
+);
 const MainApp = defineAsyncComponent(() => import("@/windows/main-app.vue"));
 const FeatureApp = defineAsyncComponent(() => import("@/windows/feature-app.vue"));
 const AppUpdateHost = defineAsyncComponent(
@@ -60,6 +66,8 @@ const isSpotlight = computed(() => props.windowLabel.startsWith("spotlight"));
   <OverlayToastApp v-else-if="windowLabel === 'overlay-toast'" />
   <ScreensaverApp v-else-if="isScreensaver" />
   <SpotlightApp v-else-if="isSpotlight" />
+  <MiniWindowApp v-else-if="windowLabel === 'mini-window'" />
+  <MiniOpacityApp v-else-if="windowLabel === 'mini-opacity'" />
   <MainApp v-else-if="windowLabel === 'main'" />
   <MouseTrailApp v-else-if="isMouseTrail" />
   <FeatureApp v-else :window-label="windowLabel" />
