@@ -5,7 +5,15 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { ElMessage, ElMessageBox } from "element-plus";
 import MonacoEditor from "@/components/monaco-editor.vue";
 
-type TeamaiAction = "deploy" | "upgrade" | "pull" | "push";
+type TeamaiAction =
+  | "deploy"
+  | "upgrade"
+  | "pull"
+  | "push"
+  | "disableAutoUpgrade"
+  | "enableAutoUpgrade";
+
+type UpdatePolicy = "auto" | "prompt" | "skip";
 
 interface TeamaiPref {
   repoUrl: string;
@@ -46,12 +54,15 @@ const ACTION_LABELS: Record<TeamaiAction, string> = {
   upgrade: "升级版本",
   pull: "拉取配置",
   push: "上传配置",
+  disableAutoUpgrade: "禁用自动升级",
+  enableAutoUpgrade: "启用自动升级",
 };
 
 const repoUrl = shallowRef(DEFAULT_REPO_URL);
 const accessToken = shallowRef("");
 const cliInstalled = shallowRef(false);
 const cliVersion = shallowRef("");
+const updatePolicy = shallowRef<UpdatePolicy | null>(null);
 const openingLocalDir = shallowRef(false);
 const pushDialogVisible = shallowRef(false);
 const pushBranch = shallowRef("");
@@ -64,6 +75,8 @@ const logs = shallowRef<Record<TeamaiAction, string>>({
   upgrade: "",
   pull: "",
   push: "",
+  disableAutoUpgrade: "",
+  enableAutoUpgrade: "",
 });
 
 const logText = computed({
@@ -81,16 +94,34 @@ const versionLabel = computed(() => {
   return v.startsWith("v") ? v : `v${v}`;
 });
 
+const autoUpgradeOff = computed(() => updatePolicy.value === "skip");
+
 const visibleActions = computed(() => {
   if (!cliInstalled.value) {
     return [{ id: "deploy" as const, label: "一键部署" }];
   }
-  return [
-    { id: "deploy" as const, label: "重新部署" },
-    { id: "upgrade" as const, label: ACTION_LABELS.upgrade },
-    { id: "pull" as const, label: ACTION_LABELS.pull },
-    { id: "push" as const, label: ACTION_LABELS.push },
+  const actions: Array<{
+    id: TeamaiAction;
+    label: string;
+    disabled?: boolean;
+  }> = [
+    { id: "deploy", label: "重新部署" },
+    { id: "upgrade", label: ACTION_LABELS.upgrade },
+    { id: "pull", label: ACTION_LABELS.pull },
+    { id: "push", label: ACTION_LABELS.push },
   ];
+  if (autoUpgradeOff.value) {
+    actions.push({
+      id: "enableAutoUpgrade",
+      label: ACTION_LABELS.enableAutoUpgrade,
+    });
+  } else {
+    actions.push({
+      id: "disableAutoUpgrade",
+      label: ACTION_LABELS.disableAutoUpgrade,
+    });
+  }
+  return actions;
 });
 
 function setActionLog(action: TeamaiAction, text: string) {
@@ -142,6 +173,16 @@ async function refreshVersion(): Promise<string | null> {
   }
 }
 
+async function refreshUpdatePolicy() {
+  try {
+    const policy = await invoke<UpdatePolicy | null>("teamai_cli_get_update_policy");
+    updatePolicy.value =
+      policy === "auto" || policy === "prompt" || policy === "skip" ? policy : null;
+  } catch {
+    updatePolicy.value = null;
+  }
+}
+
 async function detectCli() {
   let status: TeamaiCliStatus = {
     installed: false,
@@ -162,8 +203,10 @@ async function detectCli() {
     if (!cliVersion.value && verOrErr) {
       body += `\n# 读取版本失败\n${verOrErr}\n`;
     }
+    await refreshUpdatePolicy();
   } else {
     cliVersion.value = "";
+    updatePolicy.value = null;
   }
   const header = `# [${stamp}] CLI 检测 → ${status.installed ? "已安装" : "未安装"}${
     status.bin ? ` (${status.bin})` : ""
@@ -337,6 +380,32 @@ async function confirmPush() {
   }
 }
 
+async function onSetAutoUpgrade(enable: boolean) {
+  const action: TeamaiAction = enable ? "enableAutoUpgrade" : "disableAutoUpgrade";
+  const policy = enable ? "auto" : "skip";
+  logHint.value = "";
+  actionLoading.value = action;
+  try {
+    const result = await invoke<TeamaiRunResult>("teamai_cli_set_update_policy", {
+      policy,
+    });
+    setActionLog(action, result.log || "");
+    if (result.ok) {
+      updatePolicy.value = policy;
+      logHint.value = enable ? "已启用自动升级" : "已禁用自动升级";
+      ElMessage.success(logHint.value);
+    } else {
+      ElMessage.error("设置失败，详见执行日志");
+    }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    setActionLog(action, `# 设置自动升级失败\n${msg}\n`);
+    ElMessage.error(msg);
+  } finally {
+    actionLoading.value = null;
+  }
+}
+
 function onActionClick(action: TeamaiAction) {
   if (action === "deploy") {
     void onDeploy();
@@ -352,6 +421,14 @@ function onActionClick(action: TeamaiAction) {
   }
   if (action === "push") {
     void onPush();
+    return;
+  }
+  if (action === "disableAutoUpgrade") {
+    void onSetAutoUpgrade(false);
+    return;
+  }
+  if (action === "enableAutoUpgrade") {
+    void onSetAutoUpgrade(true);
   }
 }
 
@@ -405,7 +482,10 @@ onMounted(async () => {
           v-for="action in visibleActions"
           :key="action.id"
           :loading="actionLoading === action.id"
-          :disabled="actionLoading !== null && actionLoading !== action.id"
+          :disabled="
+            Boolean(action.disabled) ||
+            (actionLoading !== null && actionLoading !== action.id)
+          "
           @click="onActionClick(action.id)"
         >
           {{ action.label }}

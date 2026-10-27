@@ -128,6 +128,8 @@ pub fn run() {
             commands::teamai_cli_has_push_changes,
             commands::teamai_cli_push,
             commands::teamai_cli_deploy,
+            commands::teamai_cli_get_update_policy,
+            commands::teamai_cli_set_update_policy,
             commands::open_teamai_local_dir,
             commands::hosts_list,
             commands::hosts_upsert,

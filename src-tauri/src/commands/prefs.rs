@@ -118,3 +118,25 @@ pub async fn open_teamai_local_dir(app: AppHandle) -> Result<(), String> {
         .await
         .map_err(|e| e.to_string())?
 }
+
+#[tauri::command]
+pub async fn teamai_cli_get_update_policy() -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(crate::teamai_cli::get_update_policy)
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn teamai_cli_set_update_policy(policy: String) -> crate::teamai_cli::TeamaiRunResult {
+    match tauri::async_runtime::spawn_blocking(move || {
+        crate::teamai_cli::set_update_policy(&policy)
+    })
+    .await
+    {
+        Ok(result) => result,
+        Err(e) => crate::teamai_cli::TeamaiRunResult {
+            ok: false,
+            log: format!("设置自动升级策略失败: {e}\n"),
+        },
+    }
+}

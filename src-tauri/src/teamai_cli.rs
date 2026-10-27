@@ -1,6 +1,7 @@
 //! Detect and resolve the teamai CLI (Windows PATH / Volta shims).
 
 use serde::Serialize;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
@@ -68,6 +69,119 @@ pub struct TeamaiDeployResult {
     pub log: String,
 }
 
+/// 读取本地 `~/.teamai/config.yaml` 的 `updatePolicy`（`auto` / `prompt` / `skip`）。
+/// 文件不存在或未设置时返回 `Ok(None)`。
+pub fn get_update_policy() -> Result<Option<String>, String> {
+    let path = teamai_config_path()?;
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let text = fs::read_to_string(&path).map_err(|e| format!("读取 config.yaml 失败: {e}"))?;
+    Ok(parse_update_policy(&text))
+}
+
+/// 写入本地 `updatePolicy`：`auto` 启用自动升级，`skip` 禁用。
+pub fn set_update_policy(policy: &str) -> TeamaiRunResult {
+    let mut log = String::from("# teamai 自动升级策略\n");
+    let policy = policy.trim();
+    if policy != "auto" && policy != "skip" {
+        log.push_str(&format!("error: 非法策略 `{policy}`，仅支持 auto / skip\n"));
+        return TeamaiRunResult { ok: false, log };
+    }
+
+    let path = match teamai_config_path() {
+        Ok(p) => p,
+        Err(e) => {
+            log.push_str(&format!("error: {e}\n"));
+            return TeamaiRunResult { ok: false, log };
+        }
+    };
+    if !path.is_file() {
+        log.push_str(&format!(
+            "error: 未找到 {}\n请先完成 Teamai 部署\n",
+            path.display()
+        ));
+        return TeamaiRunResult { ok: false, log };
+    }
+
+    let text = match fs::read_to_string(&path) {
+        Ok(t) => t,
+        Err(e) => {
+            log.push_str(&format!("error: 读取 config.yaml 失败: {e}\n"));
+            return TeamaiRunResult { ok: false, log };
+        }
+    };
+
+    let next = upsert_update_policy(&text, policy);
+    log.push_str(&format!("$ 设置 updatePolicy: {policy}\n"));
+    log.push_str(&format!("config: {}\n", path.display()));
+
+    match fs::write(&path, next) {
+        Ok(()) => {
+            let label = if policy == "skip" {
+                "已禁用自动升级"
+            } else {
+                "已启用自动升级"
+            };
+            log.push_str(&format!("ok: {label}\n"));
+            TeamaiRunResult { ok: true, log }
+        }
+        Err(e) => {
+            log.push_str(&format!("error: 写入 config.yaml 失败: {e}\n"));
+            TeamaiRunResult { ok: false, log }
+        }
+    }
+}
+
+fn teamai_config_path() -> Result<PathBuf, String> {
+    let home = std::env::var_os("USERPROFILE")
+        .or_else(|| std::env::var_os("HOME"))
+        .ok_or_else(|| "无法解析用户主目录".to_string())?;
+    Ok(PathBuf::from(home).join(".teamai").join("config.yaml"))
+}
+
+fn parse_update_policy(text: &str) -> Option<String> {
+    for line in text.lines() {
+        let trimmed = line.trim();
+        let Some(rest) = trimmed.strip_prefix("updatePolicy:") else {
+            continue;
+        };
+        let value = rest
+            .trim()
+            .trim_matches(|c| c == '"' || c == '\'')
+            .trim();
+        if matches!(value, "auto" | "prompt" | "skip") {
+            return Some(value.to_string());
+        }
+    }
+    None
+}
+
+fn upsert_update_policy(text: &str, policy: &str) -> String {
+    let mut out = String::with_capacity(text.len() + 32);
+    let mut replaced = false;
+    for line in text.lines() {
+        if line.trim_start().starts_with("updatePolicy:") {
+            out.push_str("updatePolicy: ");
+            out.push_str(policy);
+            out.push('\n');
+            replaced = true;
+        } else {
+            out.push_str(line);
+            out.push('\n');
+        }
+    }
+    if !replaced {
+        if !out.is_empty() && !out.ends_with('\n') {
+            out.push('\n');
+        }
+        out.push_str("updatePolicy: ");
+        out.push_str(policy);
+        out.push('\n');
+    }
+    out
+}
+
 /// Deploy / redeploy: sync env, install CLI, init --scope user, pull.
 pub fn cli_deploy(app: &AppHandle, repo_url: String, access_token: String) -> TeamaiDeployResult {
     let mut log = String::from("# teamai 部署\n");
@@ -101,10 +215,10 @@ pub fn cli_deploy(app: &AppHandle, repo_url: String, access_token: String) -> Te
         }
     }
 
-    // 2) Install CLI
-    log.push_str("$ npm install -g teamai-cli@latest\n");
-    match run_npm_install_latest() {
-        Ok(out) => {
+    // 2) Install CLI（有 Volta 则 volta install，否则 npm -g）
+    match install_teamai_cli() {
+        Ok((cmd, out)) => {
+            log.push_str(&format!("{cmd}\n"));
             log.push_str(&out.combined);
             if !out.combined.ends_with('\n') {
                 log.push('\n');
@@ -188,6 +302,16 @@ pub fn cli_deploy(app: &AppHandle, repo_url: String, access_token: String) -> Te
         version,
         log,
     }
+}
+
+/// 有 Volta 时用 `volta install`；否则 `npm install -g`。不因 Volta 失败再回退 npm。
+fn install_teamai_cli() -> Result<(&'static str, ProcessOutput), String> {
+    if let Some(volta) = find_volta_exe() {
+        let out = run_bin_with_args(&volta, &["install", "teamai-cli@latest"])?;
+        return Ok(("$ volta install teamai-cli@latest", out));
+    }
+    let out = run_npm_install_latest()?;
+    Ok(("$ npm install -g teamai-cli@latest", out))
 }
 
 fn run_npm_install_latest() -> Result<ProcessOutput, String> {
@@ -410,7 +534,7 @@ fn detect_default_branch(repo: &Path) -> Result<String, String> {
     Err("无法确定主干分支（origin/HEAD / main / master）".to_string())
 }
 
-/// Upgrade CLI: `teamai update` first, npm global as fallback; pull after real upgrade.
+/// Upgrade CLI: `teamai update` first, volta/npm install as fallback; pull after real upgrade.
 pub fn cli_upgrade() -> TeamaiUpgradeResult {
     let mut log = String::from("# teamai 升级\n");
 
@@ -442,15 +566,15 @@ pub fn cli_upgrade() -> TeamaiUpgradeResult {
         if out.ok {
             return finish_upgrade_with_pull(log);
         }
-        // Non-zero from teamai update: still try npm fallback below.
-        log.push_str("teamai update 未成功，尝试 npm 保底升级\n");
+        // Non-zero from teamai update: still try volta/npm fallback below.
+        log.push_str("teamai update 未成功，尝试 Volta/npm 保底升级\n");
     } else {
-        log.push_str("teamai update 无法启动，尝试 npm 保底升级\n");
+        log.push_str("teamai update 无法启动，尝试 Volta/npm 保底升级\n");
     }
 
-    match run_npm_upgrade() {
-        Ok(out) => {
-            log.push_str("$ npm install -g teamai-cli@latest\n");
+    match install_teamai_cli() {
+        Ok((cmd, out)) => {
+            log.push_str(&format!("{cmd}\n"));
             log.push_str(&out.combined);
             if !out.combined.ends_with('\n') {
                 log.push('\n');
@@ -463,10 +587,11 @@ pub fn cli_upgrade() -> TeamaiUpgradeResult {
                     log,
                 };
             }
+            clear_resolved_bin();
             finish_upgrade_with_pull(log)
         }
         Err(e) => {
-            log.push_str(&format!("$ npm install -g teamai-cli@latest\nerror: {e}\n"));
+            log.push_str(&format!("error: {e}\n"));
             TeamaiUpgradeResult {
                 ok: false,
                 up_to_date: false,
@@ -605,10 +730,6 @@ fn run_teamai(args: &[&str]) -> Result<ProcessOutput, String> {
 
     let bin = resolve_teamai_bin().ok_or_else(|| "teamai 未安装".to_string())?;
     run_bin_with_args(&bin, args)
-}
-
-fn run_npm_upgrade() -> Result<ProcessOutput, String> {
-    run_npm_install_latest()
 }
 
 #[cfg(windows)]
@@ -930,39 +1051,77 @@ fn try_volta_run(log: &mut LogBuf) -> bool {
     }
 }
 
-#[cfg(windows)]
 fn find_volta_exe() -> Option<PathBuf> {
-    let candidates = [
-        PathBuf::from(r"C:\Program Files\Volta\volta.exe"),
-        PathBuf::from(r"C:\Program Files (x86)\Volta\volta.exe"),
-    ];
-    for c in candidates {
-        if c.is_file() {
-            return Some(c);
+    #[cfg(windows)]
+    {
+        let mut candidates = vec![
+            PathBuf::from(r"C:\Program Files\Volta\volta.exe"),
+            PathBuf::from(r"C:\Program Files (x86)\Volta\volta.exe"),
+        ];
+        if let Some(local) = std::env::var_os("LOCALAPPDATA") {
+            candidates.push(PathBuf::from(local).join(r"Volta\bin\volta.exe"));
         }
+        if let Some(user) = std::env::var_os("USERPROFILE") {
+            candidates.push(PathBuf::from(user).join(r".volta\bin\volta.exe"));
+        }
+        for c in candidates {
+            if c.is_file() {
+                return Some(c);
+            }
+        }
+        let mut cmd = Command::new("where.exe");
+        cmd.arg("volta.exe")
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null());
+        if let Some(p) = effective_path() {
+            cmd.env("PATH", p);
+        }
+        apply_no_window(&mut cmd);
+        let output = cmd.output().ok()?;
+        if !output.status.success() {
+            return None;
+        }
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for line in stdout.lines() {
+            let p = PathBuf::from(line.trim());
+            if p.is_file() {
+                return Some(p);
+            }
+        }
+        None
     }
-    // where volta.exe with effective PATH
-    let mut cmd = Command::new("where.exe");
-    cmd.arg("volta.exe")
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null());
-    if let Some(p) = effective_path() {
-        cmd.env("PATH", p);
-    }
-    apply_no_window(&mut cmd);
-    let output = cmd.output().ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    for line in stdout.lines() {
+    #[cfg(not(windows))]
+    {
+        let mut candidates = Vec::new();
+        if let Ok(home) = std::env::var("HOME") {
+            candidates.push(PathBuf::from(&home).join(".volta/bin/volta"));
+        }
+        candidates.push(PathBuf::from("/usr/local/bin/volta"));
+        for c in candidates {
+            if c.is_file() {
+                return Some(c);
+            }
+        }
+        let mut cmd = Command::new("which");
+        cmd.arg("volta")
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null());
+        if let Some(p) = effective_path() {
+            cmd.env("PATH", p);
+        }
+        let output = cmd.output().ok()?;
+        if !output.status.success() {
+            return None;
+        }
+        let line = String::from_utf8_lossy(&output.stdout);
         let p = PathBuf::from(line.trim());
         if p.is_file() {
             return Some(p);
         }
+        None
     }
-    None
 }
 
 fn apply_no_window(cmd: &mut Command) {
