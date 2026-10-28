@@ -12,9 +12,13 @@ use tauri::{
 use tauri_plugin_global_shortcut::{Shortcut, ShortcutState};
 use tauri_plugin_store::StoreExt;
 
+use crate::state::{AppState, DEFAULT_MOUSE_TRAIL_SHORTCUT};
+
 const MAX_OVERLAYS: usize = 8;
 const SETTINGS_STORE: &str = "settings.json";
 const PREF_KEY: &str = "mouseTrail";
+const SHORTCUT_KEY: &str = "mouseTrailShortcut";
+const SHORTCUT_PREF_KEY: &str = "mouseTrailShortcutEnabled";
 const DEFAULT_EFFECT: &str = "ribbon";
 const DEFAULT_PERFORMANCE_MODE: &str = "balanced";
 const INTERVAL_ECO_MS: u64 = 33;
@@ -24,16 +28,37 @@ const DEFAULT_METEOR_COLOR: &str = "#F8EC85";
 const DEFAULT_DOTS_COLOR: &str = "#00D1CE";
 const DEFAULT_HEART_COLOR: &str = "#FF2EC8";
 const DEFAULT_RIPPLE_COLOR: &str = "#2A2A2E";
+const DEFAULT_BLOOM_COLOR: &str = "#7AD7FF";
+const DEFAULT_FALL_COLOR: &str = "#FFB86B";
 const DISPLAY_CHANGE_DEBOUNCE: Duration = Duration::from_millis(300);
 const RAISE_FOCUS_RETRY: Duration = Duration::from_millis(50);
 const TRAIL_ARM_SHORTCUT: &str = "Ctrl+T";
-const TRAIL_EFFECT_SHORTCUTS: [&str; 6] =
-    ["Ctrl+1", "Ctrl+2", "Ctrl+3", "Ctrl+4", "Ctrl+5", "Ctrl+6"];
-const TRAIL_EFFECTS: [&str; 6] = ["ribbon", "meteor", "graffiti", "dots", "heart", "ripple"];
+const TRAIL_EFFECT_SHORTCUTS: [&str; 9] = [
+    "Ctrl+1",
+    "Ctrl+2",
+    "Ctrl+3",
+    "Ctrl+4",
+    "Ctrl+5",
+    "Ctrl+6",
+    "Ctrl+7",
+    "Ctrl+8",
+    "Ctrl+9",
+];
+const TRAIL_EFFECTS: [&str; 9] = [
+    "ribbon",
+    "meteor",
+    "graffiti",
+    "dots",
+    "heart",
+    "ripple",
+    "bubbles",
+    "bloom",
+    "fall",
+];
 
 /// Ctrl 仍按住时，已按下过 T，等待数字键完成 Ctrl+T+数字 组合。
 static TRAIL_CHORD_ARMED: AtomicBool = AtomicBool::new(false);
-static TRAIL_SHORTCUT_IDS: OnceLock<(u32, [u32; 6])> = OnceLock::new();
+static TRAIL_SHORTCUT_IDS: OnceLock<(u32, [u32; 9])> = OnceLock::new();
 
 static TRAIL_ENABLED: AtomicBool = AtomicBool::new(false);
 /// Runtime suppress while screensaver is active (does not change user pref).
@@ -63,6 +88,10 @@ pub struct MouseTrailColors {
     pub heart: String,
     #[serde(default = "default_ripple_color")]
     pub ripple: String,
+    #[serde(default = "default_bloom_color")]
+    pub bloom: String,
+    #[serde(default = "default_fall_color")]
+    pub fall: String,
 }
 
 impl Default for MouseTrailColors {
@@ -72,6 +101,8 @@ impl Default for MouseTrailColors {
             dots: default_dots_color(),
             heart: default_heart_color(),
             ripple: default_ripple_color(),
+            bloom: default_bloom_color(),
+            fall: default_fall_color(),
         }
     }
 }
@@ -90,6 +121,14 @@ fn default_heart_color() -> String {
 
 fn default_ripple_color() -> String {
     DEFAULT_RIPPLE_COLOR.to_string()
+}
+
+fn default_bloom_color() -> String {
+    DEFAULT_BLOOM_COLOR.to_string()
+}
+
+fn default_fall_color() -> String {
+    DEFAULT_FALL_COLOR.to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -167,6 +206,9 @@ fn normalize_effect(raw: &str) -> String {
         "dots" => "dots".to_string(),
         "heart" => "heart".to_string(),
         "ripple" => "ripple".to_string(),
+        "bubbles" => "bubbles".to_string(),
+        "bloom" => "bloom".to_string(),
+        "fall" => "fall".to_string(),
         _ => DEFAULT_EFFECT.to_string(),
     }
 }
@@ -209,6 +251,8 @@ fn normalize_colors(colors: &mut MouseTrailColors) {
     colors.dots = normalize_color(&colors.dots, DEFAULT_DOTS_COLOR);
     colors.heart = normalize_color(&colors.heart, DEFAULT_HEART_COLOR);
     colors.ripple = normalize_color(&colors.ripple, DEFAULT_RIPPLE_COLOR);
+    colors.bloom = normalize_color(&colors.bloom, DEFAULT_BLOOM_COLOR);
+    colors.fall = normalize_color(&colors.fall, DEFAULT_FALL_COLOR);
 }
 
 fn normalize_pref(pref: &mut MouseTrailPref) {
@@ -249,13 +293,27 @@ pub fn get_pref(app: AppHandle) -> MouseTrailPref {
     load_pref(&app)
 }
 
-pub fn set_enabled_pref(app: AppHandle, enabled: bool) -> Result<MouseTrailPref, String> {
-    let mut pref = load_pref(&app);
+fn apply_enabled_pref(app: &AppHandle, enabled: bool) -> Result<MouseTrailPref, String> {
+    let mut pref = load_pref(app);
     pref.enabled = enabled;
-    save_pref(&app, &pref)?;
-    set_enabled(&app, enabled);
+    save_pref(app, &pref)?;
+    set_enabled(app, enabled);
+    emit_pref(app, &pref);
+    Ok(pref)
+}
+
+/// Re-register global shortcuts off the hotkey callback thread.
+/// Calling `register_all` inside the global-shortcut handler deadlocks the plugin lock.
+fn schedule_register_all(app: &AppHandle) {
+    let handle = app.clone();
+    thread::spawn(move || {
+        let _ = crate::global_shortcuts::register_all(&handle);
+    });
+}
+
+pub fn set_enabled_pref(app: AppHandle, enabled: bool) -> Result<MouseTrailPref, String> {
+    let pref = apply_enabled_pref(&app, enabled)?;
     let _ = crate::global_shortcuts::register_all(&app);
-    emit_pref(&app, &pref);
     Ok(pref)
 }
 
@@ -285,7 +343,11 @@ pub fn set_color_pref(
     color: String,
 ) -> Result<MouseTrailPref, String> {
     let normalized_effect = normalize_effect(&effect);
-    if normalized_effect != "meteor" && normalized_effect != "dots" && normalized_effect != "heart"
+    if normalized_effect != "meteor"
+        && normalized_effect != "dots"
+        && normalized_effect != "heart"
+        && normalized_effect != "bloom"
+        && normalized_effect != "fall"
     {
         return Err("该特效不支持自定义颜色".into());
     }
@@ -293,11 +355,15 @@ pub fn set_color_pref(
     let normalized_color = match normalized_effect.as_str() {
         "meteor" => normalize_color(&color, DEFAULT_METEOR_COLOR),
         "dots" => normalize_color(&color, DEFAULT_DOTS_COLOR),
+        "bloom" => normalize_color(&color, DEFAULT_BLOOM_COLOR),
+        "fall" => normalize_color(&color, DEFAULT_FALL_COLOR),
         _ => normalize_color(&color, DEFAULT_HEART_COLOR),
     };
     match normalized_effect.as_str() {
         "meteor" => pref.colors.meteor = normalized_color,
         "dots" => pref.colors.dots = normalized_color,
+        "bloom" => pref.colors.bloom = normalized_color,
+        "fall" => pref.colors.fall = normalized_color,
         _ => pref.colors.heart = normalized_color,
     }
     save_pref(&app, &pref)?;
@@ -307,7 +373,11 @@ pub fn set_color_pref(
 
 pub fn reset_color_pref(app: AppHandle, effect: String) -> Result<MouseTrailPref, String> {
     let normalized_effect = normalize_effect(&effect);
-    if normalized_effect != "meteor" && normalized_effect != "dots" && normalized_effect != "heart"
+    if normalized_effect != "meteor"
+        && normalized_effect != "dots"
+        && normalized_effect != "heart"
+        && normalized_effect != "bloom"
+        && normalized_effect != "fall"
     {
         return Err("该特效不支持自定义颜色".into());
     }
@@ -315,6 +385,8 @@ pub fn reset_color_pref(app: AppHandle, effect: String) -> Result<MouseTrailPref
     match normalized_effect.as_str() {
         "meteor" => pref.colors.meteor = default_meteor_color(),
         "dots" => pref.colors.dots = default_dots_color(),
+        "bloom" => pref.colors.bloom = default_bloom_color(),
+        "fall" => pref.colors.fall = default_fall_color(),
         _ => pref.colors.heart = default_heart_color(),
     }
     save_pref(&app, &pref)?;
@@ -339,16 +411,86 @@ pub fn init_from_store(app: &AppHandle) {
     set_enabled(app, pref.enabled);
 }
 
+pub fn load_shortcut(app: &AppHandle) -> String {
+    let Ok(store) = app.store(SETTINGS_STORE) else {
+        return DEFAULT_MOUSE_TRAIL_SHORTCUT.to_string();
+    };
+    store
+        .get(SHORTCUT_KEY)
+        .and_then(|value| value.as_str().map(str::to_string))
+        .and_then(|raw| crate::mouse_follow::validate_shortcut(&raw).ok())
+        .unwrap_or_else(|| DEFAULT_MOUSE_TRAIL_SHORTCUT.to_string())
+}
+
+pub fn save_shortcut(app: &AppHandle, shortcut: &str) {
+    if let Ok(store) = app.store(SETTINGS_STORE) {
+        store.set(SHORTCUT_KEY, serde_json::json!(shortcut));
+        let _ = store.save();
+    }
+}
+
+pub fn load_shortcut_pref(app: &AppHandle) -> bool {
+    let Ok(store) = app.store(SETTINGS_STORE) else {
+        return true;
+    };
+    store
+        .get(SHORTCUT_PREF_KEY)
+        .and_then(|value| value.as_bool())
+        .unwrap_or(true)
+}
+
+pub fn save_shortcut_pref(app: &AppHandle, enabled: bool) {
+    if let Ok(store) = app.store(SETTINGS_STORE) {
+        store.set(SHORTCUT_PREF_KEY, serde_json::json!(enabled));
+        let _ = store.save();
+    }
+}
+
+pub fn apply_shortcut_pref(app: &AppHandle, enabled: bool) {
+    let state = app.state::<AppState>();
+    state
+        .mouse_trail_shortcut_pref_enabled
+        .store(enabled, Ordering::Relaxed);
+    save_shortcut_pref(app, enabled);
+    let _ = crate::global_shortcuts::register_all(app);
+}
+
+/// Toggle trail master switch via configurable shortcut (default Ctrl+Alt+T).
+pub fn handle_toggle_shortcut(app: &AppHandle, shortcut: &Shortcut) {
+    let state = app.state::<AppState>();
+    if !state
+        .mouse_trail_shortcut_pref_enabled
+        .load(Ordering::Relaxed)
+    {
+        return;
+    }
+    let expected = state
+        .mouse_trail_shortcut
+        .lock()
+        .map(|guard| guard.clone())
+        .unwrap_or_else(|_| DEFAULT_MOUSE_TRAIL_SHORTCUT.to_string());
+    let Ok(expected_shortcut) = Shortcut::from_str(&expected) else {
+        return;
+    };
+    if shortcut.id() != expected_shortcut.id() {
+        return;
+    }
+    let next = !is_enabled();
+    if apply_enabled_pref(app, next).is_ok() {
+        schedule_register_all(app);
+    }
+}
+
 pub fn is_enabled() -> bool {
     TRAIL_ENABLED.load(Ordering::Relaxed)
 }
 
-fn trail_shortcut_ids() -> Result<(u32, [u32; 6]), String> {
+fn trail_shortcut_ids() -> Result<(u32, [u32; 9]), String> {
     if let Some(ids) = TRAIL_SHORTCUT_IDS.get() {
         return Ok(*ids);
     }
     let arm = Shortcut::from_str(TRAIL_ARM_SHORTCUT).map_err(|err| err.to_string())?;
-    let mut digits = [0_u32; 6];
+    let mut digits = [0_u32; 9];
     for (index, shortcut) in TRAIL_EFFECT_SHORTCUTS.iter().enumerate() {
         let parsed = Shortcut::from_str(shortcut).map_err(|err| err.to_string())?;
         digits[index] = parsed.id();
@@ -448,6 +590,9 @@ fn effect_label(effect: &str) -> &'static str {
         "dots" => "浮络牵光",
         "heart" => "绮心逐迹",
         "ripple" => "沧涟曳逝",
+        "bubbles" => "多彩气泡",
+        "bloom" => "简约涟漪",
+        "fall" => "简约坠落",
         _ => "躁动线条",
     }
 }
@@ -475,7 +620,9 @@ fn switch_effect_by_index(app: &AppHandle, index: usize) -> Result<MouseTrailPre
     let pref = load_pref(app);
     let was_disabled = !pref.enabled;
     if was_disabled {
-        set_enabled_pref(app.clone(), true)?;
+        // Must not call register_all on this thread (global-shortcut handler).
+        apply_enabled_pref(app, true)?;
+        schedule_register_all(app);
     }
     let updated = set_effect_pref(app.clone(), effect.clone())?;
     if was_disabled {

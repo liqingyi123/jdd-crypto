@@ -16,9 +16,12 @@ export type MouseTrailEffect =
   | "graffiti"
   | "dots"
   | "heart"
-  | "ripple";
+  | "ripple"
+  | "bubbles"
+  | "bloom"
+  | "fall";
 
-export type ColorableTrailEffect = "meteor" | "dots" | "heart";
+export type ColorableTrailEffect = "meteor" | "dots" | "heart" | "bloom" | "fall";
 
 export interface MouseTrailColors {
   meteor: string;
@@ -26,6 +29,8 @@ export interface MouseTrailColors {
   heart: string;
   /** Stored for preference compat; ripple uses fixed mid-gray highlight/shadow (not user-tintable). */
   ripple: string;
+  bloom: string;
+  fall: string;
 }
 
 export type MouseTrailPerformanceMode = "eco" | "balanced" | "perf";
@@ -42,6 +47,8 @@ export const DEFAULT_MOUSE_TRAIL_COLORS: MouseTrailColors = {
   dots: "#00D1CE",
   heart: "#FF2EC8",
   ripple: "#2A2A2E",
+  bloom: "#7AD7FF",
+  fall: "#FFB86B",
 };
 
 export const DEFAULT_MOUSE_TRAIL_PREF: MouseTrailPref = {
@@ -67,6 +74,15 @@ export function normalizeMouseTrailEffect(raw: string): MouseTrailEffect {
   if (raw === "ripple") {
     return "ripple";
   }
+  if (raw === "bubbles") {
+    return "bubbles";
+  }
+  if (raw === "bloom") {
+    return "bloom";
+  }
+  if (raw === "fall") {
+    return "fall";
+  }
   return "ribbon";
 }
 
@@ -82,7 +98,13 @@ export function normalizeMouseTrailPerformanceMode(
 export function isColorableTrailEffect(
   effect: MouseTrailEffect,
 ): effect is ColorableTrailEffect {
-  return effect === "meteor" || effect === "dots" || effect === "heart";
+  return (
+    effect === "meteor" ||
+    effect === "dots" ||
+    effect === "heart" ||
+    effect === "bloom" ||
+    effect === "fall"
+  );
 }
 
 /** Normalize to #RRGGBB; invalid input returns fallback. */
@@ -107,5 +129,7 @@ export function normalizeMouseTrailColors(
     dots: normalizeTrailColor(raw?.dots ?? d.dots, d.dots),
     heart: normalizeTrailColor(raw?.heart ?? d.heart, d.heart),
     ripple: normalizeTrailColor(raw?.ripple ?? d.ripple, d.ripple),
+    bloom: normalizeTrailColor(raw?.bloom ?? d.bloom, d.bloom),
+    fall: normalizeTrailColor(raw?.fall ?? d.fall, d.fall),
   };
 }

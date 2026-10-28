@@ -302,11 +302,9 @@ export class GraffitiTrail implements MouseTrailEngine {
   }
 
   leaveScreen() {
+    // Stop adding points; existing trail ages out via REMOVE_DELAY_MS.
     this.onScreen = false;
     this.lastPos = null;
-    for (const follower of this.followers) {
-      follower.clear();
-    }
   }
 
   start() {

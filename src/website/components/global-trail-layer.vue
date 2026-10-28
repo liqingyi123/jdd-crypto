@@ -6,6 +6,8 @@ import { GraffitiTrail } from "@/effects/graffiti-trail";
 import { DotsTrail } from "@/effects/dots-trail";
 import { HeartTrail } from "@/effects/heart-trail";
 import { RippleTrail } from "@/effects/ripple-trail";
+import { BubblesTrail } from "@/effects/bubbles-trail";
+import { BloomTrail, FallTrail } from "@/effects/simple-motion-trails";
 import type { MouseTrailEffect, MouseTrailEngine } from "@/effects/mouse-trail-types";
 import { useGlobalTrail } from "../composables/use-global-trail";
 
@@ -32,6 +34,15 @@ function createEngine(next: MouseTrailEffect, trailColor: string): MouseTrailEng
   }
   if (next === "ripple") {
     return new RippleTrail(host);
+  }
+  if (next === "bubbles") {
+    return new BubblesTrail(host);
+  }
+  if (next === "bloom") {
+    return new BloomTrail(host, { color: trailColor });
+  }
+  if (next === "fall") {
+    return new FallTrail(host, { color: trailColor });
   }
   return new RibbonTrail(host);
 }

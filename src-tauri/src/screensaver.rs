@@ -21,6 +21,7 @@ const SETTINGS_STORE: &str = "settings.json";
 const SHORTCUT_KEY: &str = "screensaverShortcut";
 const PREF_KEY: &str = "screensaverEnabled";
 const EFFECT_STORE_KEY: &str = "screensaver";
+const PASSWORD_KEY: &str = "screensaverPassword";
 const DEFAULT_BACKGROUND: &str = "parallax";
 const DEFAULT_CLOCK: &str = "lcd3d";
 
@@ -136,7 +137,7 @@ pub fn apply_pref(app: &AppHandle, enabled: bool) {
 
 fn normalize_background(raw: &str) -> String {
     match raw {
-        "corona" | "parallax" | "snow" => raw.to_string(),
+        "corona" | "parallax" | "snow" | "star" => raw.to_string(),
         _ => DEFAULT_BACKGROUND.to_string(),
     }
 }
@@ -211,6 +212,65 @@ pub fn set_clock(app: &AppHandle, clock: String) -> ScreensaverPref {
     pref
 }
 
+fn load_password(app: &AppHandle) -> String {
+    let Ok(store) = app.store(SETTINGS_STORE) else {
+        return String::new();
+    };
+    store
+        .get(PASSWORD_KEY)
+        .and_then(|value| value.as_str().map(str::to_string))
+        .unwrap_or_default()
+}
+
+fn save_password(app: &AppHandle, password: &str) {
+    if let Ok(store) = app.store(SETTINGS_STORE) {
+        store.set(PASSWORD_KEY, serde_json::json!(password));
+        let _ = store.save();
+    }
+}
+
+fn emit_password_required(app: &AppHandle, required: bool) {
+    let _ = app.emit_filter(
+        "app://screensaver-password-required",
+        required,
+        is_overlay_target,
+    );
+    let _ = app.emit("app://screensaver-password-required", required);
+}
+
+pub fn password_required(app: &AppHandle) -> bool {
+    !load_password(app).is_empty()
+}
+
+pub fn get_password(app: &AppHandle) -> String {
+    load_password(app)
+}
+
+pub fn set_password(app: &AppHandle, password: String) -> bool {
+    let trimmed = password.trim().to_string();
+    save_password(app, &trimmed);
+    let required = !trimmed.is_empty();
+    emit_password_required(app, required);
+    required
+}
+
+pub fn unlock(app: &AppHandle, password: String) -> Result<(), String> {
+    let expected = load_password(app);
+    if expected.is_empty() {
+        hide(app);
+        return Ok(());
+    }
+    if password != expected {
+        return Err("密码错误".to_string());
+    }
+    hide(app);
+    Ok(())
+}
+
+fn request_unlock(app: &AppHandle) {
+    let _ = app.emit_filter("app://screensaver-unlock-request", (), is_overlay_target);
+}
+
 pub fn handle_shortcut(app: &AppHandle, shortcut: &Shortcut) {
     let state = app.state::<AppState>();
     if !state.screensaver_pref_enabled.load(Ordering::Relaxed) {
@@ -232,7 +292,11 @@ pub fn handle_shortcut(app: &AppHandle, shortcut: &Shortcut) {
 
 pub fn toggle(app: &AppHandle) {
     if is_active() {
-        hide(app);
+        if password_required(app) {
+            request_unlock(app);
+        } else {
+            hide(app);
+        }
     } else {
         show(app);
     }
@@ -270,7 +334,9 @@ fn sync_overlays(app: &AppHandle, visible: bool) {
     let monitors = app.available_monitors().unwrap_or_default();
     for index in 0..MAX_OVERLAYS {
         let label = overlay_label(index);
-        if index >= monitors.len() {
+        // Close when hidden (same as mouse trail / spotlight) so WebGL/RAF
+        // cannot keep running in invisible webviews and starve the trail.
+        if !visible || index >= monitors.len() {
             if let Some(win) = app.get_webview_window(&label) {
                 let _ = win.close();
             }
@@ -282,16 +348,8 @@ fn sync_overlays(app: &AppHandle, visible: bool) {
         if let Some(win) = app.get_webview_window(&label) {
             let _ = win.set_position(layout.physical_pos);
             let _ = win.set_size(layout.logical_size);
-            if visible {
-                let _ = win.set_always_on_top(true);
-                let _ = win.show();
-            } else {
-                let _ = win.hide();
-            }
-            continue;
-        }
-
-        if !visible {
+            let _ = win.set_always_on_top(true);
+            let _ = win.show();
             continue;
         }
 

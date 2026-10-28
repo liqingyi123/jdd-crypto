@@ -7,8 +7,17 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 use crate::state::AppState;
 
 const TRAIL_ARM_SHORTCUT: &str = "Ctrl+T";
-const TRAIL_EFFECT_SHORTCUTS: [&str; 6] =
-    ["Ctrl+1", "Ctrl+2", "Ctrl+3", "Ctrl+4", "Ctrl+5", "Ctrl+6"];
+const TRAIL_EFFECT_SHORTCUTS: [&str; 9] = [
+    "Ctrl+1",
+    "Ctrl+2",
+    "Ctrl+3",
+    "Ctrl+4",
+    "Ctrl+5",
+    "Ctrl+6",
+    "Ctrl+7",
+    "Ctrl+8",
+    "Ctrl+9",
+];
 
 #[derive(Clone, Copy)]
 pub enum ShortcutOwner {
@@ -20,6 +29,7 @@ pub enum ShortcutOwner {
     Screensaver,
     Spotlight,
     MiniWindow,
+    MouseTrail,
 }
 
 fn shortcut_id(raw: &str) -> Result<u32, String> {
@@ -34,14 +44,12 @@ pub fn ensure_no_conflict(
 ) -> Result<(), String> {
     let candidate_id = shortcut_id(candidate)?;
 
-    if crate::mouse_trail::is_enabled() {
-        if shortcut_id(TRAIL_ARM_SHORTCUT)? == candidate_id {
-            return Err(format!("与固定快捷键 {TRAIL_ARM_SHORTCUT} 冲突"));
-        }
-        for fixed in TRAIL_EFFECT_SHORTCUTS {
-            if shortcut_id(fixed)? == candidate_id {
-                return Err(format!("与固定快捷键 {fixed} 冲突"));
-            }
+    if shortcut_id(TRAIL_ARM_SHORTCUT)? == candidate_id {
+        return Err(format!("与固定快捷键 {TRAIL_ARM_SHORTCUT} 冲突"));
+    }
+    for fixed in TRAIL_EFFECT_SHORTCUTS {
+        if shortcut_id(fixed)? == candidate_id {
+            return Err(format!("与固定快捷键 {fixed} 冲突"));
         }
     }
 
@@ -86,6 +94,11 @@ pub fn ensure_no_conflict(
         .lock()
         .map(|guard| guard.clone())
         .unwrap_or_else(|_| crate::state::DEFAULT_MINI_WINDOW_SHORTCUT.to_string());
+    let mouse_trail = state
+        .mouse_trail_shortcut
+        .lock()
+        .map(|guard| guard.clone())
+        .unwrap_or_else(|_| crate::state::DEFAULT_MOUSE_TRAIL_SHORTCUT.to_string());
 
     if !matches!(owner, ShortcutOwner::MouseFollow) && shortcut_id(&follow)? == candidate_id {
         return Err(format!("与鼠标跟随快捷键 {follow} 冲突"));
@@ -112,6 +125,9 @@ pub fn ensure_no_conflict(
     }
     if !matches!(owner, ShortcutOwner::MiniWindow) && shortcut_id(&mini_window)? == candidate_id {
         return Err(format!("与迷你窗快捷键 {mini_window} 冲突"));
+    }
+    if !matches!(owner, ShortcutOwner::MouseTrail) && shortcut_id(&mouse_trail)? == candidate_id {
+        return Err(format!("与鼠标轨迹开关快捷键 {mouse_trail} 冲突"));
     }
 
     Ok(())
@@ -150,6 +166,21 @@ pub fn register_all(app: &AppHandle) -> Result<(), String> {
             let parsed = Shortcut::from_str(shortcut).map_err(|err| err.to_string())?;
             global.register(parsed).map_err(|err| err.to_string())?;
         }
+    }
+
+    if state
+        .mouse_trail_shortcut_pref_enabled
+        .load(Ordering::Relaxed)
+    {
+        let trail_toggle = state
+            .mouse_trail_shortcut
+            .lock()
+            .map(|guard| guard.clone())
+            .unwrap_or_else(|_| crate::state::DEFAULT_MOUSE_TRAIL_SHORTCUT.to_string());
+        let trail_toggle = Shortcut::from_str(&trail_toggle).map_err(|err| err.to_string())?;
+        global
+            .register(trail_toggle)
+            .map_err(|err| err.to_string())?;
     }
 
     if state.hosts_quick_pref_enabled.load(Ordering::Relaxed) {

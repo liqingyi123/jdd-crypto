@@ -331,6 +331,7 @@ pub fn position_badge_on_startup(app: &AppHandle) {
 
     if let Some((x, y)) = load_badge_position(app) {
         set_badge_position(&win, x, y);
+        ensure_badge_origin_in_work_area(app);
         return;
     }
 
@@ -342,17 +343,14 @@ pub fn position_badge_on_startup(app: &AppHandle) {
     let Some(monitor) = monitor else {
         return;
     };
-
-    let work = monitor.work_area();
-    let scale = monitor.scale_factor();
-    let Ok(outer_size) = win.outer_size() else {
-        return;
+    let area = monitor.work_area();
+    let work = WorkArea {
+        x: area.position.x,
+        y: area.position.y,
+        width: area.size.width as i32,
+        height: area.size.height as i32,
     };
-
-    let margin = (BADGE_EDGE_MARGIN * scale).round() as i32;
-    let x = work.position.x + work.size.width as i32 - outer_size.width as i32 - margin;
-    let y = work.position.y + work.size.height as i32 - outer_size.height as i32 - margin;
-    set_badge_position(&win, x, y);
+    place_badge_bottom_right(app, &win, &work, monitor.scale_factor());
 }
 
 pub fn watch_badge_position(app: &AppHandle) {
@@ -389,23 +387,10 @@ pub fn watch_badge_position(app: &AppHandle) {
 /// Move app windows that no longer intersect any monitor onto the nearest work area.
 /// Skips mouse-trail / screensaver / spotlight overlays (managed by their own sync).
 pub fn relocate_windows_to_visible_monitors(app: &AppHandle) {
-    let monitors = app.available_monitors().unwrap_or_default();
-    if monitors.is_empty() {
+    let work_areas = collect_work_areas(app);
+    if work_areas.is_empty() {
         return;
     }
-
-    let work_areas: Vec<WorkArea> = monitors
-        .iter()
-        .map(|m| {
-            let work = m.work_area();
-            WorkArea {
-                x: work.position.x,
-                y: work.position.y,
-                width: work.size.width as i32,
-                height: work.size.height as i32,
-            }
-        })
-        .collect();
 
     for (label, win) in app.webview_windows() {
         if label.starts_with("mouse-trail-")
@@ -556,7 +541,113 @@ pub fn apply_badge_window_size(app: &AppHandle, size: u32, expanded: bool) {
         let _ = win.show();
         let _ = win.set_size(tauri::LogicalSize::new(f64::from(size), f64::from(size)));
         let _ = win.emit("app://badge-size", size);
+        let skip_ensure = app
+            .try_state::<crate::state::AppState>()
+            .is_some_and(|s| s.follow_blocks_resize());
+        if !skip_ensure {
+            ensure_badge_origin_in_work_area(app);
+        }
     }
+}
+
+/// If badge is not fully inside any work area, reset to that screen's bottom-right (50×50 margin).
+fn ensure_badge_origin_in_work_area(app: &AppHandle) {
+    let Some(win) = app.get_webview_window("badge") else {
+        return;
+    };
+    let Ok(pos) = win.outer_position() else {
+        return;
+    };
+    let Ok(size) = win.outer_size() else {
+        return;
+    };
+    let width = size.width as i32;
+    let height = size.height as i32;
+    if width <= 0 || height <= 0 {
+        return;
+    }
+
+    let work_areas = collect_work_areas(app);
+    if work_areas.is_empty() {
+        return;
+    }
+
+    if work_areas
+        .iter()
+        .any(|work| rect_fully_inside(pos.x, pos.y, width, height, work))
+    {
+        return;
+    }
+
+    let work = work_areas
+        .iter()
+        .find(|work| {
+            rects_intersect(
+                pos.x,
+                pos.y,
+                width,
+                height,
+                work.x,
+                work.y,
+                work.width,
+                work.height,
+            )
+        })
+        .or_else(|| nearest_work_area(pos.x + width / 2, pos.y + height / 2, &work_areas));
+    let Some(work) = work else {
+        return;
+    };
+    let scale = scale_for_work_area(app, work);
+    place_badge_bottom_right(app, &win, work, scale);
+}
+
+/// Place badge at work-area bottom-right with [`BADGE_EDGE_MARGIN`] (logical px × scale).
+fn place_badge_bottom_right(app: &AppHandle, win: &WebviewWindow, work: &WorkArea, scale: f64) {
+    let Ok(outer_size) = win.outer_size() else {
+        return;
+    };
+    let margin = (BADGE_EDGE_MARGIN * scale).round() as i32;
+    let x = work.x + work.width - outer_size.width as i32 - margin;
+    let y = work.y + work.height - outer_size.height as i32 - margin;
+    set_badge_position(win, x, y);
+    save_badge_position(app, x, y);
+}
+
+fn rect_fully_inside(x: i32, y: i32, w: i32, h: i32, work: &WorkArea) -> bool {
+    x >= work.x
+        && y >= work.y
+        && x + w <= work.x + work.width
+        && y + h <= work.y + work.height
+}
+
+fn scale_for_work_area(app: &AppHandle, work: &WorkArea) -> f64 {
+    for monitor in app.available_monitors().unwrap_or_default() {
+        let area = monitor.work_area();
+        if area.position.x == work.x
+            && area.position.y == work.y
+            && area.size.width as i32 == work.width
+            && area.size.height as i32 == work.height
+        {
+            return monitor.scale_factor();
+        }
+    }
+    1.0
+}
+
+fn collect_work_areas(app: &AppHandle) -> Vec<WorkArea> {
+    app.available_monitors()
+        .unwrap_or_default()
+        .iter()
+        .map(|m| {
+            let work = m.work_area();
+            WorkArea {
+                x: work.position.x,
+                y: work.position.y,
+                width: work.size.width as i32,
+                height: work.size.height as i32,
+            }
+        })
+        .collect()
 }
 
 pub fn hide_clipboard_prompt(app: &AppHandle) {

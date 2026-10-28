@@ -106,4 +106,7 @@ export const TRAIL_EFFECT_OPTIONS = [
   { id: "dots" as const, label: "浮络牵光" },
   { id: "heart" as const, label: "绮心逐迹" },
   { id: "ripple" as const, label: "沧涟曳逝" },
+  { id: "bubbles" as const, label: "多彩气泡" },
+  { id: "bloom" as const, label: "简约涟漪" },
+  { id: "fall" as const, label: "简约坠落" },
 ];

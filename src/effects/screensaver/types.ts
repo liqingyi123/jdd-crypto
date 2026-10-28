@@ -1,4 +1,4 @@
-export type ScreensaverBackground = "parallax" | "corona" | "snow";
+export type ScreensaverBackground = "parallax" | "corona" | "snow" | "star";
 export type ScreensaverClock = "lcd3d" | "analog" | "compass" | "off";
 
 export type ScreensaverPref = {
@@ -12,7 +12,7 @@ export const DEFAULT_SCREENSAVER_PREF: ScreensaverPref = {
 };
 
 export function normalizeScreensaverBackground(raw: unknown): ScreensaverBackground {
-  if (raw === "corona" || raw === "snow" || raw === "parallax") {
+  if (raw === "corona" || raw === "snow" || raw === "parallax" || raw === "star") {
     return raw;
   }
   return "parallax";

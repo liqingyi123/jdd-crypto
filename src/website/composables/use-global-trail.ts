@@ -18,6 +18,12 @@ function defaultColorFor(next: MouseTrailEffect): string {
   if (next === "heart") {
     return DEFAULT_MOUSE_TRAIL_COLORS.heart;
   }
+  if (next === "bloom") {
+    return DEFAULT_MOUSE_TRAIL_COLORS.bloom;
+  }
+  if (next === "fall") {
+    return DEFAULT_MOUSE_TRAIL_COLORS.fall;
+  }
   return DEFAULT_MOUSE_TRAIL_COLORS.meteor;
 }
 

@@ -69,3 +69,23 @@ pub fn set_screensaver_background(
 pub fn set_screensaver_clock(app: AppHandle, clock: String) -> crate::screensaver::ScreensaverPref {
     crate::screensaver::set_clock(&app, clock)
 }
+
+#[tauri::command]
+pub fn screensaver_password_required(app: AppHandle) -> bool {
+    crate::screensaver::password_required(&app)
+}
+
+#[tauri::command]
+pub fn get_screensaver_password(app: AppHandle) -> String {
+    crate::screensaver::get_password(&app)
+}
+
+#[tauri::command]
+pub fn set_screensaver_password(app: AppHandle, password: String) -> bool {
+    crate::screensaver::set_password(&app, password)
+}
+
+#[tauri::command]
+pub fn unlock_screensaver(app: AppHandle, password: String) -> Result<(), String> {
+    crate::screensaver::unlock(&app, password)
+}

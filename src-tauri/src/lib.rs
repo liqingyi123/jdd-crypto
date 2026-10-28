@@ -68,6 +68,7 @@ pub fn run() {
                         screensaver::handle_shortcut(app, shortcut);
                         spotlight::handle_shortcut(app, shortcut);
                         mini_window::handle_shortcut(app, shortcut);
+                        mouse_trail::handle_toggle_shortcut(app, shortcut);
                     }
                 })
                 .build(),
@@ -115,6 +116,10 @@ pub fn run() {
             commands::set_mouse_trail_color,
             commands::reset_mouse_trail_colors,
             commands::reset_mouse_trail_pref,
+            commands::get_mouse_trail_shortcut,
+            commands::set_mouse_trail_shortcut,
+            commands::get_mouse_trail_shortcut_pref,
+            commands::set_mouse_trail_shortcut_pref,
             commands::get_autostart_pref,
             commands::set_autostart_pref,
             commands::get_intranet_server_base,
@@ -182,6 +187,10 @@ pub fn run() {
             commands::get_screensaver_effect_pref,
             commands::set_screensaver_background,
             commands::set_screensaver_clock,
+            commands::screensaver_password_required,
+            commands::get_screensaver_password,
+            commands::set_screensaver_password,
+            commands::unlock_screensaver,
             commands::hide_spotlight,
             commands::get_spotlight_pref,
             commands::set_spotlight_pref,
@@ -309,6 +318,14 @@ pub fn run() {
             mini_window::init_from_store(app.handle());
             mouse_follow::start_follow_loop(app.handle().clone());
             mouse_trail::init_from_store(app.handle());
+            let mouse_trail_shortcut = mouse_trail::load_shortcut(app.handle());
+            if let Ok(mut current) = app.state::<AppState>().mouse_trail_shortcut.lock() {
+                *current = mouse_trail_shortcut;
+            }
+            let mouse_trail_shortcut_pref = mouse_trail::load_shortcut_pref(app.handle());
+            app.state::<AppState>()
+                .mouse_trail_shortcut_pref_enabled
+                .store(mouse_trail_shortcut_pref, Ordering::Relaxed);
             let _ = global_shortcuts::register_all(app.handle());
             if let Some(tip) = app.get_webview_window("compare-tip") {
                 let _ = tip.set_ignore_cursor_events(true);

@@ -31,6 +31,8 @@ export class RibbonTrail implements MouseTrailEngine {
   private running = false;
   private rafId = 0;
   private onScreen = false;
+  /** 1 while on-screen; decays after leaveScreen until clear. */
+  private leaveFade = 1;
   /** After leave/cold start, next setMouse seeds the whole trail at the entry point. */
   private needsReseed = true;
   private readonly bodyLength: number;
@@ -97,15 +99,18 @@ export class RibbonTrail implements MouseTrailEngine {
       this.needsReseed = false;
     }
     this.onScreen = true;
+    this.leaveFade = 1;
     this.mouseX = x;
     this.mouseY = y;
     this.kick();
   }
 
   leaveScreen() {
+    // Freeze last point and fade out instead of clearing instantly (cross-monitor).
     this.onScreen = false;
     this.needsReseed = true;
-    this.stopDrawing(true);
+    this.leaveFade = 1;
+    this.kick();
   }
 
   start() {
@@ -125,11 +130,14 @@ export class RibbonTrail implements MouseTrailEngine {
       if (!this.running) {
         return;
       }
-      if (!this.onScreen) {
-        this.stopDrawing(true);
-        return;
-      }
       if (this.frameGate.shouldRun(now)) {
+        if (!this.onScreen) {
+          this.leaveFade *= 0.82;
+          if (this.leaveFade < 0.04) {
+            this.stopDrawing(true);
+            return;
+          }
+        }
         this.render();
       }
       this.rafId = window.requestAnimationFrame(tick);
@@ -188,6 +196,7 @@ export class RibbonTrail implements MouseTrailEngine {
 
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     const color = `rgb(${this.red[this.step]},${this.grn[this.step]},${this.blu[this.step]})`;
+    ctx.globalAlpha = this.leaveFade;
     ctx.lineWidth = this.line;
     ctx.strokeStyle = color;
     ctx.fillStyle = color;
@@ -210,5 +219,6 @@ export class RibbonTrail implements MouseTrailEngine {
     ctx.beginPath();
     ctx.arc(xc, yc, this.line / 2, 0, twoPi);
     ctx.fill();
+    ctx.globalAlpha = 1;
   }
 }

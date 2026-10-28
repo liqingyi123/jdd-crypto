@@ -3,6 +3,7 @@ import { nextTick, onUnmounted, ref, shallowRef } from "vue";
 import ParallaxSeaside from "@/effects/screensaver/parallax-seaside.vue";
 import CoronaSunrise from "@/effects/screensaver/corona-sunrise.vue";
 import SnowRelic from "@/effects/screensaver/snow-relic.vue";
+import StarCosmos from "@/effects/screensaver/star-cosmos.vue";
 import FluorescentClock from "@/effects/screensaver/fluorescent-clock.vue";
 import ClassicAnalogClock from "@/effects/screensaver/classic-analog-clock.vue";
 import TextCompassClock from "@/effects/screensaver/text-compass-clock.vue";
@@ -15,6 +16,7 @@ const BACKGROUND_OPTIONS: Array<{ id: ScreensaverBackground; label: string }> = 
   { id: "parallax", label: "海景视差" },
   { id: "corona", label: "日冕生辉" },
   { id: "snow", label: "雪国遗踪" },
+  { id: "star", label: "宇宙星光" },
 ];
 
 const CLOCK_OPTIONS: Array<{ id: ScreensaverClock; label: string }> = [
@@ -161,6 +163,7 @@ onUnmounted(() => {
       <ParallaxSeaside v-if="background === 'parallax'" />
       <CoronaSunrise v-else-if="background === 'corona'" />
       <SnowRelic v-else-if="background === 'snow'" />
+      <StarCosmos v-else-if="background === 'star'" />
       <FluorescentClock v-if="clock === 'lcd3d'" />
       <ClassicAnalogClock v-else-if="clock === 'analog'" />
       <TextCompassClock v-else-if="clock === 'compass'" />

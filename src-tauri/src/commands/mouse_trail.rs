@@ -1,4 +1,7 @@
-use tauri::AppHandle;
+use std::sync::atomic::Ordering;
+use tauri::{AppHandle, State};
+
+use crate::state::AppState;
 
 #[tauri::command]
 pub fn begin_shortcut_capture(app: AppHandle) -> Result<(), String> {
@@ -70,4 +73,45 @@ pub fn reset_mouse_trail_pref(
     app: AppHandle,
 ) -> Result<crate::mouse_trail::MouseTrailPref, String> {
     crate::mouse_trail::reset_pref(app)
+}
+
+#[tauri::command]
+pub fn get_mouse_trail_shortcut(state: State<AppState>) -> String {
+    state
+        .mouse_trail_shortcut
+        .lock()
+        .map(|guard| guard.clone())
+        .unwrap_or_else(|_| crate::state::DEFAULT_MOUSE_TRAIL_SHORTCUT.to_string())
+}
+
+#[tauri::command]
+pub fn set_mouse_trail_shortcut(
+    app: AppHandle,
+    state: State<AppState>,
+    shortcut: String,
+) -> Result<String, String> {
+    let normalized = crate::mouse_follow::validate_shortcut(&shortcut)?;
+    crate::global_shortcuts::ensure_no_conflict(
+        &app,
+        &normalized,
+        crate::global_shortcuts::ShortcutOwner::MouseTrail,
+    )?;
+    if let Ok(mut current) = state.mouse_trail_shortcut.lock() {
+        *current = normalized.clone();
+    }
+    crate::mouse_trail::save_shortcut(&app, &normalized);
+    crate::global_shortcuts::register_all(&app)?;
+    Ok(normalized)
+}
+
+#[tauri::command]
+pub fn get_mouse_trail_shortcut_pref(state: State<AppState>) -> bool {
+    state
+        .mouse_trail_shortcut_pref_enabled
+        .load(Ordering::Relaxed)
+}
+
+#[tauri::command]
+pub fn set_mouse_trail_shortcut_pref(app: AppHandle, enabled: bool) {
+    crate::mouse_trail::apply_shortcut_pref(&app, enabled);
 }

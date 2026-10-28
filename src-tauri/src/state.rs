@@ -17,6 +17,7 @@ pub const DEFAULT_BRIGHTNESS_QUICK_SHORTCUT: &str = "Ctrl+Alt+L";
 pub const DEFAULT_SCREENSAVER_SHORTCUT: &str = "Ctrl+Alt+P";
 pub const DEFAULT_SPOTLIGHT_SHORTCUT: &str = "Ctrl+Alt+D";
 pub const DEFAULT_MINI_WINDOW_SHORTCUT: &str = "Ctrl+Alt+M";
+pub const DEFAULT_MOUSE_TRAIL_SHORTCUT: &str = "Ctrl+Alt+T";
 pub const DEFAULT_SPOTLIGHT_SIZE: u32 = 200;
 pub const MIN_SPOTLIGHT_SIZE: u32 = 100;
 pub const MAX_SPOTLIGHT_SIZE: u32 = 300;
@@ -60,6 +61,8 @@ pub struct AppState {
     pub mini_window_pref_enabled: AtomicBool,
     pub mini_window_shortcut: Mutex<String>,
     pub mini_window_auto_hide: AtomicBool,
+    pub mouse_trail_shortcut_pref_enabled: AtomicBool,
+    pub mouse_trail_shortcut: Mutex<String>,
     pub pending_update: Mutex<Option<UpdateCheckResult>>,
 }
 
@@ -97,6 +100,8 @@ impl Default for AppState {
             mini_window_pref_enabled: AtomicBool::new(true),
             mini_window_shortcut: Mutex::new(DEFAULT_MINI_WINDOW_SHORTCUT.to_string()),
             mini_window_auto_hide: AtomicBool::new(false),
+            mouse_trail_shortcut_pref_enabled: AtomicBool::new(true),
+            mouse_trail_shortcut: Mutex::new(DEFAULT_MOUSE_TRAIL_SHORTCUT.to_string()),
             pending_update: Mutex::new(None),
         }
     }

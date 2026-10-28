@@ -159,6 +159,22 @@ const {
   defaultShortcut: "Ctrl+Alt+M",
 });
 
+const {
+  recording: trailShortcutRecording,
+  errorMessage: trailShortcutErrorMessage,
+  display: trailShortcutDisplay,
+  previewDisplay: trailShortcutPreviewDisplay,
+  buttonRef: trailShortcutButtonRef,
+  startRecording: startTrailShortcutRecording,
+  cancelRecording: cancelTrailShortcutRecording,
+  onRecordKey: onTrailShortcutRecordKey,
+  loadShortcut: loadTrailShortcut,
+} = useShortcutRecorder({
+  getCommand: "get_mouse_trail_shortcut",
+  setCommand: "set_mouse_trail_shortcut",
+  defaultShortcut: "Ctrl+Alt+T",
+});
+
 const themeOptions: Array<{ value: ThemePreference; label: string }> = [
   { value: "system", label: "跟随系统" },
   { value: "light", label: "浅色" },
@@ -180,11 +196,15 @@ const screensaverBackground = shallowRef<ScreensaverBackground>(
   DEFAULT_SCREENSAVER_PREF.background,
 );
 const screensaverClock = shallowRef<ScreensaverClock>(DEFAULT_SCREENSAVER_PREF.clock);
+const screensaverPasswordRequired = shallowRef(false);
+const screensaverPasswordDraft = shallowRef("");
+const screensaverPasswordSaving = shallowRef(false);
 const autostartEnabled = shallowRef(false);
 const intranetServerBase = shallowRef("http://172.20.2.169:7101/");
 const intranetServerSaving = shallowRef(false);
 const DEFAULT_INTRANET_SERVER = "http://172.20.2.169:7101/";
 const trailEnabled = shallowRef(DEFAULT_MOUSE_TRAIL_PREF.enabled);
+const trailShortcutPref = shallowRef(true);
 const trailEffect = shallowRef<MouseTrailEffect>(DEFAULT_MOUSE_TRAIL_PREF.effect);
 const trailPerformanceMode = shallowRef<MouseTrailPerformanceMode>(
   DEFAULT_MOUSE_TRAIL_PREF.performanceMode,
@@ -229,6 +249,9 @@ const trailEffectOptions: Array<{ value: MouseTrailEffect; label: string; shortc
   { value: "dots", label: "浮络牵光", shortcutKey: "4" },
   { value: "heart", label: "绮心逐迹", shortcutKey: "5" },
   { value: "ripple", label: "沧涟曳逝", shortcutKey: "6" },
+  { value: "bubbles", label: "多彩气泡", shortcutKey: "7" },
+  { value: "bloom", label: "简约涟漪", shortcutKey: "8" },
+  { value: "fall", label: "简约坠落", shortcutKey: "9" },
 ];
 
 let unlistenTrailPref: UnlistenFn | null = null;
@@ -374,6 +397,14 @@ onMounted(async () => {
     screensaverClock.value = DEFAULT_SCREENSAVER_PREF.clock;
   }
   try {
+    const password = await invoke<string>("get_screensaver_password");
+    screensaverPasswordDraft.value = password;
+    screensaverPasswordRequired.value = password.trim().length > 0;
+  } catch {
+    screensaverPasswordDraft.value = "";
+    screensaverPasswordRequired.value = false;
+  }
+  try {
     autostartEnabled.value = await invoke<boolean>("get_autostart_pref");
   } catch {
     autostartEnabled.value = false;
@@ -389,6 +420,11 @@ onMounted(async () => {
   } catch {
     applyTrailPref(DEFAULT_MOUSE_TRAIL_PREF);
   }
+  try {
+    trailShortcutPref.value = await invoke<boolean>("get_mouse_trail_shortcut_pref");
+  } catch {
+    // browser preview
+  }
   await loadShortcut();
   await loadCompareShortcut();
   await loadHostsQuickShortcut();
@@ -397,6 +433,7 @@ onMounted(async () => {
   await loadScreensaverShortcut();
   await loadSpotlightShortcut();
   await loadMiniWindowShortcut();
+  await loadTrailShortcut();
   try {
     unlistenTrailPref = await listen<MouseTrailPref>("app://mouse-trail-pref", (event) => {
       applyTrailPref(event.payload);
@@ -526,6 +563,46 @@ async function onScreensaverPrefChange(value: string | number | boolean) {
   } catch (error) {
     screensaverPref.value = previous;
     ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
+}
+
+async function saveScreensaverPassword() {
+  if (screensaverPasswordSaving.value) {
+    return;
+  }
+  screensaverPasswordSaving.value = true;
+  try {
+    const required = await invoke<boolean>("set_screensaver_password", {
+      password: screensaverPasswordDraft.value,
+    });
+    screensaverPasswordRequired.value = required;
+    if (!required) {
+      screensaverPasswordDraft.value = "";
+    } else {
+      screensaverPasswordDraft.value = screensaverPasswordDraft.value.trim();
+    }
+    ElMessage.success(required ? "屏保密码已保存" : "屏保密码已清除");
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  } finally {
+    screensaverPasswordSaving.value = false;
+  }
+}
+
+async function clearScreensaverPassword() {
+  if (screensaverPasswordSaving.value) {
+    return;
+  }
+  screensaverPasswordSaving.value = true;
+  try {
+    await invoke<boolean>("set_screensaver_password", { password: "" });
+    screensaverPasswordRequired.value = false;
+    screensaverPasswordDraft.value = "";
+    ElMessage.success("屏保密码已清除");
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  } finally {
+    screensaverPasswordSaving.value = false;
   }
 }
 
@@ -706,6 +783,21 @@ async function onTrailEnabledChange(value: string | number | boolean) {
   }
 }
 
+async function onTrailShortcutPrefChange(value: string | number | boolean) {
+  const enabled = Boolean(value);
+  const previous = trailShortcutPref.value;
+  trailShortcutPref.value = enabled;
+  if (!enabled && trailShortcutRecording.value) {
+    await cancelTrailShortcutRecording();
+  }
+  try {
+    await invoke("set_mouse_trail_shortcut_pref", { enabled });
+  } catch (error) {
+    trailShortcutPref.value = previous;
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
+}
+
 async function onTrailEffectChange(value: string | number | boolean | undefined) {
   if (
     value !== "ribbon" &&
@@ -713,7 +805,10 @@ async function onTrailEffectChange(value: string | number | boolean | undefined)
     value !== "graffiti" &&
     value !== "dots" &&
     value !== "heart" &&
-    value !== "ripple"
+    value !== "ripple" &&
+    value !== "bubbles" &&
+    value !== "bloom" &&
+    value !== "fall"
   ) {
     return;
   }
@@ -816,7 +911,7 @@ async function onThemeChange(value: string | number | boolean | undefined) {
           <section>
             <h2>内网服务器</h2>
             <p>
-              用于检查更新与拉取 Hosts 预置配置。
+              用于检查更新、装机必备软件包、拉取 Hosts 预置配置。
             </p>
             <div class="row intranet-row">
               <ElInput
@@ -932,7 +1027,47 @@ async function onThemeChange(value: string | number | boolean | undefined) {
               </label>
             </div>
             <p>
-              在所有显示器工作区跟随鼠标绘制炫酷好玩的拖尾特效以帮助更好的寻找鼠标位置。
+              在所有显示器工作区跟随鼠标绘制炫酷好玩的拖尾特效以帮助更好的寻找鼠标位置。亦可用开关快捷键切换。
+            </p>
+            <div class="section-head">
+              <h3>开关快捷键</h3>
+              <label class="row">
+                <ElSwitch
+                  :model-value="trailShortcutPref"
+                  @change="onTrailShortcutPrefChange"
+                />
+              </label>
+            </div>
+            <div class="row shortcut-row">
+              <span>快捷键</span>
+              <div ref="trailShortcutButtonRef">
+                <ElTooltip
+                  placement="top"
+                  :content="SHORTCUT_RECORD_TIP"
+                  popper-class="shortcut-record-tip-popper"
+                >
+                  <span class="shortcut-record-trigger">
+                    <ElButton
+                      :type="trailShortcutRecording ? 'primary' : 'default'"
+                      :disabled="!trailShortcutPref"
+                      @click="startTrailShortcutRecording"
+                      @keydown="onTrailShortcutRecordKey"
+                    >
+                      {{
+                        trailShortcutRecording
+                          ? trailShortcutPreviewDisplay
+                          : trailShortcutDisplay
+                      }}
+                    </ElButton>
+                  </span>
+                </ElTooltip>
+              </div>
+            </div>
+            <p v-if="trailShortcutErrorMessage" class="error">
+              {{ trailShortcutErrorMessage }}
+            </p>
+            <p>
+              默认 Ctrl+Alt+T 切换轨迹开/关；关闭上方开关后快捷键失效（与轨迹总开关独立）。
             </p>
             <h3>丝滑程度</h3>
             <ElRadioGroup
@@ -1138,7 +1273,7 @@ async function onThemeChange(value: string | number | boolean | undefined) {
               </label>
             </div>
             <p>
-              按下快捷键后在所有显示器全屏显示屏幕保护特效；按任意键、点击鼠标或再次快捷键退出。开启期间会暂时关闭鼠标轨迹。
+              按下快捷键后在所有显示器全屏显示屏幕保护特效。未设置密码时，按任意键、点击鼠标或再次快捷键即可退出；设置密码后需输入正确密码才能关闭。开启期间会暂时关闭鼠标轨迹。
             </p>
             <div class="row shortcut-row">
               <span>快捷键</span>
@@ -1168,6 +1303,32 @@ async function onThemeChange(value: string | number | boolean | undefined) {
             <p v-if="screensaverErrorMessage" class="error">
               {{ screensaverErrorMessage }}
             </p>
+            <h3>屏保密码</h3>
+            <div class="row screensaver-password-row">
+              <ElInput
+                v-model="screensaverPasswordDraft"
+                type="password"
+                show-password
+                clearable
+                :disabled="!screensaverPref || screensaverPasswordSaving"
+                placeholder="请输入屏保密码"
+              />
+              <ElButton
+                type="primary"
+                :disabled="!screensaverPref"
+                :loading="screensaverPasswordSaving"
+                @click="saveScreensaverPassword"
+              >
+                保存
+              </ElButton>
+              <ElButton
+                :disabled="!screensaverPref || !screensaverPasswordRequired"
+                :loading="screensaverPasswordSaving"
+                @click="clearScreensaverPassword"
+              >
+                清除
+              </ElButton>
+            </div>
             <h3>背景特效</h3>
             <ElRadioGroup
               :model-value="screensaverBackground"
@@ -1177,6 +1338,7 @@ async function onThemeChange(value: string | number | boolean | undefined) {
               <ElRadio value="parallax">海景视差</ElRadio>
               <ElRadio value="corona">日冕生辉</ElRadio>
               <ElRadio value="snow">雪国遗踪</ElRadio>
+              <ElRadio value="star">宇宙星光</ElRadio>
             </ElRadioGroup>
             <h3>时钟效果</h3>
             <ElRadioGroup
@@ -1364,6 +1526,17 @@ h3 {
 
 .shortcut-row {
   margin-top: 16px;
+}
+
+.screensaver-password-row {
+  margin-top: 8px;
+  align-items: center;
+}
+
+.screensaver-password-row :deep(.el-input) {
+  flex: 1;
+  min-width: 0;
+  max-width: 280px;
 }
 
 .actions {
